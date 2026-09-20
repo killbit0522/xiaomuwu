@@ -10,12 +10,13 @@ import base64
 import io
 import re
 import zipfile
+import mimetypes
 from html.parser import HTMLParser
 from xml.etree import ElementTree
 from datetime import timedelta
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import unquote, urlsplit, parse_qs, urlencode
+from urllib.parse import unquote, urlsplit, parse_qs, urlencode, quote
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from http.cookies import SimpleCookie
 
@@ -332,8 +333,32 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             self.send_header("Location", destination)
             self.end_headers()
             return
-        if request_path.startswith("/books/") and not self.consume_download():
-            self.send_error(403, "Card key required or download limit exhausted")
+        if request_path.startswith("/books/"):
+            info = self.access_info()
+            if not info or info["card_type"] != "download":
+                self.send_error(403, "Download card required or download limit exhausted")
+                return
+            source = Path(self.translate_path(self.path))
+            try:
+                raw = source.read_bytes()
+            except OSError:
+                self.send_error(404, "Book file unavailable")
+                return
+            if source.suffix.lower() == ".txt":
+                body = b"\xef\xbb\xbf" + decode_book_text(raw).encode("utf-8")
+                content_type = "text/plain; charset=utf-8"
+            else:
+                body = raw
+                content_type = mimetypes.guess_type(source.name)[0] or "application/octet-stream"
+            if not self.consume_download():
+                self.send_error(403, "Download limit exhausted")
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Disposition", "attachment; filename=book%s; filename*=UTF-8''%s" % (source.suffix, quote(source.name)))
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
             return
         if request_path.startswith("/read/"):
             info = self.access_info()
