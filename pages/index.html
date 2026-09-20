@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>找文链接</title>
+    <style id="theme-vars">
+/* ==========================================================================
+   Palette note
+   These tokens are sampled from the artwork supplied for this project, not
+   invented. Measured mean colours of the source images:
+     IMG_1939 home hero        #766952   (dark warm olive)
+     IMG_1948 home fill        #ccc9c3   (neutral warm grey)
+     IMG_1949 left rail/search #c2bfba   (neutral warm grey)
+     IMG_1950 catalog          #dfdcd5   (pale neutral grey)
+     IMG_1950-2 request        #c7c4be   (neutral warm grey)
+     IMG_1952 review           #f3f3f3   (near white)
+     IMG_1947 birds            #e8e9e9   (near white)
+   The artwork is neutral paper, so the page base is a neutral paper grey.
+   No cream / yellow cast is applied anywhere.
+   ========================================================================== */
+
+:root {
+  /* Neutral paper base taken from the artwork itself */
+  --zhaowen-background: #c9c5be;
+  --zhaowen-foreground: #1c1a17;
+
+  --zhaowen-card: #f2efe9;
+  --zhaowen-card-foreground: #1c1a17;
+  --zhaowen-popover: #f7f5f0;
+  --zhaowen-popover-foreground: #1c1a17;
+
+  /* Ink, not red. Buttons are transparent with black text. */
+  --zhaowen-primary: #1c1a17;
+  --zhaowen-primary-foreground: #f7f5f0;
+
+  --zhaowen-muted: #d9d5ce;
+  --zhaowen-muted-foreground: #5f5a52;
+  --zhaowen-border: rgba(28, 26, 23, 0.22);
+  --zhaowen-input: rgba(28, 26, 23, 0.06);
+  --zhaowen-ring: #1c1a17;
+
+  /* Radius scale - restrained */
+  --zhaowen-radius-sm: 3px;
+  --zhaowen-radius-md: 6px;
+  --zhaowen-radius-lg: 14px;
+
+  /* Semantic surfaces */
+  --zhaowen-surface-1: #d5d1ca;
+  --zhaowen-surface-2: #dedad3;
+  --zhaowen-surface-3: #e7e3dc;
+  --zhaowen-ink-1: #1c1a17;
+  --zhaowen-ink-2: #443f38;
+  --zhaowen-ink-3: #6b655c;
+  --zhaowen-line: rgba(28, 26, 23, 0.22);
+
+  /* Per-page base tone. Each page overrides this with the tone of the
+     artwork used on that page, so the page never fights its own image. */
+  --zhaowen-page-base: #c9c5be;
+  /* How strongly the artwork shows through. Kept high so images are not washed out. */
+  --zhaowen-art-opacity: 0.92;
+  --zhaowen-art-blur: 0px;
+
+  /* Secondary accent kept neutral; legacy name retained for compatibility */
+  --zhaowen-seal: #1c1a17;
+  --zhaowen-ink-blue: #2f3a3d;
+  --zhaowen-gold: #6d6450;
+
+  /* Neutral whites: paper glow washes and the 木木书屋 orb shell.
+     Declared here so page HTML/CSS never needs a literal colour value. */
+  --zhaowen-glow: #ffffff;
+  --zhaowen-orb-base: #f1efeb;
+  --zhaowen-orb-highlight: #fdfcfa;
+  --zhaowen-orb-shade: #dcd8d1;
+
+  /* Layout rhythm */
+  --zhaowen-section-gap: 2.5rem;
+  --zhaowen-card-pad: 1.5rem;
+
+  /* Typography
+     Display = Mincho (明朝体); Body = Source Han Serif (思源宋体). */
+  --zhaowen-font-display: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Hiragino Mincho Pro",
+    "MS PMincho", "Source Han Serif SC", "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --zhaowen-font-serif: "Source Han Serif SC", "Noto Serif SC", "Source Han Serif",
+    "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Songti SC", "STSong", "SimSun", serif;
+  --zhaowen-font-sans: "Source Han Sans SC", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --zhaowen-font-mono: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
+
+  /* Slightly reduced type scale */
+  --zhaowen-text-xs: 0.68rem;
+  --zhaowen-text-sm: 0.78rem;
+  --zhaowen-text-base: 0.88rem;
+  --zhaowen-text-lg: 1.02rem;
+  --zhaowen-text-xl: 1.3rem;
+  --zhaowen-text-2xl: 1.72rem;
+  --zhaowen-text-3xl: 2.05rem;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  font-family: var(--zhaowen-font-serif);
+  background-color: var(--zhaowen-page-base);
+  color: var(--zhaowen-foreground);
+  font-size: var(--zhaowen-text-base);
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--zhaowen-font-display);
+  font-weight: 500;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--zhaowen-background);
+    --color-foreground: var(--zhaowen-foreground);
+    --color-card: var(--zhaowen-card);
+    --color-card-foreground: var(--zhaowen-card-foreground);
+    --color-popover: var(--zhaowen-popover);
+    --color-popover-foreground: var(--zhaowen-popover-foreground);
+    --color-primary: var(--zhaowen-primary);
+    --color-primary-foreground: var(--zhaowen-primary-foreground);
+    --color-muted: var(--zhaowen-muted);
+    --color-muted-foreground: var(--zhaowen-muted-foreground);
+    --color-border: var(--zhaowen-border);
+    --color-input: var(--zhaowen-input);
+    --color-ring: var(--zhaowen-ring);
+    --radius-sm: var(--zhaowen-radius-sm);
+    --radius-md: var(--zhaowen-radius-md);
+    --radius-lg: var(--zhaowen-radius-lg);
+  }
+  @layer base {
+    body { background: var(--zhaowen-background); color: var(--zhaowen-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--zhaowen-background); }
+      .text-background { color: var(--zhaowen-background); }
+      .border-background { border-color: var(--zhaowen-background); }
+      .ring-background { --tw-ring-color: var(--zhaowen-background); }
+      .bg-foreground { background-color: var(--zhaowen-foreground); }
+      .text-foreground { color: var(--zhaowen-foreground); }
+      .border-foreground { border-color: var(--zhaowen-foreground); }
+      .ring-foreground { --tw-ring-color: var(--zhaowen-foreground); }
+      .bg-card { background-color: var(--zhaowen-card); }
+      .text-card { color: var(--zhaowen-card); }
+      .border-card { border-color: var(--zhaowen-card); }
+      .ring-card { --tw-ring-color: var(--zhaowen-card); }
+      .bg-card-foreground { background-color: var(--zhaowen-card-foreground); }
+      .text-card-foreground { color: var(--zhaowen-card-foreground); }
+      .border-card-foreground { border-color: var(--zhaowen-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--zhaowen-card-foreground); }
+      .bg-popover { background-color: var(--zhaowen-popover); }
+      .text-popover { color: var(--zhaowen-popover); }
+      .border-popover { border-color: var(--zhaowen-popover); }
+      .ring-popover { --tw-ring-color: var(--zhaowen-popover); }
+      .bg-popover-foreground { background-color: var(--zhaowen-popover-foreground); }
+      .text-popover-foreground { color: var(--zhaowen-popover-foreground); }
+      .border-popover-foreground { border-color: var(--zhaowen-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--zhaowen-popover-foreground); }
+      .bg-primary { background-color: var(--zhaowen-primary); }
+      .text-primary { color: var(--zhaowen-primary); }
+      .border-primary { border-color: var(--zhaowen-primary); }
+      .ring-primary { --tw-ring-color: var(--zhaowen-primary); }
+      .bg-primary-foreground { background-color: var(--zhaowen-primary-foreground); }
+      .text-primary-foreground { color: var(--zhaowen-primary-foreground); }
+      .border-primary-foreground { border-color: var(--zhaowen-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--zhaowen-primary-foreground); }
+      .bg-muted { background-color: var(--zhaowen-muted); }
+      .text-muted { color: var(--zhaowen-muted); }
+      .border-muted { border-color: var(--zhaowen-muted); }
+      .ring-muted { --tw-ring-color: var(--zhaowen-muted); }
+      .bg-muted-foreground { background-color: var(--zhaowen-muted-foreground); }
+      .text-muted-foreground { color: var(--zhaowen-muted-foreground); }
+      .border-muted-foreground { border-color: var(--zhaowen-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--zhaowen-muted-foreground); }
+      .bg-border { background-color: var(--zhaowen-border); }
+      .text-border { color: var(--zhaowen-border); }
+      .border-border { border-color: var(--zhaowen-border); }
+      .ring-border { --tw-ring-color: var(--zhaowen-border); }
+      .bg-input { background-color: var(--zhaowen-input); }
+      .text-input { color: var(--zhaowen-input); }
+      .border-input { border-color: var(--zhaowen-input); }
+      .ring-input { --tw-ring-color: var(--zhaowen-input); }
+      .bg-ring { background-color: var(--zhaowen-ring); }
+      .text-ring { color: var(--zhaowen-ring); }
+      .border-ring { border-color: var(--zhaowen-ring); }
+      .ring-ring { --tw-ring-color: var(--zhaowen-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+<link rel="stylesheet" href="../site-preferences.css">
+</head>
+<body class="font-sans antialiased overflow-hidden">
+  <div class="paper-grain" aria-hidden="true"></div>
+
+  <div class="zhaowen-shell">
+    <aside id="sidebar-controls" class="zhaowen-sidebar" data-dom-id="sidebar-controls">
+      <div class="px-6 pt-8 pb-6 border-b border-[var(--zhaowen-line)]">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="relative w-10 h-10 rounded-md overflow-hidden border border-[var(--zhaowen-line)] shrink-0">
+            <img src="../assets/ink-birds.jpg" alt="" class="w-full h-full object-cover opacity-80">
+          </div>
+          <div>
+            <h1 class="text-lg font-medium tracking-wide serif-title text-[var(--zhaowen-ink-1)]">找文链接</h1>
+            <p class="text-xs text-[var(--zhaowen-ink-3)]">古典小说索引</p>
+          </div>
+        </div>
+        <div class="relative">
+          <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--zhaowen-ink-3)]"></i>
+          <input type="text" placeholder="检索书名、回目、作者…" class="zhaowen-input w-full rounded-md pl-9 pr-3 py-2 text-sm placeholder:text-[var(--zhaowen-ink-3)]">
+        </div>
+      </div>
+
+      <div class="px-6 py-5 border-b border-[var(--zhaowen-line)]">
+        <div class="flex items-center gap-2 mb-4 caps-label">
+          <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+          <span>小说部类</span>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button class="px-3 py-1.5 text-xs rounded-full border border-[var(--zhaowen-line)] bg-[var(--zhaowen-surface-2)] text-[var(--zhaowen-ink-2)] hover:border-[var(--zhaowen-primary)] hover:text-[var(--zhaowen-primary)] transition-colors">章回</button>
+          <button class="px-3 py-1.5 text-xs rounded-full border border-[var(--zhaowen-line)] bg-[var(--zhaowen-surface-2)] text-[var(--zhaowen-ink-2)] hover:border-[var(--zhaowen-primary)] hover:text-[var(--zhaowen-primary)] transition-colors">话本</button>
+          <button class="px-3 py-1.5 text-xs rounded-full border border-[var(--zhaowen-line)] bg-[var(--zhaowen-surface-2)] text-[var(--zhaowen-ink-2)] hover:border-[var(--zhaowen-primary)] hover:text-[var(--zhaowen-primary)] transition-colors">志怪</button>
+          <button class="px-3 py-1.5 text-xs rounded-full border border-[var(--zhaowen-line)] bg-[var(--zhaowen-surface-2)] text-[var(--zhaowen-ink-2)] hover:border-[var(--zhaowen-primary)] hover:text-[var(--zhaowen-primary)] transition-colors">笔记</button>
+          <button class="px-3 py-1.5 text-xs rounded-full border border-[var(--zhaowen-line)] bg-[var(--zhaowen-surface-2)] text-[var(--zhaowen-ink-2)] hover:border-[var(--zhaowen-primary)] hover:text-[var(--zhaowen-primary)] transition-colors">传奇</button>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-y-auto no-scrollbar px-6 py-6">
+        <div class="flex items-center gap-2 mb-5 caps-label">
+          <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
+          <span>滚动物理参数</span>
+        </div>
+
+        <div class="space-y-5">
+          <div class="control-group" data-param="extensionFalloff">
+            <div class="flex justify-between items-center mb-2">
+              <label class="text-xs text-[var(--zhaowen-ink-2)]">摆幅衰减</label>
+              <span class="mono-num text-xs text-[var(--zhaowen-primary)]">0.60</span>
+            </div>
+            <input type="range" min="0" max="1" step="0.01" value="0.60" class="zhaowen-slider">
+          </div>
+
+          <div class="control-group" data-param="colorFalloff">
+            <div class="flex justify-between items-center mb-2">
+              <label class="text-xs text-[var(--zhaowen-ink-2)]">墨色衰减</label>
+              <span class="mono-num text-xs text-[var(--zhaowen-primary)]">0.30</span>
+            </div>
+            <input type="range" min="0" max="1" step="0.01" value="0.30" class="zhaowen-slider">
+          </div>
+
+          <div class="control-group" data-param="smoothingTau">
+            <div class="flex justify-between items-center mb-2">
+              <label class="text-xs text-[var(--zhaowen-ink-2)]">平滑系数</label>
+              <span class="mono-num text-xs text-[var(--zhaowen-primary)]">0.05</span>
+            </div>
+            <input type="range" min="0" max="0.2" step="0.001" value="0.05" class="zhaowen-slider">
+          </div>
+
+          <div class="control-group" data-param="hitPadding">
+            <div class="flex justify-between items-center mb-2">
+              <label class="text-xs text-[var(--zhaowen-ink-2)]">热区宽度</label>
+              <span class="mono-num text-xs text-[var(--zhaowen-primary)]">10</span>
+            </div>
+            <input type="range" min="0" max="40" step="1" value="10" class="zhaowen-slider">
+          </div>
+
+          <div class="control-group" data-param="timing">
+            <div class="flex justify-between items-center mb-2">
+              <label class="text-xs text-[var(--zhaowen-ink-2)]">缓动方式</label>
+            </div>
+            <div class="relative">
+              <select class="zhaowen-select w-full rounded-md px-3 py-2 text-sm appearance-none cursor-pointer">
+                <option value="ease-out">渐出</option>
+                <option value="ease-in-out">缓入缓出</option>
+                <option value="spring">回弹</option>
+              </select>
+              <i data-lucide="chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--zhaowen-ink-3)] pointer-events-none"></i>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-8 p-4 rounded-lg bg-[var(--zhaowen-surface-2)] border border-[var(--zhaowen-line)]">
+          <div class="flex items-center gap-2 mb-2 text-[var(--zhaowen-ink-2)]">
+            <i data-lucide="scroll-text" class="w-4 h-4 text-[var(--zhaowen-primary)]"></i>
+            <span class="text-xs">当前速率</span>
+          </div>
+          <div class="mono-num text-2xl text-[var(--zhaowen-primary)]" id="velocity-readout">0.00</div>
+        </div>
+      </div>
+
+      <div class="px-6 py-4 border-t border-[var(--zhaowen-line)] text-[10px] text-[var(--zhaowen-ink-3)] leading-relaxed">
+        拖动滑块实时调整滚动条物理行为。基于滚动速度与「摆幅衰减」的摆幅会在快速滚动时生效。
+      </div>
+    </aside>
+
+    <main class="zhaowen-main">
+      <div id="content-scroll-area" class="zhaowen-scroll no-scrollbar" data-dom-id="content-scroll-area">
+        <div class="relative z-10 min-h-[200vh] max-w-3xl mx-auto px-8 py-12">
+          <header class="mb-12 text-pad">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--zhaowen-line)] bg-[var(--zhaowen-surface-2)] text-[var(--zhaowen-ink-3)] text-xs mb-4">
+              <span class="w-1.5 h-1.5 rounded-full bg-[var(--zhaowen-primary)]"></span>
+              <span>今日推荐 · 十二则</span>
+            </div>
+            <h2 class="text-3xl font-medium serif-title text-[var(--zhaowen-ink-1)] mb-3">墨海拾遗</h2>
+            <p class="text-sm text-[var(--zhaowen-ink-2)] max-w-xl leading-relaxed">
+              从章回话本里拾取片段，以现代索引重连小说文本。拖动右侧物理滚动条，体验墨迹一般的惯性流动。
+            </p>
+          </header>
+
+          <div class="space-y-5">
+            <article class="zhaowen-card rounded-xl p-5 flex gap-5">
+              <div class="shrink-0 hidden sm:block">
+                <div class="w-24 h-24 rounded-lg overflow-hidden border border-[var(--zhaowen-line)] bg-[var(--zhaowen-surface-2)]">
+                  <img src="../assets/ancient-book.png" alt="" class="w-full h-full object-cover opacity-90">
+                </div>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-3 mb-2">
+                  <span class="px-2 py-0.5 rounded text-[10px] tracking-wider bg-[var(--zhaowen-surface-2)] text-[var(--zhaowen-ink-3)] border border-[var(--zhaowen-line)]">世情</span>
+                </div>
+                <h3 class="text-lg font-medium serif-title text-[var(--zhaowen-ink-1)] mb-2">《红楼梦·第一回》</h3>
+                <p class="text-sm text-[var(--zhaowen-ink-2)] leading-7 mb-3">满纸荒唐言，一把辛酸泪。都云作者痴，谁解其中味？</p>
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-[var(--zhaowen-ink-3)]">清 · 曹雪芹</span>
+                  <button class="text-[var(--zhaowen-primary)] hover:underline">展开链接</button>
+                </div>
+              </div>
+            </article>
+
+            <article class="zhaowen-card rounded-xl p-5 flex gap-5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-3 mb-2">
+                  <span class="px-2 py-0.5 rounded text-[10px] tracking-wider bg-[var(--zhaowen-surface-2)] text-[var(--zhaowen-ink-3)] border border-[var(--zhaowen-line)]">神魔</span>
+                </div>
+                <h3 class="text-lg font-medium serif-title text-[var(--zhaowen-ink-1)] mb-2">《西游记·第一回》</h3>
+                <p class="text-sm text-[var(--zhaowen-ink-2)] leading-7 mb-3">混沌未分天地乱，茫茫渺渺无人见。自从盘古破鸿蒙，开辟从兹清浊辨。</p>
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-[var(--zhaowen-ink-3)]">明 · 吴承恩</span>
+                  <button class="text-[var(--zhaowen-primary)] hover:underline">展开链接</button>
+                </div>
+              </div>
+            </article>
+
+            <article class="zhaowen-card rounded-xl p-5 flex gap-5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-3 mb-2">
+                  <span class="px-2 py-0.5 rounded text-[10px] tracking-wider bg-[var(--zhaowen-surface-2)] text-[var(--zhaowen-ink-3)] border border-[var(--zhaowen-line)]">英雄传奇</span>
+                </div>
+                <h3 class="text-lg font-medium serif-title text-[var(--zhaowen-ink-1)] mb-2">《水浒传·第十六回》</h3>
+                <p class="text-sm text-[var(--zhaowen-ink-2)] leading-7 mb-3">赤日炎炎似火烧，野田禾稻半枯焦。农夫心内如汤煮，公子王孙把扇摇。</p>
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-[var(--zhaowen-ink-3)]">明 · 施耐庵</span>
+                  <button class="text-[var(--zhaowen-primary)] hover:underline">展开链接</button>
+                </div>
+              </div>
+            </article>
+
+            <article class="zhaowen-card rounded-xl p-5 flex gap-5">
+              <div class="shrink-0 hidden sm:block">
+                <div class="w-24 h-24 rounded-lg overflow-hidden border border-[var(--zhaowen-line)] bg-[var(--zhaowen-surface-2)]">
+                  <img src="../assets/ancient-book.png" alt="" class="w-full h-full object-cover opacity-90">
+                </div>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-3 mb-2">
+                  <span class="px-2 py-0.5 rounded text-[10px] tracking-wider bg-[var(--zhaowen-surface-2)] text-[var(--zhaowen-ink-3)] border border-[var(--zhaowen-line)]">历史演义</span>
+                </div>
+                <h3 class="text-lg font-medium serif-title text-[var(--zhaowen-ink-1)] mb-2">《三国演义·第一回》</h3>
+                <p class="text-sm text-[var(--zhaowen-ink-2)] leading-7 mb-3">话说天下大势，分久必合，合久必分。</p>
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-[var(--zhaowen-ink-3)]">明 · 罗贯中</span>
+                  <button class="text-[var(--zhaowen-primary)] hover:underline">展开链接</button>
+                </div>
+              </div>
+            </article>
+
+            <article class="zhaowen-card rounded-xl p-5 flex gap-5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-3 mb-2">
+                  <span class="px-2 py-0.5 rounded text-[10px] tracking-wider bg-[var(--zhaowen-surface-2)] text-[var(--zhaowen-ink-3)] border border-[var(--zhaowen-line)]">志怪</span>
+                </div>
+                <h3 class="text-lg font-medium serif-title text-[var(--zhaowen-ink-1)] mb-2">《聊斋志异·阿宝》</h3>
+                <p class="text-sm text-[var(--zhaowen-ink-2)] leading-7 mb-3">性痴则其志凝，故书痴者文必工，艺痴者技必良。</p>
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-[var(--zhaowen-ink-3)]">清 · 蒲松龄</span>
+                  <button class="text-[var(--zhaowen-primary)] hover:underline">展开链接</button>
+                </div>
+              </div>
+            </article>
+
+            <article class="zhaowen-card rounded-xl p-5 flex gap-5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-3 mb-2">
+                  <span class="px-2 py-0.5 rounded text-[10px] tracking-wider bg-[var(--zhaowen-surface-2)] text-[var(--zhaowen-ink-3)] border border-[var(--zhaowen-line)]">讽刺</span>
+                </div>
+                <h3 class="text-lg font-medium serif-title text-[var(--zhaowen-ink-1)] mb-2">《儒林外史·第一回》</h3>
+                <p class="text-sm text-[var(--zhaowen-ink-2)] leading-7 mb-3">功名富贵无凭据，费尽心情，总把流光误。</p>
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-[var(--zhaowen-ink-3)]">清 · 吴敬梓</span>
+                  <button class="text-[var(--zhaowen-primary)] hover:underline">展开链接</button>
+                </div>
+              </div>
+            </article>
+
+            <article class="zhaowen-card rounded-xl p-5 flex gap-5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-3 mb-2">
+                  <span class="px-2 py-0.5 rounded text-[10px] tracking-wider bg-[var(--zhaowen-surface-2)] text-[var(--zhaowen-ink-3)] border border-[var(--zhaowen-line)]">幻想</span>
+                </div>
+                <h3 class="text-lg font-medium serif-title text-[var(--zhaowen-ink-1)] mb-2">《镜花缘·第一回》</h3>
+                <p class="text-sm text-[var(--zhaowen-ink-2)] leading-7 mb-3">人见利而不见害，鱼见食而不见钩。</p>
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-[var(--zhaowen-ink-3)]">清 · 李汝珍</span>
+                  <button class="text-[var(--zhaowen-primary)] hover:underline">展开链接</button>
+                </div>
+              </div>
+            </article>
+
+            <article class="zhaowen-card rounded-xl p-5 flex gap-5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-3 mb-2">
+                  <span class="px-2 py-0.5 rounded text-[10px] tracking-wider bg-[var(--zhaowen-surface-2)] text-[var(--zhaowen-ink-3)] border border-[var(--zhaowen-line)]">神魔</span>
+                </div>
+                <h3 class="text-lg font-medium serif-title text-[var(--zhaowen-ink-1)] mb-2">《封神演义·第一回》</h3>
+                <p class="text-sm text-[var(--zhaowen-ink-2)] leading-7 mb-3">混沌初分盘古先，太极两仪四象悬。</p>
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-[var(--zhaowen-ink-3)]">明 · 许仲琳</span>
+                  <button class="text-[var(--zhaowen-primary)] hover:underline">展开链接</button>
+                </div>
+              </div>
+            </article>
+
+            <article class="zhaowen-card rounded-xl p-5 flex gap-5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-3 mb-2">
+                  <span class="px-2 py-0.5 rounded text-[10px] tracking-wider bg-[var(--zhaowen-surface-2)] text-[var(--zhaowen-ink-3)] border border-[var(--zhaowen-line)]">笔记</span>
+                </div>
+                <h3 class="text-lg font-medium serif-title text-[var(--zhaowen-ink-1)] mb-2">《世说新语·文学》</h3>
+                <p class="text-sm text-[var(--zhaowen-ink-2)] leading-7 mb-3">夜光之珠，不必出于孟津之河。</p>
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-[var(--zhaowen-ink-3)]">南朝宋 · 刘义庆</span>
+                  <button class="text-[var(--zhaowen-primary)] hover:underline">展开链接</button>
+                </div>
+              </div>
+            </article>
+
+            <article class="zhaowen-card rounded-xl p-5 flex gap-5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-3 mb-2">
+                  <span class="px-2 py-0.5 rounded text-[10px] tracking-wider bg-[var(--zhaowen-surface-2)] text-[var(--zhaowen-ink-3)] border border-[var(--zhaowen-line)]">世情</span>
+                </div>
+                <h3 class="text-lg font-medium serif-title text-[var(--zhaowen-ink-1)] mb-2">《金瓶梅·第一回》</h3>
+                <p class="text-sm text-[var(--zhaowen-ink-2)] leading-7 mb-3">一朝马死黄金尽，亲者如同陌路人。</p>
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-[var(--zhaowen-ink-3)]">明 · 兰陵笑笑生</span>
+                  <button class="text-[var(--zhaowen-primary)] hover:underline">展开链接</button>
+                </div>
+              </div>
+            </article>
+
+            <article class="zhaowen-card rounded-xl p-5 flex gap-5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-3 mb-2">
+                  <span class="px-2 py-0.5 rounded text-[10px] tracking-wider bg-[var(--zhaowen-surface-2)] text-[var(--zhaowen-ink-3)] border border-[var(--zhaowen-line)]">志怪</span>
+                </div>
+                <h3 class="text-lg font-medium serif-title text-[var(--zhaowen-ink-1)] mb-2">《搜神记·卷十二》</h3>
+                <p class="text-sm text-[var(--zhaowen-ink-2)] leading-7 mb-3">南海之外有鲛人，水居如鱼，不废织绩。</p>
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-[var(--zhaowen-ink-3)]">东晋 · 干宝</span>
+                  <button class="text-[var(--zhaowen-primary)] hover:underline">展开链接</button>
+                </div>
+              </div>
+            </article>
+
+            <article class="zhaowen-card rounded-xl p-5 flex gap-5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-3 mb-2">
+                  <span class="px-2 py-0.5 rounded text-[10px] tracking-wider bg-[var(--zhaowen-surface-2)] text-[var(--zhaowen-ink-3)] border border-[var(--zhaowen-line)]">笔记</span>
+                </div>
+                <h3 class="text-lg font-medium serif-title text-[var(--zhaowen-ink-1)] mb-2">《浮生六记·闺房记乐》</h3>
+                <p class="text-sm text-[var(--zhaowen-ink-2)] leading-7 mb-3">情之所钟，虽丑不嫌。</p>
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-[var(--zhaowen-ink-3)]">清 · 沈复</span>
+                  <button class="text-[var(--zhaowen-primary)] hover:underline">展开链接</button>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <footer class="mt-16 pt-8 border-t border-[var(--zhaowen-line)] text-center text-xs text-[var(--zhaowen-ink-3)] text-pad">
+            <p>找文链接 · 古典小说索引实验</p>
+            <p class="mt-1">依据滚动速度推算墨迹惯性的原生实现</p>
+          </footer>
+        </div>
+      </div>
+
+      <div id="custom-scrollbar" class="zhaowen-scrollbar" data-dom-id="custom-scrollbar" aria-hidden="true">
+        <div class="zhaowen-scrollbar-track"></div>
+        <div class="zhaowen-scrollbar-thumb">
+          <div class="zhaowen-scrollbar-hit"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    (function() {
+      const scrollArea = document.getElementById('content-scroll-area');
+      const scrollbar = document.getElementById('custom-scrollbar');
+      const track = scrollbar.querySelector('.zhaowen-scrollbar-track');
+      const thumb = scrollbar.querySelector('.zhaowen-scrollbar-thumb');
+      const velocityReadout = document.getElementById('velocity-readout');
+
+      const params = {
+        extensionFalloff: 0.60,
+        colorFalloff: 0.30,
+        smoothingTau: 0.05,
+        hitPadding: 10,
+        timing: 'ease-out'
+      };
+
+      document.querySelectorAll('#sidebar-controls .control-group').forEach(group => {
+        const key = group.dataset.param;
+        const input = group.querySelector('input, select');
+        const valueEl = group.querySelector('.mono-num');
+        if (!input) return;
+        input.addEventListener('input', () => {
+          params[key] = input.type === 'number' || input.tagName === 'SELECT' ? input.value : parseFloat(input.value);
+          if (valueEl) valueEl.textContent = typeof params[key] === 'number' ? params[key].toFixed(input.step.includes('.') ? 2 : 0) : params[key];
+          updateHitPadding();
+        });
+      });
+
+      function updateHitPadding() {
+        const hit = thumb.querySelector('.zhaowen-scrollbar-hit');
+        const pad = -params.hitPadding;
+        hit.style.inset = `${pad}px ${pad}px ${pad}px ${pad}px`;
+      }
+      updateHitPadding();
+
+      let targetScroll = 0;
+      let currentScroll = 0;
+      let velocity = 0;
+      let lastScroll = 0;
+      let lastTime = performance.now();
+      let isDragging = false;
+      let dragStartY = 0;
+      let dragStartScroll = 0;
+      let thumbHeight = 60;
+      let trackHeight = 0;
+      let thumbTop = 0;
+      let bobOffset = 0;
+      let bobStretch = 0;
+      let idleBobPhase = 0;
+      let reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      function getEasing() {
+        switch (params.timing) {
+          case 'spring': return { k: 0.18, damping: 0.78 };
+          case 'ease-in-out': return { k: 0.08, damping: 0.92 };
+          default: return { k: 0.12, damping: 0.88 };
+        }
+      }
+
+      function updateMetrics() {
+        const sh = scrollArea.scrollHeight;
+        const ch = scrollArea.clientHeight;
+        trackHeight = scrollbar.clientHeight;
+        thumbHeight = Math.max(48, Math.min(trackHeight, ch * (ch / sh)));
+        thumb.style.height = thumbHeight + 'px';
+      }
+
+      function updateScroll(e) {
+        if (isDragging) return;
+        targetScroll = scrollArea.scrollTop;
+      }
+
+      function onTrackClick(e) {
+        if (e.target.closest('.zhaowen-scrollbar-thumb')) return;
+        const rect = track.getBoundingClientRect();
+        const ratio = (e.clientY - rect.top) / rect.height;
+        scrollArea.scrollTop = ratio * (scrollArea.scrollHeight - scrollArea.clientHeight);
+      }
+
+      function onThumbDown(e) {
+        e.preventDefault();
+        isDragging = true;
+        dragStartY = e.clientY;
+        dragStartScroll = scrollArea.scrollTop;
+        thumb.classList.add('is-dragging');
+        document.body.style.userSelect = 'none';
+      }
+
+      function onThumbMove(e) {
+        if (!isDragging) return;
+        const deltaY = e.clientY - dragStartY;
+        const maxScroll = scrollArea.scrollHeight - scrollArea.clientHeight;
+        const maxThumbTravel = trackHeight - thumbHeight;
+        scrollArea.scrollTop = dragStartScroll + (deltaY / maxThumbTravel) * maxScroll;
+      }
+
+      function onThumbUp() {
+        isDragging = false;
+        thumb.classList.remove('is-dragging');
+        document.body.style.userSelect = '';
+      }
+
+      scrollArea.addEventListener('scroll', updateScroll, { passive: true });
+      track.addEventListener('click', onTrackClick);
+      thumb.addEventListener('mousedown', onThumbDown);
+      window.addEventListener('mousemove', onThumbMove);
+      window.addEventListener('mouseup', onThumbUp);
+      window.addEventListener('resize', updateMetrics);
+
+      function tick(now) {
+        const dt = Math.min(0.05, (now - lastTime) / 1000);
+        lastTime = now;
+
+        targetScroll = scrollArea.scrollTop;
+        velocity = (targetScroll - lastScroll) / (dt * 1000 || 1);
+        lastScroll = targetScroll;
+
+        const easing = getEasing();
+        const diff = targetScroll - currentScroll;
+        currentScroll += diff * easing.k;
+
+        const maxScroll = Math.max(1, scrollArea.scrollHeight - scrollArea.clientHeight);
+        const maxThumbTravel = Math.max(1, trackHeight - thumbHeight);
+        const targetThumbTop = (currentScroll / maxScroll) * maxThumbTravel;
+
+        // Bob / overshoot physics
+        let targetBob = 0;
+        let targetStretch = 0;
+        if (!reducedMotion) {
+          const speed = Math.min(Math.abs(velocity) / 2500, 1);
+          const direction = Math.sign(velocity) || 1;
+          targetBob = direction * speed * params.extensionFalloff * 14;
+          targetStretch = speed * params.extensionFalloff * 18;
+          idleBobPhase += dt * 1.5;
+        }
+        bobOffset += (targetBob - bobOffset) * 0.12;
+        bobStretch += (targetStretch - bobStretch) * 0.12;
+
+        // Color falloff: rest opacity low, motion opacity high
+        const motion = Math.min(Math.abs(velocity) / 1500, 1);
+        const restOpacity = 0.55 + params.colorFalloff * 0.25;
+        const activeOpacity = 1;
+        const opacity = restOpacity + (activeOpacity - restOpacity) * motion;
+
+        thumbTop = targetThumbTop;
+        thumb.style.transform = `translate3d(${bobOffset}px, ${thumbTop}px, 0) scaleY(${1 + bobStretch / thumbHeight})`;
+        thumb.style.opacity = opacity.toFixed(3);
+
+        if (velocityReadout) {
+          velocityReadout.textContent = Math.abs(velocity).toFixed(2);
+        }
+
+        requestAnimationFrame(tick);
+      }
+
+      updateMetrics();
+      requestAnimationFrame(tick);
+    })();
+  </script>
+  <script>lucide.createIcons();</script>
+
+    <style id="critical-layout">
+      /* Page-level palette override — measured straight off assets/novel-bg.jpg (1908x956).
+         The page base is the artwork's own neutral paper grey; never black. */
+      :root {
+        --zhaowen-page-base: #9f9d99;
+        --zhaowen-surface-1: #aba9a3;
+        --zhaowen-surface-2: #a8a6a0;
+        --zhaowen-surface-3: #b2afac;
+        --zhaowen-card: #bcb8b2;
+        --zhaowen-ink-1: #2b2926;
+        --zhaowen-ink-2: #46433e;
+        --zhaowen-ink-3: #63605a;
+        --zhaowen-line: color-mix(in srgb, var(--zhaowen-ink-1) 24%, transparent);
+        --zhaowen-primary: var(--zhaowen-ink-1);
+        --zhaowen-foreground: var(--zhaowen-ink-1);
+        --zhaowen-art-opacity: 0.96;
+        color-scheme: light;
+      }
+      html, body {
+        background-color: var(--zhaowen-page-base);
+        color: var(--zhaowen-ink-1);
+      }
+      body.font-sans {
+        font-family: var(--zhaowen-font-serif);
+        font-size: 0.88rem;
+        line-height: 1.85;
+      }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+
+      /* Critical layout shell */
+      .zhaowen-shell {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        overflow: hidden;
+        z-index: 2;
+      }
+      .zhaowen-sidebar {
+        width: 280px;
+        min-width: 240px;
+        max-width: 320px;
+        height: 100%;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        border-right: 1px solid var(--zhaowen-line);
+        background: color-mix(in srgb, var(--zhaowen-surface-1) 88%, transparent);
+      }
+      .zhaowen-main {
+        position: relative;
+        flex: 1 1 auto;
+        min-width: 0;
+        height: 100%;
+        overflow: hidden;
+        background-color: var(--zhaowen-page-base);
+      }
+      /* Artwork fill: novel-bg.jpg covers the whole main column, feathered only at the outer edge. */
+      .zhaowen-main::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background: url("../assets/novel-bg.jpg") center center / cover no-repeat;
+        mix-blend-mode: multiply;
+        opacity: var(--zhaowen-art-opacity, 0.96);
+        mask-image: radial-gradient(ellipse 53% 56% at 50% 50%, #000 86%, rgba(0, 0, 0, 0.6) 95%, rgba(0, 0, 0, 0.18) 100%);
+        -webkit-mask-image: radial-gradient(ellipse 53% 56% at 50% 50%, #000 86%, rgba(0, 0, 0, 0.6) 95%, rgba(0, 0, 0, 0.18) 100%);
+      }
+      /* Local feathered pad behind text sitting directly on the artwork (never a full-page cover). */
+      .text-pad {
+        position: relative;
+      }
+      .text-pad::before {
+        content: "";
+        position: absolute;
+        inset: -1.25rem -1.75rem;
+        z-index: -1;
+        pointer-events: none;
+        border-radius: 22px;
+        background: radial-gradient(
+          ellipse 66% 66% at 50% 50%,
+          color-mix(in srgb, var(--zhaowen-card) 88%, transparent) 0%,
+          color-mix(in srgb, var(--zhaowen-card) 44%, transparent) 58%,
+          transparent 100%
+        );
+      }
+      .zhaowen-scroll {
+        position: absolute;
+        inset: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+      .zhaowen-scrollbar {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 16px;
+        pointer-events: none;
+        z-index: 50;
+      }
+      .zhaowen-scrollbar-track {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: 7px;
+        width: 2px;
+        background: var(--zhaowen-line);
+        pointer-events: auto;
+      }
+      .zhaowen-scrollbar-thumb {
+        position: absolute;
+        right: 3px;
+        width: 10px;
+        border-radius: 9999px;
+        background: var(--zhaowen-ink-1);
+        box-shadow: 0 0 14px color-mix(in srgb, var(--zhaowen-ink-1) 35%, transparent);
+        pointer-events: auto;
+        cursor: grab;
+        transform-origin: center center;
+        transition: width 180ms ease, box-shadow 180ms ease;
+      }
+      .zhaowen-scrollbar-thumb:hover,
+      .zhaowen-scrollbar-thumb.is-dragging {
+        width: 12px;
+        box-shadow: 0 0 22px color-mix(in srgb, var(--zhaowen-ink-1) 45%, transparent);
+      }
+      .zhaowen-scrollbar-thumb.is-dragging {
+        cursor: grabbing;
+      }
+      .zhaowen-scrollbar-hit {
+        position: absolute;
+        inset: -8px -8px -8px -8px;
+        pointer-events: auto;
+      }
+      .zhaowen-input,
+      .zhaowen-select {
+        background: color-mix(in srgb, var(--zhaowen-surface-3) 72%, transparent);
+        border: 1px solid var(--zhaowen-line);
+        color: var(--zhaowen-ink-1);
+      }
+      .zhaowen-input:focus,
+      .zhaowen-select:focus {
+        outline: none;
+        border-color: var(--zhaowen-ink-1);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--zhaowen-ink-1) 18%, transparent);
+      }
+      .zhaowen-select option {
+        background: var(--zhaowen-card);
+        color: var(--zhaowen-ink-1);
+      }
+      .zhaowen-slider {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--zhaowen-surface-3);
+        outline: none;
+      }
+      .zhaowen-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--zhaowen-ink-1);
+        cursor: pointer;
+        box-shadow: 0 0 0 2px var(--zhaowen-surface-1);
+        transition: transform 120ms ease;
+      }
+      .zhaowen-slider::-webkit-slider-thumb:hover {
+        transform: scale(1.15);
+      }
+      .zhaowen-slider::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--zhaowen-ink-1);
+        cursor: pointer;
+        border: 2px solid var(--zhaowen-surface-1);
+      }
+      .zhaowen-card {
+        background: color-mix(in srgb, var(--zhaowen-card) 92%, transparent);
+        border: 1px solid var(--zhaowen-line);
+        transition: border-color 200ms ease, transform 200ms ease, box-shadow 200ms ease;
+        backdrop-filter: blur(6px);
+      }
+      .zhaowen-card:hover {
+        border-color: color-mix(in srgb, var(--zhaowen-ink-1) 48%, var(--zhaowen-line));
+        box-shadow: 0 8px 32px color-mix(in srgb, var(--zhaowen-ink-1) 14%, transparent);
+      }
+      .paper-grain {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 1;
+        opacity: 0.10;
+        background-image:
+          radial-gradient(circle at 20% 30%, rgba(255,255,255,0.14) 0%, transparent 1px),
+          radial-gradient(circle at 70% 60%, rgba(255,255,255,0.12) 0%, transparent 1px),
+          radial-gradient(circle at 40% 80%, rgba(255,255,255,0.10) 0%, transparent 1px);
+        background-size: 220px 220px, 180px 180px, 260px 260px;
+      }
+      .serif-title { font-family: var(--zhaowen-font-display); }
+      .mono-num { font-family: var(--zhaowen-font-mono); }
+      .caps-label {
+        font-family: var(--zhaowen-font-display);
+        font-size: 1.02rem;
+        line-height: 1.4;
+        letter-spacing: 0.06em;
+        color: var(--zhaowen-ink-2);
+      }
+      /* Type scale: display mincho for headings, serif for body copy */
+      .zhaowen-main h2 {
+        font-size: 2.05rem;
+        line-height: 1.24;
+        letter-spacing: 0.02em;
+      }
+      .zhaowen-main h3 {
+        font-family: var(--zhaowen-font-serif);
+        font-size: 1rem;
+        line-height: 1.55;
+      }
+      .zhaowen-main p {
+        font-size: 0.88rem;
+        line-height: 1.86;
+      }
+      .zhaowen-main .text-sm { font-size: 0.88rem; }
+      .zhaowen-main footer p { font-size: 0.72rem; line-height: 1.8; }
+      .zhaowen-sidebar .text-xs { font-size: 0.76rem; }
+
+      @media (prefers-reduced-motion: reduce) {
+        .zhaowen-scrollbar-thumb {
+          transition: none;
+        }
+        .zhaowen-card {
+          transition: none;
+        }
+      }
+      @media (max-width: 860px) {
+        .zhaowen-sidebar {
+          width: 220px;
+          min-width: 200px;
+        }
+      }
+    </style>
+<script src="../site-preferences.js"></script>
+</body>
+</html>

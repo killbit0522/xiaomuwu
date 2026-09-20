@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>读后感描写</title>
+    <style id="theme-vars">
+/* ==========================================================================
+   Palette note
+   These tokens are sampled from the artwork supplied for this project, not
+   invented. Measured mean colours of the source images:
+     IMG_1939 home hero        #766952   (dark warm olive)
+     IMG_1948 home fill        #ccc9c3   (neutral warm grey)
+     IMG_1949 left rail/search #c2bfba   (neutral warm grey)
+     IMG_1950 catalog          #dfdcd5   (pale neutral grey)
+     IMG_1950-2 request        #c7c4be   (neutral warm grey)
+     IMG_1952 review           #f3f3f3   (near white)
+     IMG_1947 birds            #e8e9e9   (near white)
+   The artwork is neutral paper, so the page base is a neutral paper grey.
+   No cream / yellow cast is applied anywhere.
+   ========================================================================== */
+
+:root {
+  /* Neutral paper base taken from the artwork itself */
+  --zhaowen-background: #c9c5be;
+  --zhaowen-foreground: #1c1a17;
+
+  --zhaowen-card: #f2efe9;
+  --zhaowen-card-foreground: #1c1a17;
+  --zhaowen-popover: #f7f5f0;
+  --zhaowen-popover-foreground: #1c1a17;
+
+  /* Ink, not red. Buttons are transparent with black text. */
+  --zhaowen-primary: #1c1a17;
+  --zhaowen-primary-foreground: #f7f5f0;
+
+  --zhaowen-muted: #d9d5ce;
+  --zhaowen-muted-foreground: #5f5a52;
+  --zhaowen-border: rgba(28, 26, 23, 0.22);
+  --zhaowen-input: rgba(28, 26, 23, 0.06);
+  --zhaowen-ring: #1c1a17;
+
+  /* Radius scale - restrained */
+  --zhaowen-radius-sm: 3px;
+  --zhaowen-radius-md: 6px;
+  --zhaowen-radius-lg: 14px;
+
+  /* Semantic surfaces */
+  --zhaowen-surface-1: #d5d1ca;
+  --zhaowen-surface-2: #dedad3;
+  --zhaowen-surface-3: #e7e3dc;
+  --zhaowen-ink-1: #1c1a17;
+  --zhaowen-ink-2: #443f38;
+  --zhaowen-ink-3: #6b655c;
+  --zhaowen-line: rgba(28, 26, 23, 0.22);
+
+  /* Per-page base tone. Each page overrides this with the tone of the
+     artwork used on that page, so the page never fights its own image. */
+  --zhaowen-page-base: #c9c5be;
+  /* How strongly the artwork shows through. Kept high so images are not washed out. */
+  --zhaowen-art-opacity: 0.92;
+  --zhaowen-art-blur: 0px;
+
+  /* Secondary accent kept neutral; legacy name retained for compatibility */
+  --zhaowen-seal: #1c1a17;
+  --zhaowen-ink-blue: #2f3a3d;
+  --zhaowen-gold: #6d6450;
+
+  /* Neutral whites: paper glow washes and the 木木书屋 orb shell.
+     Declared here so page HTML/CSS never needs a literal colour value. */
+  --zhaowen-glow: #ffffff;
+  --zhaowen-orb-base: #f1efeb;
+  --zhaowen-orb-highlight: #fdfcfa;
+  --zhaowen-orb-shade: #dcd8d1;
+
+  /* Layout rhythm */
+  --zhaowen-section-gap: 2.5rem;
+  --zhaowen-card-pad: 1.5rem;
+
+  /* Typography
+     Display = Mincho (明朝体); Body = Source Han Serif (思源宋体). */
+  --zhaowen-font-display: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Hiragino Mincho Pro",
+    "MS PMincho", "Source Han Serif SC", "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --zhaowen-font-serif: "Source Han Serif SC", "Noto Serif SC", "Source Han Serif",
+    "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Songti SC", "STSong", "SimSun", serif;
+  --zhaowen-font-sans: "Source Han Sans SC", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --zhaowen-font-mono: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
+
+  /* Slightly reduced type scale */
+  --zhaowen-text-xs: 0.68rem;
+  --zhaowen-text-sm: 0.78rem;
+  --zhaowen-text-base: 0.88rem;
+  --zhaowen-text-lg: 1.02rem;
+  --zhaowen-text-xl: 1.3rem;
+  --zhaowen-text-2xl: 1.72rem;
+  --zhaowen-text-3xl: 2.05rem;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  font-family: var(--zhaowen-font-serif);
+  background-color: var(--zhaowen-page-base);
+  color: var(--zhaowen-foreground);
+  font-size: var(--zhaowen-text-base);
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--zhaowen-font-display);
+  font-weight: 500;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--zhaowen-background);
+    --color-foreground: var(--zhaowen-foreground);
+    --color-card: var(--zhaowen-card);
+    --color-card-foreground: var(--zhaowen-card-foreground);
+    --color-popover: var(--zhaowen-popover);
+    --color-popover-foreground: var(--zhaowen-popover-foreground);
+    --color-primary: var(--zhaowen-primary);
+    --color-primary-foreground: var(--zhaowen-primary-foreground);
+    --color-muted: var(--zhaowen-muted);
+    --color-muted-foreground: var(--zhaowen-muted-foreground);
+    --color-border: var(--zhaowen-border);
+    --color-input: var(--zhaowen-input);
+    --color-ring: var(--zhaowen-ring);
+    --radius-sm: var(--zhaowen-radius-sm);
+    --radius-md: var(--zhaowen-radius-md);
+    --radius-lg: var(--zhaowen-radius-lg);
+  }
+  @layer base {
+    body { background: var(--zhaowen-background); color: var(--zhaowen-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--zhaowen-background); }
+      .text-background { color: var(--zhaowen-background); }
+      .border-background { border-color: var(--zhaowen-background); }
+      .ring-background { --tw-ring-color: var(--zhaowen-background); }
+      .bg-foreground { background-color: var(--zhaowen-foreground); }
+      .text-foreground { color: var(--zhaowen-foreground); }
+      .border-foreground { border-color: var(--zhaowen-foreground); }
+      .ring-foreground { --tw-ring-color: var(--zhaowen-foreground); }
+      .bg-card { background-color: var(--zhaowen-card); }
+      .text-card { color: var(--zhaowen-card); }
+      .border-card { border-color: var(--zhaowen-card); }
+      .ring-card { --tw-ring-color: var(--zhaowen-card); }
+      .bg-card-foreground { background-color: var(--zhaowen-card-foreground); }
+      .text-card-foreground { color: var(--zhaowen-card-foreground); }
+      .border-card-foreground { border-color: var(--zhaowen-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--zhaowen-card-foreground); }
+      .bg-popover { background-color: var(--zhaowen-popover); }
+      .text-popover { color: var(--zhaowen-popover); }
+      .border-popover { border-color: var(--zhaowen-popover); }
+      .ring-popover { --tw-ring-color: var(--zhaowen-popover); }
+      .bg-popover-foreground { background-color: var(--zhaowen-popover-foreground); }
+      .text-popover-foreground { color: var(--zhaowen-popover-foreground); }
+      .border-popover-foreground { border-color: var(--zhaowen-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--zhaowen-popover-foreground); }
+      .bg-primary { background-color: var(--zhaowen-primary); }
+      .text-primary { color: var(--zhaowen-primary); }
+      .border-primary { border-color: var(--zhaowen-primary); }
+      .ring-primary { --tw-ring-color: var(--zhaowen-primary); }
+      .bg-primary-foreground { background-color: var(--zhaowen-primary-foreground); }
+      .text-primary-foreground { color: var(--zhaowen-primary-foreground); }
+      .border-primary-foreground { border-color: var(--zhaowen-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--zhaowen-primary-foreground); }
+      .bg-muted { background-color: var(--zhaowen-muted); }
+      .text-muted { color: var(--zhaowen-muted); }
+      .border-muted { border-color: var(--zhaowen-muted); }
+      .ring-muted { --tw-ring-color: var(--zhaowen-muted); }
+      .bg-muted-foreground { background-color: var(--zhaowen-muted-foreground); }
+      .text-muted-foreground { color: var(--zhaowen-muted-foreground); }
+      .border-muted-foreground { border-color: var(--zhaowen-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--zhaowen-muted-foreground); }
+      .bg-border { background-color: var(--zhaowen-border); }
+      .text-border { color: var(--zhaowen-border); }
+      .border-border { border-color: var(--zhaowen-border); }
+      .ring-border { --tw-ring-color: var(--zhaowen-border); }
+      .bg-input { background-color: var(--zhaowen-input); }
+      .text-input { color: var(--zhaowen-input); }
+      .border-input { border-color: var(--zhaowen-input); }
+      .ring-input { --tw-ring-color: var(--zhaowen-input); }
+      .bg-ring { background-color: var(--zhaowen-ring); }
+      .text-ring { color: var(--zhaowen-ring); }
+      .border-ring { border-color: var(--zhaowen-ring); }
+      .ring-ring { --tw-ring-color: var(--zhaowen-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+<link rel="stylesheet" href="../site-preferences.css">
+</head>
+<body class="sh-body">
+<style id="critical-layout">
+  /* 本页兜底色取自 review-bg.jpg 实测均值 #f3f3f3（近纯白，非米黄） */
+  :root {
+    --zhaowen-page-base: #f3f3f3;
+    --zhaowen-art-opacity: 0.94;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  [hidden] { display: none !important; }
+
+  html { background: var(--zhaowen-page-base); }
+
+  body.sh-body {
+    margin: 0;
+    min-height: 100vh;
+    max-width: 100%;
+    background: var(--zhaowen-page-base);
+    color: var(--zhaowen-ink-1);
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.88rem;
+    line-height: 1.86;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .sh-shell :focus-visible {
+    outline: 2px solid var(--zhaowen-primary);
+    outline-offset: 2px;
+    border-radius: var(--zhaowen-radius-sm);
+  }
+
+  /* 图标基座：lucide 未加载时也占位不塌陷 */
+  .sh-nav-ico {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
+    color: inherit;
+  }
+
+  /* ---------------- 共享外壳：左栏 sticky + 右栏文档流 ---------------- */
+  .sh-shell {
+    display: flex;
+    align-items: flex-start;
+    width: 100%;
+    max-width: 100%;
+    min-height: 100vh;
+    background: var(--zhaowen-page-base);
+  }
+
+  .sh-side {
+    position: sticky;
+    top: 0;
+    flex: 0 0 300px;
+    width: 300px;
+    height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--zhaowen-line);
+    background-color: var(--zhaowen-page-base);
+    isolation: isolate;
+    z-index: 6;
+  }
+  .sh-side::-webkit-scrollbar { width: 6px; }
+  .sh-side::-webkit-scrollbar-track { background: transparent; }
+  .sh-side::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--zhaowen-ink-3) 40%, transparent);
+    border-radius: 3px;
+  }
+
+  /* 左栏底图：multiply 与主栏白底咬合；仅四边最外 8%~10% 羽化，中心清晰 */
+  .sh-side-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background-image: url("../assets/sidebar-bg.jpg");
+    background-size: cover;
+    background-position: center 28%;
+    background-repeat: no-repeat;
+    opacity: var(--zhaowen-art-opacity);
+    mix-blend-mode: multiply;
+    pointer-events: none;
+    -webkit-mask-image:
+      linear-gradient(to bottom, transparent 0%, #000 9%, #000 91%, transparent 100%),
+      linear-gradient(to right, transparent 0%, #000 8%, #000 90%, transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-image:
+      linear-gradient(to bottom, transparent 0%, #000 9%, #000 91%, transparent 100%),
+      linear-gradient(to right, transparent 0%, #000 8%, #000 90%, transparent 100%);
+    mask-composite: intersect;
+  }
+
+  /* 文字局部柔光垫：径向羽化，恰好包住导航文字块并向外渐隐，不整幅压盖 */
+  .sh-side-veil {
+    position: absolute;
+    left: -6%;
+    right: -6%;
+    top: 4%;
+    bottom: 4%;
+    z-index: 1;
+    pointer-events: none;
+    background: radial-gradient(
+      68% 58% at 46% 48%,
+      color-mix(in srgb, var(--zhaowen-page-base) 72%, transparent) 0%,
+      color-mix(in srgb, var(--zhaowen-page-base) 44%, transparent) 54%,
+      transparent 100%
+    );
+  }
+
+  .sh-side-inner {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    min-height: 100vh;
+    padding: 1.9rem 1.3rem 1.6rem;
+  }
+
+  /* 品牌区 */
+  .sh-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding-bottom: 1.3rem;
+    border-bottom: 1px solid var(--zhaowen-line);
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+  }
+  .sh-brand:focus-visible { outline: 2px solid var(--zhaowen-ink-1); outline-offset: 3px; }
+  .sh-seal {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: var(--zhaowen-ink-1);
+    font-family: var(--zhaowen-font-display);
+    font-size: 1.28rem;
+    line-height: 1;
+    border: 1px solid var(--zhaowen-ink-1);
+    border-radius: var(--zhaowen-radius-sm);
+  }
+  .sh-brand-text { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+  .sh-brand-title {
+    font-family: var(--zhaowen-font-display);
+    font-size: 1.12rem;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    line-height: 1.2;
+    color: var(--zhaowen-ink-1);
+  }
+  .sh-brand-sub {
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.7rem;
+    letter-spacing: 0.13em;
+    color: var(--zhaowen-ink-3);
+  }
+
+  /* 导航 */
+  .sh-nav {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .sh-nav-btn {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.95rem 0.9rem 0.95rem 1.05rem;
+    border-top: 1px solid var(--zhaowen-line);
+    color: var(--zhaowen-ink-2);
+    text-decoration: none;
+    transition: transform 0.18s ease, background-color 0.18s ease, color 0.18s ease;
+  }
+  .sh-nav-btn:last-child { border-bottom: 1px solid var(--zhaowen-line); }
+  .sh-nav-btn::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--zhaowen-primary);
+    opacity: 0;
+    transition: opacity 0.18s ease;
+  }
+  .sh-nav-btn:hover {
+    transform: translateX(2px);
+    background: color-mix(in srgb, var(--zhaowen-ink-1) 5%, transparent);
+    color: var(--zhaowen-ink-1);
+  }
+  .sh-nav-btn:hover::before { opacity: 1; }
+  .sh-nav-btn.is-active {
+    background: color-mix(in srgb, var(--zhaowen-ink-1) 8%, transparent);
+    color: var(--zhaowen-ink-1);
+    font-weight: 600;
+  }
+  .sh-nav-btn.is-active::before { opacity: 1; }
+  .sh-nav-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.94rem;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sh-nav-en {
+    flex: 0 0 auto;
+    font-family: var(--zhaowen-font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--zhaowen-ink-3);
+  }
+
+  /* 分类标签行 */
+  .sh-cats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    padding-top: 0.15rem;
+  }
+  .sh-cat {
+    display: inline-block;
+    padding: 0.26rem 0.68rem;
+    border: 1px solid var(--zhaowen-ink-1);
+    border-radius: 999px;
+    background: transparent;
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    color: var(--zhaowen-ink-2);
+  }
+
+  .sh-side-foot {
+    margin-top: auto;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--zhaowen-line);
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.68rem;
+    line-height: 1.78;
+    letter-spacing: 0.1em;
+    color: var(--zhaowen-ink-3);
+  }
+
+  /* ---------------- 主栏 ---------------- */
+  .sh-main {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    background: var(--zhaowen-page-base);
+    isolation: isolate;
+  }
+
+  /* 两栏交界过渡带：把左栏灰调顺延进主栏，避免生硬色块分界 */
+  .sh-main::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 160px;
+    z-index: 1;
+    pointer-events: none;
+    background: linear-gradient(
+      to right,
+      color-mix(in srgb, var(--zhaowen-page-base) 74%, var(--zhaowen-ink-3)) 0,
+      color-mix(in srgb, var(--zhaowen-page-base) 88%, var(--zhaowen-ink-3)) 42%,
+      color-mix(in srgb, var(--zhaowen-page-base) 97%, var(--zhaowen-ink-3)) 74%,
+      transparent 100%
+    );
+  }
+
+  /* 满铺底图（唯一允许的绝对定位排版）；仅四边最外 8%~9% 羽化，中心清晰 */
+  .rv-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .rv-bg-img {
+    position: absolute;
+    inset: -1px;
+    background-image: url("../assets/review-bg.jpg");
+    background-size: cover;
+    background-position: center 42%;
+    background-repeat: no-repeat;
+    opacity: var(--zhaowen-art-opacity);
+    mix-blend-mode: multiply;
+    -webkit-mask-image:
+      linear-gradient(to bottom, transparent 0%, #000 9%, #000 91%, transparent 100%),
+      linear-gradient(to right, transparent 0%, #000 8%, #000 92%, transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-image:
+      linear-gradient(to bottom, transparent 0%, #000 9%, #000 91%, transparent 100%),
+      linear-gradient(to right, transparent 0%, #000 8%, #000 92%, transparent 100%);
+    mask-composite: intersect;
+  }
+  .rv-bg-texture {
+    position: absolute;
+    inset: 0;
+    background-image: url("../assets/paper-texture.jpg");
+    background-size: 420px 420px;
+    background-repeat: repeat;
+    opacity: 0.06;
+    mix-blend-mode: multiply;
+  }
+
+  /* 内容层 */
+  .rv-wrap {
+    position: relative;
+    z-index: 2;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 4rem 2.5rem 4.5rem;
+  }
+
+  /* 标题块局部柔光垫：径向羽化，只垫在文字后面，不做整幅遮罩 */
+  .rv-head { position: relative; }
+  .rv-head::before {
+    content: "";
+    position: absolute;
+    inset: -1.6rem -2rem -1.2rem -2rem;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(
+      64% 132% at 46% 50%,
+      color-mix(in srgb, var(--zhaowen-page-base) 94%, transparent) 0%,
+      color-mix(in srgb, var(--zhaowen-page-base) 76%, transparent) 58%,
+      transparent 100%
+    );
+  }
+
+  .rv-kicker { margin: 0 0 1rem; }
+  .rv-kicker-seal {
+    display: inline-block;
+    padding: 0.22rem 0.5rem 0.22rem 0.66rem;
+    background: transparent;
+    border: 1px solid var(--zhaowen-ink-1);
+    color: var(--zhaowen-ink-1);
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.68rem;
+    letter-spacing: 0.34em;
+    border-radius: var(--zhaowen-radius-sm);
+  }
+
+  .rv-page-title {
+    margin: 0;
+    font-family: var(--zhaowen-font-display);
+    font-size: 2.05rem;
+    font-weight: 500;
+    line-height: 1.28;
+    letter-spacing: 0.16em;
+    color: var(--zhaowen-ink-1);
+  }
+  .rv-lede {
+    margin: 0.8rem 0 0;
+    max-width: 34em;
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.88rem;
+    line-height: 1.85;
+    letter-spacing: 0.06em;
+    color: var(--zhaowen-ink-2);
+  }
+
+  /* 写作卡片：近白底图不靠加深底色分层，改用 1px 黑描边 + 柔和投影 */
+  .rv-card {
+    margin-top: 2rem;
+    padding: 2rem;
+    background: color-mix(in srgb, var(--zhaowen-card) 94%, transparent);
+    border: 1px solid var(--zhaowen-ink-1);
+    border-radius: var(--zhaowen-radius-lg);
+    box-shadow:
+      0 20px 40px -28px color-mix(in srgb, var(--zhaowen-ink-1) 58%, transparent),
+      0 2px 6px -4px color-mix(in srgb, var(--zhaowen-ink-1) 30%, transparent);
+  }
+
+  .rv-card-head {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding-bottom: 1.25rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--zhaowen-line);
+  }
+  .rv-thumb {
+    flex: 0 0 auto;
+    display: block;
+    width: 64px;
+    height: 64px;
+    overflow: hidden;
+    border: 1px solid var(--zhaowen-ink-1);
+    border-radius: var(--zhaowen-radius-sm);
+    background: color-mix(in srgb, var(--zhaowen-ink-1) 5%, transparent);
+  }
+  .rv-thumb img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 34%;
+  }
+  .rv-card-head-text { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+  .rv-card-head-kicker {
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.66rem;
+    letter-spacing: 0.22em;
+    color: var(--zhaowen-ink-3);
+  }
+  .rv-card-head-title {
+    font-family: var(--zhaowen-font-display);
+    font-size: 1.02rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    line-height: 1.35;
+    color: var(--zhaowen-ink-1);
+  }
+
+  .rv-form { display: flex; flex-direction: column; }
+  .rv-field { display: flex; flex-direction: column; gap: 0.55rem; min-width: 0; }
+  .rv-field + .rv-field { margin-top: 1.5rem; }
+
+  .rv-label,
+  .rv-fieldset legend.rv-label {
+    display: block;
+    padding: 0;
+    margin: 0 0 0.55rem;
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.8rem;
+    letter-spacing: 0.16em;
+    color: var(--zhaowen-ink-2);
+  }
+
+  .rv-fieldset {
+    margin: 0 0 1.5rem;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+  }
+
+  /* 书目 radio 胶囊 */
+  .rv-chipset { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+  .rv-chip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.5rem 1.05rem;
+    border: 1px solid var(--zhaowen-ink-1);
+    border-radius: 999px;
+    background: transparent;
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.84rem;
+    letter-spacing: 0.1em;
+    color: var(--zhaowen-ink-1);
+    cursor: pointer;
+    transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+  }
+  .rv-chip input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .rv-chip-dot {
+    flex: 0 0 auto;
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--zhaowen-ink-1);
+    opacity: 0;
+    transition: opacity 0.18s ease;
+  }
+  .rv-chip:hover { background: color-mix(in srgb, var(--zhaowen-ink-1) 6%, transparent); }
+  .rv-chip:has(input:checked),
+  .rv-chip.is-on {
+    background: color-mix(in srgb, var(--zhaowen-ink-1) 6%, transparent);
+    border-color: var(--zhaowen-ink-1);
+    color: var(--zhaowen-ink-1);
+    font-weight: 600;
+  }
+  .rv-chip:has(input:checked) .rv-chip-dot,
+  .rv-chip.is-on .rv-chip-dot { opacity: 1; }
+  .rv-chip:has(input:focus-visible) {
+    outline: 2px solid var(--zhaowen-ink-1);
+    outline-offset: 2px;
+  }
+
+  .rv-input,
+  .rv-textarea {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    border: 1px solid var(--zhaowen-ink-1);
+    border-radius: var(--zhaowen-radius-md);
+    background: color-mix(in srgb, var(--zhaowen-ink-1) 3.5%, transparent);
+    color: var(--zhaowen-ink-1);
+    font-family: var(--zhaowen-font-serif);
+    letter-spacing: 0.04em;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+  .rv-input {
+    height: 46px;
+    padding: 0 0.95rem;
+    font-size: 0.9rem;
+  }
+  .rv-textarea {
+    padding: 1rem 1.1rem;
+    font-size: 0.9rem;
+    line-height: 1.9;
+    min-height: 264px;
+    resize: vertical;
+    overflow-wrap: break-word;
+  }
+  .rv-input::placeholder,
+  .rv-textarea::placeholder { color: var(--zhaowen-ink-3); letter-spacing: 0.04em; }
+  .rv-input:focus,
+  .rv-textarea:focus {
+    outline: none;
+    border-color: var(--zhaowen-ink-1);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--zhaowen-ink-1) 14%, transparent);
+  }
+  .rv-input:focus-visible,
+  .rv-textarea:focus-visible {
+    outline: 2px solid var(--zhaowen-ink-1);
+    outline-offset: 2px;
+  }
+  .rv-textarea.is-invalid {
+    border-color: var(--zhaowen-ink-1);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--zhaowen-ink-1) 22%, transparent);
+  }
+
+  .rv-meta {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin: 0.75rem 0 0;
+  }
+  .rv-count {
+    font-family: var(--zhaowen-font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    color: var(--zhaowen-ink-3);
+  }
+
+  .rv-error {
+    margin: 0.85rem 0 0;
+    padding-left: 0.7rem;
+    border-left: 3px solid var(--zhaowen-ink-1);
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.84rem;
+    letter-spacing: 0.08em;
+    color: var(--zhaowen-ink-1);
+  }
+
+  .rv-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.9rem;
+    margin-top: 1.7rem;
+  }
+  /* 按钮统一：透明底 + 黑字 + 1px 黑描边，无实心色块 */
+  .rv-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-width: 8.5rem;
+    height: 44px;
+    padding: 0 1.6rem;
+    background: transparent;
+    color: var(--zhaowen-ink-1);
+    border: 1px solid var(--zhaowen-ink-1);
+    border-radius: var(--zhaowen-radius-md);
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.9rem;
+    letter-spacing: 0.14em;
+    cursor: pointer;
+    transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+  }
+  .rv-btn-primary,
+  .rv-btn-ghost {
+    background: transparent;
+    color: var(--zhaowen-ink-1);
+    border-color: var(--zhaowen-ink-1);
+  }
+  .rv-btn:hover { background: color-mix(in srgb, var(--zhaowen-ink-1) 6%, transparent); }
+  .rv-btn-primary:hover,
+  .rv-btn-ghost:hover {
+    background: color-mix(in srgb, var(--zhaowen-ink-1) 6%, transparent);
+    color: var(--zhaowen-ink-1);
+  }
+  .rv-btn:focus-visible {
+    outline: 2px solid var(--zhaowen-ink-1);
+    outline-offset: 2px;
+  }
+  .rv-btn:disabled {
+    cursor: default;
+    background: transparent;
+    color: color-mix(in srgb, var(--zhaowen-ink-1) 48%, transparent);
+    border-color: color-mix(in srgb, var(--zhaowen-ink-1) 40%, transparent);
+  }
+
+  .rv-toast {
+    margin-top: 1.25rem;
+    padding: 0.7rem 1rem;
+    text-align: center;
+    background: color-mix(in srgb, var(--zhaowen-page-base) 88%, transparent);
+    border: 1px solid var(--zhaowen-ink-1);
+    border-radius: var(--zhaowen-radius-md);
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.86rem;
+    letter-spacing: 0.14em;
+    color: var(--zhaowen-ink-1);
+  }
+
+  .rv-foot {
+    margin: 3rem 0 0;
+    text-align: center;
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    color: var(--zhaowen-ink-3);
+  }
+
+  /* ---------------- 响应式 ---------------- */
+  @media (max-width: 980px) {
+    .sh-side { flex-basis: 240px; width: 240px; }
+    .rv-wrap { padding: 3rem 1.75rem 3.5rem; }
+    .rv-page-title { font-size: 1.86rem; }
+    .rv-card { padding: 1.6rem; }
+  }
+
+  @media (max-width: 620px) {
+    .sh-shell { flex-direction: column; align-items: stretch; }
+    .sh-side {
+      position: relative;
+      top: auto;
+      flex: 0 0 auto;
+      width: 100%;
+      height: auto;
+      max-height: none;
+      overflow: visible;
+      border-right: 0;
+      border-bottom: 1px solid var(--zhaowen-line);
+    }
+    .sh-side-inner { min-height: 0; gap: 0.9rem; padding: 1.1rem 1rem 1rem; }
+    .sh-brand { padding-bottom: 0.85rem; }
+    .sh-nav {
+      flex: 0 0 auto;
+      flex-direction: row;
+      gap: 0.5rem;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding-bottom: 0.35rem;
+      -webkit-overflow-scrolling: touch;
+    }
+    .sh-nav-btn {
+      flex: 0 0 auto;
+      border: 1px solid var(--zhaowen-line);
+      border-radius: var(--zhaowen-radius-md);
+      padding: 0.55rem 0.9rem;
+    }
+    .sh-nav-btn:last-child { border-bottom: 1px solid var(--zhaowen-line); }
+    .sh-nav-btn::before { display: none; }
+    .sh-nav-label { flex: 0 0 auto; font-size: 0.88rem; }
+    .sh-nav-en { display: none; }
+    .sh-side-foot { margin-top: 0.25rem; }
+
+    .rv-wrap { padding: 2.25rem 1.15rem 3rem; }
+    .rv-page-title { font-size: 1.55rem; letter-spacing: 0.1em; }
+    .rv-card { padding: 1.15rem; }
+    .sh-main::before { display: none; }
+    .rv-actions { flex-direction: column; align-items: stretch; }
+    .rv-btn { width: 100%; }
+    .rv-meta { justify-content: flex-start; }
+  }
+</style>
+
+<div class="sh-shell">
+  <aside class="sh-side">
+    <div class="sh-side-bg" aria-hidden="true"></div>
+    <div class="sh-side-veil" aria-hidden="true"></div>
+
+    <div class="sh-side-inner">
+      <a class="sh-brand" href="./home.html" aria-label="返回小木屋首页" title="返回首页">
+        <span class="sh-seal" aria-hidden="true">木</span>
+        <span class="sh-brand-text">
+          <span class="sh-brand-title">小木屋</span>
+          <span class="sh-brand-sub">古典文本索引 · 找书</span>
+        </span>
+      </a>
+
+      <nav id="sidebar-nav" data-dom-id="sidebar-nav" class="sh-nav" aria-label="全站导航">
+        <a class="sh-nav-btn" href="./search.html">
+          <i data-lucide="search" class="sh-nav-ico" aria-hidden="true"></i>
+          <span class="sh-nav-label">找书</span>
+          <span class="sh-nav-en">Search</span>
+        </a>
+        <a class="sh-nav-btn" href="./catalog.html">
+          <i data-lucide="list" class="sh-nav-ico" aria-hidden="true"></i>
+          <span class="sh-nav-label">目录</span>
+          <span class="sh-nav-en">Catalog</span>
+        </a>
+        <a class="sh-nav-btn" href="./request.html">
+          <i data-lucide="clipboard-list" class="sh-nav-ico" aria-hidden="true"></i>
+          <span class="sh-nav-label">缺书登记</span>
+          <span class="sh-nav-en">Request</span>
+        </a>
+        <a class="sh-nav-btn is-active" href="./review.html" aria-current="page">
+          <i data-lucide="pen-line" class="sh-nav-ico" aria-hidden="true"></i>
+          <span class="sh-nav-label">读后感描写</span>
+          <span class="sh-nav-en">Review</span>
+        </a>
+      </nav>
+
+      <div class="sh-cats" aria-label="分类">
+        <span class="sh-cat">经部</span>
+        <span class="sh-cat">史部</span>
+        <span class="sh-cat">子部</span>
+        <span class="sh-cat">集部</span>
+        <span class="sh-cat">蒙学</span>
+      </div>
+
+      <p class="sh-side-foot">拖动画轴浏览板块 · 内容随卷而变</p>
+    </div>
+  </aside>
+
+  <main class="sh-main">
+    <div class="rv-bg" aria-hidden="true">
+      <div class="rv-bg-img"></div>
+      <div class="rv-bg-texture"></div>
+    </div>
+
+    <div class="rv-wrap">
+      <header class="rv-head">
+        <p class="rv-kicker"><span class="rv-kicker-seal">落笔</span></p>
+        <h1 class="rv-page-title">读后感描写</h1>
+        <p class="rv-lede">读罢一卷，落笔数行。</p>
+      </header>
+
+      <section id="review-editor" data-dom-id="review-editor" class="rv-card" aria-labelledby="review-editor-title">
+        <h2 id="review-editor-title" hidden>读后感撰写</h2>
+
+        <div class="rv-card-head">
+          <span class="rv-thumb">
+            <img src="../assets/ancient-book.png" alt="案头书影">
+          </span>
+          <span class="rv-card-head-text">
+            <span class="rv-card-head-kicker">案头书影</span>
+            <span id="rv-book-now" class="rv-card-head-title">请选择一本书</span>
+          </span>
+        </div>
+
+        <form id="review-form" class="rv-form" novalidate>
+          <div class="rv-field">
+            <label class="rv-label" for="rv-book">所读之书</label>
+            <input type="text" id="rv-book" class="rv-input" list="rv-book-list" autocomplete="off" placeholder="输入书名，或从同步书目中选择" required>
+            <datalist id="rv-book-list"></datalist>
+          </div>
+
+          <div class="rv-field">
+            <label class="rv-label" for="rv-title">题目</label>
+            <input type="text" id="rv-title" class="rv-input" autocomplete="off" placeholder="为这段读后感取个题目">
+          </div>
+
+          <div class="rv-field">
+            <label class="rv-label" for="rv-body">正文</label>
+            <textarea id="rv-body" class="rv-textarea" rows="12" placeholder="写下你的摘句与感想…"></textarea>
+          </div>
+
+          <p class="rv-meta"><span id="rv-count" class="rv-count">已写 0 字</span></p>
+
+          <p id="rv-error" class="rv-error" role="alert" hidden>至少写下十个字。</p>
+
+          <div class="rv-actions">
+            <button type="button" id="rv-draft" class="rv-btn rv-btn-ghost">保存草稿</button>
+            <button type="submit" id="rv-submit" class="rv-btn rv-btn-primary">提交</button>
+          </div>
+
+          <div id="rv-toast" class="rv-toast" hidden>已提交 · 感谢落笔</div>
+        </form>
+      </section>
+
+      <p class="rv-foot">小木屋 · 私人书单</p>
+    </div>
+  </main>
+</div>
+
+<script>(function () { if (window.lucide && typeof window.lucide.createIcons === 'function') { window.lucide.createIcons(); } })();</script>
+<script>
+(function () {
+  var form = document.getElementById('review-form');
+  if (!form) { return; }
+
+  var titleEl = document.getElementById('rv-title');
+  var bodyEl = document.getElementById('rv-body');
+  var countEl = document.getElementById('rv-count');
+  var errorEl = document.getElementById('rv-error');
+  var toastEl = document.getElementById('rv-toast');
+  var draftBtn = document.getElementById('rv-draft');
+  var submitBtn = document.getElementById('rv-submit');
+  var bookNow = document.getElementById('rv-book-now');
+  var bookInput = document.getElementById('rv-book');
+  var bookList = document.getElementById('rv-book-list');
+  var DRAFT_KEY = 'zhaowen-review-draft';
+  var submitTimer = null;
+  var draftTimer = null;
+
+  function countChars(value) {
+    return (value || '').replace(/\s+/g, '').length;
+  }
+
+  function paintCount() {
+    if (countEl && bodyEl) { countEl.textContent = '已写 ' + countChars(bodyEl.value) + ' 字'; }
+  }
+
+  function clearError() {
+    if (errorEl) { errorEl.hidden = true; }
+    if (bodyEl) { bodyEl.classList.remove('is-invalid'); }
+  }
+
+  function selectedBook() {
+    return bookInput ? bookInput.value.trim() : '';
+  }
+
+  function setSelectedBook(name) {
+    if(bookInput){bookInput.value=name||''} if(bookNow){bookNow.textContent=name||'请选择一本书'}
+  }
+
+  if(bookInput){bookInput.addEventListener('input',function(){if(bookNow){bookNow.textContent=bookInput.value.trim()||'请选择一本书'}})}
+  fetch('../assets/catalog.json?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.json()}).then(function(items){var seen={};items.forEach(function(book){if(!seen[book.title]){seen[book.title]=true;var option=document.createElement('option');option.value=book.title;bookList.appendChild(option)}})}).catch(function(){});
+
+  if (bodyEl) {
+    bodyEl.addEventListener('input', function () {
+      paintCount();
+      clearError();
+    });
+  }
+  if (titleEl) { titleEl.addEventListener('input', clearError); }
+
+  form.addEventListener('submit', function (event) {
+    event.preventDefault();
+
+    if (!selectedBook()) { errorEl.textContent='请先选择或填写所读之书。';errorEl.hidden=false;bookInput.focus();return; }
+    if (countChars(bodyEl.value) < 10) {
+      errorEl.textContent='至少写下十个字。';
+      if (errorEl) { errorEl.hidden = false; }
+      bodyEl.classList.add('is-invalid');
+      bodyEl.focus();
+      return;
+    }
+
+    clearError();
+    var visitor = 'visitor';
+    try { var visitorKey='cabin-visitor-id'; visitor=localStorage.getItem(visitorKey)||Math.random().toString(36).slice(2); localStorage.setItem(visitorKey,visitor); } catch(err){}
+    submitBtn.disabled = true;
+    submitBtn.textContent = '提交中…';
+    fetch('/api/reviews', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ book: selectedBook(), title: titleEl ? titleEl.value : '', body: bodyEl.value, visitor: visitor }) })
+      .then(function(response){ if(!response.ok){throw new Error('submit')} if(toastEl){toastEl.hidden=false} submitBtn.textContent='已提交'; bodyEl.value=''; paintCount(); })
+      .catch(function(){ errorEl.textContent='提交失败，请确认网站服务正在运行。'; errorEl.hidden=false; submitBtn.textContent='重新提交'; })
+      .finally(function(){ submitBtn.disabled=false; });
+  });
+
+  if (draftBtn) {
+    draftBtn.addEventListener('click', function () {
+      try {
+        window.localStorage.setItem(DRAFT_KEY, JSON.stringify({
+          book: selectedBook(),
+          title: titleEl ? titleEl.value : '',
+          body: bodyEl ? bodyEl.value : ''
+        }));
+      } catch (err) { /* 存储不可用时静默降级 */ }
+
+      var label = draftBtn.textContent;
+      draftBtn.textContent = '已存';
+      if (draftTimer) { clearTimeout(draftTimer); }
+      draftTimer = setTimeout(function () { draftBtn.textContent = label; }, 1500);
+    });
+  }
+
+  try {
+    var raw = window.localStorage.getItem(DRAFT_KEY);
+    if (raw) {
+      var saved = JSON.parse(raw);
+      if (saved && typeof saved === 'object') {
+        if (saved.book) { setSelectedBook(saved.book); }
+        if (typeof saved.title === 'string' && titleEl) { titleEl.value = saved.title; }
+        if (typeof saved.body === 'string' && bodyEl) { bodyEl.value = saved.body; }
+      }
+    }
+  } catch (err) { /* 忽略损坏的草稿 */ }
+
+  paintCount();
+})();
+</script>
+<script src="../site-preferences.js"></script>
+</body>
+</html>

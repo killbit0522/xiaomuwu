@@ -1,0 +1,106 @@
+/* ==========================================================================
+   Palette note
+   These tokens are sampled from the artwork supplied for this project, not
+   invented. Measured mean colours of the source images:
+     IMG_1939 home hero        #766952   (dark warm olive)
+     IMG_1948 home fill        #ccc9c3   (neutral warm grey)
+     IMG_1949 left rail/search #c2bfba   (neutral warm grey)
+     IMG_1950 catalog          #dfdcd5   (pale neutral grey)
+     IMG_1950-2 request        #c7c4be   (neutral warm grey)
+     IMG_1952 review           #f3f3f3   (near white)
+     IMG_1947 birds            #e8e9e9   (near white)
+   The artwork is neutral paper, so the page base is a neutral paper grey.
+   No cream / yellow cast is applied anywhere.
+   ========================================================================== */
+
+:root {
+  /* Neutral paper base taken from the artwork itself */
+  --zhaowen-background: #c9c5be;
+  --zhaowen-foreground: #1c1a17;
+
+  --zhaowen-card: #f2efe9;
+  --zhaowen-card-foreground: #1c1a17;
+  --zhaowen-popover: #f7f5f0;
+  --zhaowen-popover-foreground: #1c1a17;
+
+  /* Ink, not red. Buttons are transparent with black text. */
+  --zhaowen-primary: #1c1a17;
+  --zhaowen-primary-foreground: #f7f5f0;
+
+  --zhaowen-muted: #d9d5ce;
+  --zhaowen-muted-foreground: #5f5a52;
+  --zhaowen-border: rgba(28, 26, 23, 0.22);
+  --zhaowen-input: rgba(28, 26, 23, 0.06);
+  --zhaowen-ring: #1c1a17;
+
+  /* Radius scale - restrained */
+  --zhaowen-radius-sm: 3px;
+  --zhaowen-radius-md: 6px;
+  --zhaowen-radius-lg: 14px;
+
+  /* Semantic surfaces */
+  --zhaowen-surface-1: #d5d1ca;
+  --zhaowen-surface-2: #dedad3;
+  --zhaowen-surface-3: #e7e3dc;
+  --zhaowen-ink-1: #1c1a17;
+  --zhaowen-ink-2: #443f38;
+  --zhaowen-ink-3: #6b655c;
+  --zhaowen-line: rgba(28, 26, 23, 0.22);
+
+  /* Per-page base tone. Each page overrides this with the tone of the
+     artwork used on that page, so the page never fights its own image. */
+  --zhaowen-page-base: #c9c5be;
+  /* How strongly the artwork shows through. Kept high so images are not washed out. */
+  --zhaowen-art-opacity: 0.92;
+  --zhaowen-art-blur: 0px;
+
+  /* Secondary accent kept neutral; legacy name retained for compatibility */
+  --zhaowen-seal: #1c1a17;
+  --zhaowen-ink-blue: #2f3a3d;
+  --zhaowen-gold: #6d6450;
+
+  /* Neutral whites: paper glow washes and the 木木书屋 orb shell.
+     Declared here so page HTML/CSS never needs a literal colour value. */
+  --zhaowen-glow: #ffffff;
+  --zhaowen-orb-base: #f1efeb;
+  --zhaowen-orb-highlight: #fdfcfa;
+  --zhaowen-orb-shade: #dcd8d1;
+
+  /* Layout rhythm */
+  --zhaowen-section-gap: 2.5rem;
+  --zhaowen-card-pad: 1.5rem;
+
+  /* Typography
+     Display = Mincho (明朝体); Body = Source Han Serif (思源宋体). */
+  --zhaowen-font-display: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Hiragino Mincho Pro",
+    "MS PMincho", "Source Han Serif SC", "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --zhaowen-font-serif: "Source Han Serif SC", "Noto Serif SC", "Source Han Serif",
+    "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Songti SC", "STSong", "SimSun", serif;
+  --zhaowen-font-sans: "Source Han Sans SC", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --zhaowen-font-mono: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
+
+  /* Slightly reduced type scale */
+  --zhaowen-text-xs: 0.68rem;
+  --zhaowen-text-sm: 0.78rem;
+  --zhaowen-text-base: 0.88rem;
+  --zhaowen-text-lg: 1.02rem;
+  --zhaowen-text-xl: 1.3rem;
+  --zhaowen-text-2xl: 1.72rem;
+  --zhaowen-text-3xl: 2.05rem;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  font-family: var(--zhaowen-font-serif);
+  background-color: var(--zhaowen-page-base);
+  color: var(--zhaowen-foreground);
+  font-size: var(--zhaowen-text-base);
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--zhaowen-font-display);
+  font-weight: 500;
+}

@@ -1,0 +1,81 @@
+/* 全站显示偏好：略小字号、图片铺满、柔和夜间模式 */
+html { font-size: 15px; }
+img { object-fit: cover; }
+[class*="-art-img"], [class*="-cover"], [class*="-bg"] { background-size: cover !important; background-position: center !important; }
+.site-theme-toggle {
+  position: fixed; right: 18px; top: 16px; z-index: 9999;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 12px; border: 1px solid rgba(28,26,23,.32); border-radius: 999px;
+  color: #1c1a17; background: rgba(244,241,235,.86); backdrop-filter: blur(10px);
+  box-shadow: 0 6px 22px rgba(28,26,23,.12); cursor: pointer;
+  font: 500 .78rem/1.2 serif; letter-spacing: .08em;
+}
+.site-shelf-link{position:fixed;right:18px;top:58px;z-index:9998;padding:8px 12px;border-radius:999px;background:rgba(244,241,235,.86);color:#1c1a17;text-decoration:none;border:1px solid #5555;font-size:.78rem}
+.site-side-reveal{position:fixed;left:0;top:45%;z-index:9998;padding:12px 7px;border:0;border-radius:0 8px 8px 0;background:#34312dcc;color:#eee;cursor:pointer;display:none}
+.gw-butterflies,.gw-butterfly{display:none!important}
+@media(min-width:701px){.gw-sidebar,.sh-side{transition:width .45s,flex-basis .45s,opacity .3s}.gw-sidebar.is-auto-hidden,.sh-side.is-auto-hidden{width:0!important;flex-basis:0!important;min-width:0!important;overflow:hidden!important;opacity:0}.site-side-reveal.is-visible{display:block}}
+@media(max-width:700px){
+  .gw-shell,.sh-shell{display:block!important}
+  .gw-main-col,.sh-main{width:100%!important;min-width:0!important}
+  .gw-sidebar,.sh-side{position:fixed!important;inset:0 auto 0 0!important;z-index:9997!important;width:min(76vw,260px)!important;max-width:260px!important;height:100dvh!important;min-height:0!important;overflow:auto!important;box-shadow:10px 0 28px rgba(28,26,23,.2);transform:translateX(0);transition:transform .32s ease!important}
+  .gw-sidebar.is-auto-hidden,.sh-side.is-auto-hidden{transform:translateX(-102%)}
+  .gw-sidebar-inner,.sh-side-inner{min-height:100dvh!important;padding:1rem .85rem!important;gap:.8rem!important}
+  .gw-brand{padding-bottom:.75rem!important}.gw-seal{width:36px!important;height:36px!important}.gw-brand-title{font-size:1.15rem!important}
+  .gw-nav-btn{padding:.62rem .7rem!important;font-size:.86rem!important}.gw-nav-en,.gw-sidebar-hint{display:none!important}
+  .sh-nav{display:flex!important;flex-direction:column!important;overflow:visible!important;width:100%!important}
+  .sh-nav-btn{display:flex!important;width:100%!important;flex:0 0 auto!important;border-right:0!important;border-bottom:1px solid rgba(28,26,23,.2)!important;padding:.68rem .7rem!important;white-space:normal!important}
+  .site-side-reveal.is-visible{display:block;top:42%;padding:10px 6px;font-size:.76rem}
+  .gw-hero-art-img,.gw-panel-art-img,.gw-sidebar-bg{background-size:contain!important;background-position:center!important}
+  .gw-book-thumb img,.gw-main-col img{object-fit:contain!important;max-width:100%;height:auto}
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --zhaowen-background: #282724;
+  --zhaowen-foreground: #e7e2d9;
+  --zhaowen-card: #34322f;
+  --zhaowen-card-foreground: #eee9df;
+  --zhaowen-muted: #3b3935;
+  --zhaowen-muted-foreground: #bbb3a8;
+  --zhaowen-border: #58534c;
+  --zhaowen-ink-1: #ebe5dc;
+  --zhaowen-ink-2: #c8c0b5;
+  --zhaowen-paper: #292825;
+  --zhaowen-paper-deep: #22211f;
+}
+html[data-theme="dark"] body { background-color: #282724 !important; color: #e7e2d9 !important; }
+html[data-theme="dark"] .site-theme-toggle { color:#eee9df; background:rgba(49,47,44,.9); border-color:rgba(235,229,220,.28); }
+html[data-theme="dark"] .gw-main,
+html[data-theme="dark"] .sm-main,
+html[data-theme="dark"] .ct-main-shell,
+html[data-theme="dark"] .rv-main,
+html[data-theme="dark"] .panel { background-color:#302f2c !important; color:#e7e2d9; }
+html[data-theme="dark"] .gw-hero-art-img,
+html[data-theme="dark"] [class*="-cover"],
+html[data-theme="dark"] [class*="-art"],
+html[data-theme="dark"] img { filter: brightness(.72) contrast(1.03); }
+html[data-theme="dark"] .gw-sidebar,
+html[data-theme="dark"] .sh-side { background:#272623 !important;color:#e7e2d9 !important; }
+html[data-theme="dark"] .gw-sidebar-bg,
+html[data-theme="dark"] .sh-side-bg { filter:brightness(.48) contrast(1.05) !important; }
+html[data-theme="dark"] .gw-sidebar-veil,
+html[data-theme="dark"] .sh-side-veil { background:rgba(35,34,31,.38) !important; }
+html[data-theme="dark"] .gw-sidebar a,
+html[data-theme="dark"] .gw-sidebar button,
+html[data-theme="dark"] .sh-side a,
+html[data-theme="dark"] .sh-side button { color:#e7e2d9 !important;border-color:rgba(231,226,217,.28) !important; }
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] button:not(.site-theme-toggle) { color:#e7e2d9; background-color:#35332f; border-color:#666057; }
+@media (max-width: 640px) { html{font-size:14px}.site-theme-toggle{right:10px;top:10px;padding:7px 9px}.site-theme-label{display:none} }
+body[data-mode] .topbar{z-index:10001}
+body[data-mode] .control-sheet{z-index:10002}
+body[data-mode] .toc-mask{z-index:10003}
+body[data-mode] .toc{z-index:10004}
+body[data-mode="page"] .paper.page-mode{scroll-behavior:auto!important;scroll-snap-type:none!important;touch-action:pan-y}
+.page-turn-zone{display:none;position:fixed;top:58px;bottom:0;width:24%;z-index:9000;border:0;background:transparent;color:transparent;font-size:2rem;cursor:pointer;-webkit-tap-highlight-color:transparent}
+body[data-mode="page"] .page-turn-zone{display:block}.page-turn-prev{left:0}.page-turn-next{right:0}
+.page-turn-cover{display:none;position:fixed;inset:58px 0 0;z-index:9500;pointer-events:none;background:var(--paper,#f4efe3);opacity:0}
+.page-turn-cover.active{display:block}.page-turn-cover.turn-next{animation:page-cover-next .36s ease-in-out}.page-turn-cover.turn-prev{animation:page-cover-prev .36s ease-in-out}
+@keyframes page-cover-next{0%{opacity:0;clip-path:inset(0 0 0 100%)}45%{opacity:.96;clip-path:inset(0 0 0 0)}100%{opacity:0;clip-path:inset(0 100% 0 0)}}
+@keyframes page-cover-prev{0%{opacity:0;clip-path:inset(0 100% 0 0)}45%{opacity:.96;clip-path:inset(0 0 0 0)}100%{opacity:0;clip-path:inset(0 0 0 100%)}}

@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>目录</title>
+    <style id="theme-vars">
+/* ==========================================================================
+   Palette note
+   These tokens are sampled from the artwork supplied for this project, not
+   invented. Measured mean colours of the source images:
+     IMG_1939 home hero        #766952   (dark warm olive)
+     IMG_1948 home fill        #ccc9c3   (neutral warm grey)
+     IMG_1949 left rail/search #c2bfba   (neutral warm grey)
+     IMG_1950 catalog          #dfdcd5   (pale neutral grey)
+     IMG_1950-2 request        #c7c4be   (neutral warm grey)
+     IMG_1952 review           #f3f3f3   (near white)
+     IMG_1947 birds            #e8e9e9   (near white)
+   The artwork is neutral paper, so the page base is a neutral paper grey.
+   No cream / yellow cast is applied anywhere.
+   ========================================================================== */
+
+:root {
+  /* Neutral paper base taken from the artwork itself */
+  --zhaowen-background: #c9c5be;
+  --zhaowen-foreground: #1c1a17;
+
+  --zhaowen-card: #f2efe9;
+  --zhaowen-card-foreground: #1c1a17;
+  --zhaowen-popover: #f7f5f0;
+  --zhaowen-popover-foreground: #1c1a17;
+
+  /* Ink, not red. Buttons are transparent with black text. */
+  --zhaowen-primary: #1c1a17;
+  --zhaowen-primary-foreground: #f7f5f0;
+
+  --zhaowen-muted: #d9d5ce;
+  --zhaowen-muted-foreground: #5f5a52;
+  --zhaowen-border: rgba(28, 26, 23, 0.22);
+  --zhaowen-input: rgba(28, 26, 23, 0.06);
+  --zhaowen-ring: #1c1a17;
+
+  /* Radius scale - restrained */
+  --zhaowen-radius-sm: 3px;
+  --zhaowen-radius-md: 6px;
+  --zhaowen-radius-lg: 14px;
+
+  /* Semantic surfaces */
+  --zhaowen-surface-1: #d5d1ca;
+  --zhaowen-surface-2: #dedad3;
+  --zhaowen-surface-3: #e7e3dc;
+  --zhaowen-ink-1: #1c1a17;
+  --zhaowen-ink-2: #443f38;
+  --zhaowen-ink-3: #6b655c;
+  --zhaowen-line: rgba(28, 26, 23, 0.22);
+
+  /* Per-page base tone. Each page overrides this with the tone of the
+     artwork used on that page, so the page never fights its own image. */
+  --zhaowen-page-base: #c9c5be;
+  /* How strongly the artwork shows through. Kept high so images are not washed out. */
+  --zhaowen-art-opacity: 0.92;
+  --zhaowen-art-blur: 0px;
+
+  /* Secondary accent kept neutral; legacy name retained for compatibility */
+  --zhaowen-seal: #1c1a17;
+  --zhaowen-ink-blue: #2f3a3d;
+  --zhaowen-gold: #6d6450;
+
+  /* Neutral whites: paper glow washes and the 木木书屋 orb shell.
+     Declared here so page HTML/CSS never needs a literal colour value. */
+  --zhaowen-glow: #ffffff;
+  --zhaowen-orb-base: #f1efeb;
+  --zhaowen-orb-highlight: #fdfcfa;
+  --zhaowen-orb-shade: #dcd8d1;
+
+  /* Layout rhythm */
+  --zhaowen-section-gap: 2.5rem;
+  --zhaowen-card-pad: 1.5rem;
+
+  /* Typography
+     Display = Mincho (明朝体); Body = Source Han Serif (思源宋体). */
+  --zhaowen-font-display: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Hiragino Mincho Pro",
+    "MS PMincho", "Source Han Serif SC", "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --zhaowen-font-serif: "Source Han Serif SC", "Noto Serif SC", "Source Han Serif",
+    "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Songti SC", "STSong", "SimSun", serif;
+  --zhaowen-font-sans: "Source Han Sans SC", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --zhaowen-font-mono: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
+
+  /* Slightly reduced type scale */
+  --zhaowen-text-xs: 0.68rem;
+  --zhaowen-text-sm: 0.78rem;
+  --zhaowen-text-base: 0.88rem;
+  --zhaowen-text-lg: 1.02rem;
+  --zhaowen-text-xl: 1.3rem;
+  --zhaowen-text-2xl: 1.72rem;
+  --zhaowen-text-3xl: 2.05rem;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  font-family: var(--zhaowen-font-serif);
+  background-color: var(--zhaowen-page-base);
+  color: var(--zhaowen-foreground);
+  font-size: var(--zhaowen-text-base);
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--zhaowen-font-display);
+  font-weight: 500;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--zhaowen-background);
+    --color-foreground: var(--zhaowen-foreground);
+    --color-card: var(--zhaowen-card);
+    --color-card-foreground: var(--zhaowen-card-foreground);
+    --color-popover: var(--zhaowen-popover);
+    --color-popover-foreground: var(--zhaowen-popover-foreground);
+    --color-primary: var(--zhaowen-primary);
+    --color-primary-foreground: var(--zhaowen-primary-foreground);
+    --color-muted: var(--zhaowen-muted);
+    --color-muted-foreground: var(--zhaowen-muted-foreground);
+    --color-border: var(--zhaowen-border);
+    --color-input: var(--zhaowen-input);
+    --color-ring: var(--zhaowen-ring);
+    --radius-sm: var(--zhaowen-radius-sm);
+    --radius-md: var(--zhaowen-radius-md);
+    --radius-lg: var(--zhaowen-radius-lg);
+  }
+  @layer base {
+    body { background: var(--zhaowen-background); color: var(--zhaowen-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--zhaowen-background); }
+      .text-background { color: var(--zhaowen-background); }
+      .border-background { border-color: var(--zhaowen-background); }
+      .ring-background { --tw-ring-color: var(--zhaowen-background); }
+      .bg-foreground { background-color: var(--zhaowen-foreground); }
+      .text-foreground { color: var(--zhaowen-foreground); }
+      .border-foreground { border-color: var(--zhaowen-foreground); }
+      .ring-foreground { --tw-ring-color: var(--zhaowen-foreground); }
+      .bg-card { background-color: var(--zhaowen-card); }
+      .text-card { color: var(--zhaowen-card); }
+      .border-card { border-color: var(--zhaowen-card); }
+      .ring-card { --tw-ring-color: var(--zhaowen-card); }
+      .bg-card-foreground { background-color: var(--zhaowen-card-foreground); }
+      .text-card-foreground { color: var(--zhaowen-card-foreground); }
+      .border-card-foreground { border-color: var(--zhaowen-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--zhaowen-card-foreground); }
+      .bg-popover { background-color: var(--zhaowen-popover); }
+      .text-popover { color: var(--zhaowen-popover); }
+      .border-popover { border-color: var(--zhaowen-popover); }
+      .ring-popover { --tw-ring-color: var(--zhaowen-popover); }
+      .bg-popover-foreground { background-color: var(--zhaowen-popover-foreground); }
+      .text-popover-foreground { color: var(--zhaowen-popover-foreground); }
+      .border-popover-foreground { border-color: var(--zhaowen-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--zhaowen-popover-foreground); }
+      .bg-primary { background-color: var(--zhaowen-primary); }
+      .text-primary { color: var(--zhaowen-primary); }
+      .border-primary { border-color: var(--zhaowen-primary); }
+      .ring-primary { --tw-ring-color: var(--zhaowen-primary); }
+      .bg-primary-foreground { background-color: var(--zhaowen-primary-foreground); }
+      .text-primary-foreground { color: var(--zhaowen-primary-foreground); }
+      .border-primary-foreground { border-color: var(--zhaowen-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--zhaowen-primary-foreground); }
+      .bg-muted { background-color: var(--zhaowen-muted); }
+      .text-muted { color: var(--zhaowen-muted); }
+      .border-muted { border-color: var(--zhaowen-muted); }
+      .ring-muted { --tw-ring-color: var(--zhaowen-muted); }
+      .bg-muted-foreground { background-color: var(--zhaowen-muted-foreground); }
+      .text-muted-foreground { color: var(--zhaowen-muted-foreground); }
+      .border-muted-foreground { border-color: var(--zhaowen-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--zhaowen-muted-foreground); }
+      .bg-border { background-color: var(--zhaowen-border); }
+      .text-border { color: var(--zhaowen-border); }
+      .border-border { border-color: var(--zhaowen-border); }
+      .ring-border { --tw-ring-color: var(--zhaowen-border); }
+      .bg-input { background-color: var(--zhaowen-input); }
+      .text-input { color: var(--zhaowen-input); }
+      .border-input { border-color: var(--zhaowen-input); }
+      .ring-input { --tw-ring-color: var(--zhaowen-input); }
+      .bg-ring { background-color: var(--zhaowen-ring); }
+      .text-ring { color: var(--zhaowen-ring); }
+      .border-ring { border-color: var(--zhaowen-ring); }
+      .ring-ring { --tw-ring-color: var(--zhaowen-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+<link rel="stylesheet" href="../site-preferences.css">
+</head>
+<body class="min-h-screen antialiased">
+<style id="critical-layout">
+  :root {
+    /* page base is the measured mean tone of this page's own artwork (IMG_1950) */
+    --zhaowen-page-base: #dfdcd5;
+    --zhaowen-art-opacity: 0.94;
+  }
+
+  /* ============ base / reset ============ */
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    overflow-x: hidden;
+    background-color: var(--zhaowen-page-base);
+    color: var(--zhaowen-ink-1);
+    font-family: var(--zhaowen-font-serif);
+    font-size: var(--zhaowen-text-base);
+    line-height: 1.85;
+  }
+  h1, p { margin: 0; }
+  button { font: inherit; background: transparent; border: 0; padding: 0; color: inherit; }
+
+  /* ---- readability: local radial light pads (feathered, text-sized) ----
+     No full-page scrim: each text block sits on its own soft halo that fades
+     out to transparent, so the artwork stays fully visible everywhere else. */
+  .sh-brand, .sh-nav, .sh-tags, .sh-side-foot, .ct-head, .ct-filters { position: relative; }
+  .sh-brand::before,
+  .sh-nav::before,
+  .sh-tags::before,
+  .sh-side-foot::before,
+  .ct-head::before,
+  .ct-filters::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: -0.5rem -0.7rem;
+    pointer-events: none;
+    background-image: radial-gradient(ellipse closest-side at 50% 50%,
+      color-mix(in srgb, var(--zhaowen-page-base) 90%, transparent) 0%,
+      color-mix(in srgb, var(--zhaowen-page-base) 62%, transparent) 52%,
+      color-mix(in srgb, var(--zhaowen-page-base) 26%, transparent) 78%,
+      transparent 100%);
+  }
+
+  /* ============ shared shell ============ */
+  .sh-shell {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+    min-height: 100vh;
+    background-color: var(--zhaowen-page-base);
+    color: var(--zhaowen-ink-1);
+    font-family: var(--zhaowen-font-serif);
+  }
+
+  /* ---------- sidebar ---------- */
+  .sh-side {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    flex: 0 0 300px;
+    width: 300px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border-right: 1px solid var(--zhaowen-line);
+    background-color: transparent;
+  }
+  /* rail artwork multiplies onto the page base and feathers on all four edges,
+     so the rail tone melts into the main sheet instead of stopping at the seam */
+  .sh-side-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image: url("../assets/sidebar-bg.jpg");
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+    opacity: var(--zhaowen-art-opacity, 0.94);
+    mix-blend-mode: multiply;
+    -webkit-mask-image:
+      linear-gradient(to right, transparent 0%, #000 12%, #000 86%, transparent 100%),
+      linear-gradient(to bottom, transparent 0%, #000 9%, #000 91%, transparent 100%);
+    mask-image:
+      linear-gradient(to right, transparent 0%, #000 12%, #000 86%, transparent 100%),
+      linear-gradient(to bottom, transparent 0%, #000 9%, #000 91%, transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+  }
+  .sh-side-inner {
+    position: relative;
+    z-index: 2;
+    flex: 1 1 auto;
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 1.75rem 1.25rem 1.4rem;
+  }
+  .sh-brand { display: flex; align-items: center; gap: 0.7rem; padding-bottom: 1.15rem; border-bottom: 1px solid var(--zhaowen-line); text-decoration: none; color: inherit; cursor: pointer; }
+  .sh-brand:focus-visible { outline: 2px solid var(--zhaowen-ink-1); outline-offset: 3px; }
+  .sh-seal {
+    flex: none;
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--zhaowen-radius-sm);
+    border: 1px solid var(--zhaowen-ink-1);
+    background-color: transparent;
+    color: var(--zhaowen-ink-1);
+    font-family: var(--zhaowen-font-display);
+    font-size: 0.95rem;
+    line-height: 1;
+  }
+  .sh-brand-text { display: flex; flex-direction: column; min-width: 0; }
+  .sh-brand-title { display: block; font-family: var(--zhaowen-font-display); font-size: 1.12rem; font-weight: 500; letter-spacing: 0.14em; line-height: 1.35; }
+  .sh-brand-sub {
+    display: block;
+    margin-top: 0.22rem;
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    color: var(--zhaowen-ink-3);
+  }
+  .sh-nav { display: flex; flex-direction: column; margin-top: 1.25rem; }
+  .sh-nav-btn {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.8rem 0.85rem 0.8rem 1rem;
+    border-top: 1px solid var(--zhaowen-line);
+    color: var(--zhaowen-ink-2);
+    text-decoration: none;
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.88rem;
+    line-height: 1.7;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: transform 0.18s ease, background-color 0.18s ease, color 0.18s ease;
+  }
+  .sh-nav-btn:last-child { border-bottom: 1px solid var(--zhaowen-line); }
+  .sh-nav-btn::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background-color: var(--zhaowen-ink-1);
+    transform: scaleY(0);
+    transition: transform 0.18s ease;
+  }
+  .sh-nav-btn:hover { transform: translateX(2px); background-color: color-mix(in srgb, var(--zhaowen-ink-1) 6%, transparent); color: var(--zhaowen-ink-1); }
+  .sh-nav-btn:hover::before { transform: scaleY(1); }
+  .sh-nav-btn:focus-visible { outline: 2px solid var(--zhaowen-ink-1); outline-offset: -2px; }
+  .sh-nav-btn.is-active { background-color: transparent; color: var(--zhaowen-ink-1); font-weight: 700; }
+  .sh-nav-btn.is-active::before { transform: scaleY(1); }
+  .sh-nav-ico { flex: none; width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; color: currentColor; }
+  .sh-nav-ico svg { width: 16px; height: 16px; }
+  .sh-nav-label { flex: 1 1 auto; }
+  .sh-nav-en {
+    flex: none;
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--zhaowen-ink-3);
+  }
+  .sh-nav-btn.is-active .sh-nav-en { color: var(--zhaowen-ink-1); }
+  .sh-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 1.6rem; padding-top: 1.2rem; border-top: 1px solid var(--zhaowen-line); }
+  .sh-tag {
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    padding: 0.2rem 0.55rem;
+    border-radius: var(--zhaowen-radius-sm);
+    border: 1px solid var(--zhaowen-ink-1);
+    color: var(--zhaowen-ink-2);
+    background-color: transparent;
+  }
+  .sh-side-foot {
+    margin-top: auto;
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--zhaowen-line);
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.62rem;
+    line-height: 1.7;
+    letter-spacing: 0.04em;
+    color: var(--zhaowen-ink-3);
+  }
+
+  /* ---------- main ---------- */
+  .sh-main {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    background-color: transparent;
+  }
+
+  /* ============ page: artwork layer ============
+     The sheet artwork is multiplied onto the measured page base and stays at
+     0.94 opacity — no full-bleed wash on top of it. Feathering only touches the
+     outermost 9%, so the middle of the sheet is fully sharp. */
+  .ct-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image: url("../assets/catalog-bg.jpg");
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+    opacity: var(--zhaowen-art-opacity, 0.94);
+    mix-blend-mode: multiply;
+    -webkit-mask-image:
+      linear-gradient(to right, transparent 0%, #000 9%, #000 91%, transparent 100%),
+      linear-gradient(to bottom, transparent 0%, #000 8%, #000 92%, transparent 100%);
+    mask-image:
+      linear-gradient(to right, transparent 0%, #000 9%, #000 91%, transparent 100%),
+      linear-gradient(to bottom, transparent 0%, #000 8%, #000 92%, transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+  }
+
+  /* ============ page: ink birds (top-right) ============ */
+  .ct-birds {
+    position: absolute;
+    top: 2rem;
+    right: 2.5rem;
+    z-index: 1;
+    width: 220px;
+    height: 264px;
+    pointer-events: none;
+  }
+  .ct-birds-ink {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: url("../assets/ink-birds.jpg");
+    background-repeat: no-repeat;
+    /* crop: show only the right half / middle band of the source, so paper white never fills the box */
+    background-size: 200% auto;
+    background-position: right 28%;
+    background-color: transparent;
+    opacity: var(--zhaowen-art-opacity, 0.94);
+    /* multiply drops the near-white paper (#e8e9e9) and keeps only the ink strokes */
+    mix-blend-mode: multiply;
+    -webkit-mask-image:
+      linear-gradient(to left, #000 52%, transparent 100%),
+      linear-gradient(to bottom, #000 44%, transparent 94%);
+    mask-image:
+      linear-gradient(to left, #000 52%, transparent 100%),
+      linear-gradient(to bottom, #000 44%, transparent 94%);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    animation: zhaowen-bird-glide 7s ease-in-out infinite;
+    will-change: transform;
+  }
+  @keyframes zhaowen-bird-glide {
+    0%   { transform: translateY(6px) rotate(1.4deg); }
+    50%  { transform: translateY(-6px) rotate(-1.4deg); }
+    100% { transform: translateY(6px) rotate(1.4deg); }
+  }
+
+  /* ============ page: content ============ */
+  .ct-wrap {
+    position: relative;
+    z-index: 2;
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 4rem 2rem 5rem;
+    overflow-wrap: break-word;
+  }
+  .ct-head { display: block; }
+  .ct-seal-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.2rem 0.55rem 0.2rem 0.45rem;
+    border: 1px solid var(--zhaowen-ink-1);
+    border-radius: var(--zhaowen-radius-sm);
+    background-color: transparent;
+    color: var(--zhaowen-ink-1);
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.64rem;
+    letter-spacing: 0.24em;
+  }
+  .ct-seal-mark { width: 5px; height: 5px; border: 1px solid var(--zhaowen-ink-1); border-radius: 1px; background-color: transparent; }
+  .ct-title {
+    margin-top: 0.9rem;
+    font-family: var(--zhaowen-font-display);
+    font-size: var(--zhaowen-text-3xl);
+    font-weight: 500;
+    line-height: 1.35;
+    letter-spacing: 0.2em;
+    color: var(--zhaowen-ink-1);
+  }
+  .ct-sub {
+    margin-top: 0.6rem;
+    font-family: var(--zhaowen-font-serif);
+    font-size: var(--zhaowen-text-sm);
+    line-height: 1.85;
+    letter-spacing: 0.06em;
+    color: var(--zhaowen-ink-3);
+  }
+  .ct-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1.75rem;
+    padding-bottom: 1.1rem;
+    border-bottom: 1px solid var(--zhaowen-line);
+  }
+  .ct-chip {
+    padding: 0.32rem 0.85rem;
+    border: 1px solid var(--zhaowen-ink-1);
+    border-radius: var(--zhaowen-radius-sm);
+    background-color: transparent;
+    color: var(--zhaowen-ink-1);
+    font-family: var(--zhaowen-font-serif);
+    font-size: var(--zhaowen-text-sm);
+    line-height: 1.7;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+  }
+  .ct-chip:hover { background-color: color-mix(in srgb, var(--zhaowen-ink-1) 6%, transparent); color: var(--zhaowen-ink-1); }
+  .ct-chip:focus-visible { outline: 2px solid var(--zhaowen-ink-1); outline-offset: 2px; }
+  .ct-chip.is-active {
+    background-color: transparent;
+    border-color: var(--zhaowen-ink-1);
+    box-shadow: inset 0 0 0 1px var(--zhaowen-ink-1);
+    color: var(--zhaowen-ink-1);
+    font-weight: 700;
+  }
+
+  /* ---------- catalog list ---------- */
+  #catalog-list { display: flex; flex-direction: column; }
+  .ct-row { border-bottom: 1px solid var(--zhaowen-line); }
+  .ct-row.is-filtered-out { display: none; }
+  .ct-row-btn {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+    padding: 0.78rem 1rem;
+    text-align: left;
+    cursor: pointer;
+    color: var(--zhaowen-ink-1);
+    transition: background-color 0.18s ease, color 0.18s ease;
+  }
+  .ct-row-btn:hover { background-color: color-mix(in srgb, var(--zhaowen-ink-1) 6%, transparent); }
+  .ct-row-btn:hover .ct-book { text-decoration: underline; text-underline-offset: 0.22em; text-decoration-thickness: 1px; }
+  .ct-row-btn:focus-visible { outline: 2px solid var(--zhaowen-ink-1); outline-offset: -2px; }
+  .ct-no {
+    flex: none;
+    width: 2.1rem;
+    font-family: var(--zhaowen-font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    color: var(--zhaowen-ink-3);
+  }
+  .ct-main { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.15rem 0.6rem; }
+  .ct-book { font-family: var(--zhaowen-font-serif); font-size: 0.92rem; line-height: 1.85; letter-spacing: 0.04em; color: var(--zhaowen-ink-1); }
+  .ct-meta { font-family: var(--zhaowen-font-serif); font-size: 0.72rem; line-height: 1.8; letter-spacing: 0.04em; color: var(--zhaowen-ink-3); }
+  .ct-cat {
+    flex: none;
+    width: 1.45rem;
+    height: 1.45rem;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--zhaowen-ink-1);
+    border-radius: var(--zhaowen-radius-sm);
+    background-color: transparent;
+    color: var(--zhaowen-ink-1);
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.66rem;
+    line-height: 1;
+  }
+  .ct-toggle {
+    flex: none;
+    min-width: 3.1rem;
+    padding: 0.08rem 0.45rem;
+    text-align: center;
+    border: 1px solid var(--zhaowen-ink-1);
+    border-radius: var(--zhaowen-radius-sm);
+    background-color: transparent;
+    color: var(--zhaowen-ink-1);
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.6rem;
+    line-height: 1.7;
+    letter-spacing: 0.14em;
+  }
+  .ct-note {
+    display: none;
+    padding: 0 1.25rem 0.9rem 3.35rem;
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.78rem;
+    line-height: 1.9;
+    letter-spacing: 0.03em;
+    color: var(--zhaowen-ink-2);
+  }
+  .ct-row.is-open .ct-row-btn { background-color: color-mix(in srgb, var(--zhaowen-ink-1) 6%, transparent); }
+  .ct-row.is-open .ct-book { font-weight: 700; }
+  .ct-row.is-open .ct-note { display: block; }
+
+  /* ============ responsive ============ */
+  @media (max-width: 1240px) {
+    .ct-birds { top: 1.75rem; right: 2rem; width: 176px; height: 210px; }
+    .ct-wrap { padding-top: 5.25rem; }
+  }
+  @media (max-width: 980px) {
+    .sh-side { flex: 0 0 240px; width: 240px; }
+    .sh-side-inner { padding: 1.5rem 1rem 1.2rem; }
+    .ct-wrap { padding: 5rem 1.5rem 4rem; }
+  }
+  @media (max-width: 620px) {
+    .sh-shell { flex-direction: column; }
+    .sh-side {
+      position: relative;
+      top: auto;
+      flex: 0 0 auto;
+      width: 100%;
+      height: auto;
+      min-height: 0;
+      border-right: 0;
+      border-bottom: 1px solid var(--zhaowen-line);
+    }
+    .sh-side-inner { padding: 1rem 1rem 0.9rem; }
+    .sh-brand { padding-bottom: 0.9rem; }
+    .sh-nav { flex-direction: row; margin-top: 0.9rem; overflow-x: auto; }
+    .sh-nav-btn { flex: 0 0 auto; border-top: 0; border-right: 1px solid var(--zhaowen-line); padding: 0.65rem 0.8rem; font-size: 0.84rem; white-space: nowrap; }
+    .sh-nav-btn:last-child { border-bottom: 0; border-right: 0; }
+    .sh-nav-btn:hover { transform: none; }
+    .sh-nav-en { display: none; }
+    .sh-tags { margin-top: 0.9rem; padding-top: 0.9rem; }
+    .sh-side-foot { margin-top: 0.9rem; padding-top: 0.9rem; }
+    .ct-birds { top: 0.75rem; right: 0.75rem; width: 128px; height: 172px; }
+    .ct-wrap { padding: 2.75rem 1.1rem 3rem; }
+    .ct-title { font-size: var(--zhaowen-text-2xl); }
+    .ct-no { display: none; }
+    .ct-row-btn { gap: 0.7rem; padding: 0.75rem 0.7rem; }
+    .ct-main { flex-wrap: wrap; gap: 0.1rem 0.5rem; }
+    .ct-book { font-size: 0.88rem; }
+    .ct-toggle { min-width: 2.8rem; }
+    .ct-note { padding: 0 0.8rem 0.9rem 0.8rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ct-birds-ink { animation: none; }
+    .sh-nav-btn { transition: none; }
+  }
+</style>
+
+<div class="sh-shell">
+  <aside class="sh-side">
+    <div class="sh-side-bg" aria-hidden="true"></div>
+    <div class="sh-side-inner">
+      <a class="sh-brand" href="./home.html" aria-label="返回小木屋首页" title="返回首页">
+        <span class="sh-seal" aria-hidden="true">木</span>
+        <span class="sh-brand-text">
+          <span class="sh-brand-title">小木屋</span>
+          <span class="sh-brand-sub">私人书单 · 找文</span>
+        </span>
+      </a>
+
+      <nav id="sidebar-nav" data-dom-id="sidebar-nav" class="sh-nav" aria-label="主导航">
+        <a class="sh-nav-btn" href="./search.html">
+          <i class="sh-nav-ico" data-lucide="search" aria-hidden="true"></i>
+          <span class="sh-nav-label">找书</span>
+          <span class="sh-nav-en">Search</span>
+        </a>
+        <a class="sh-nav-btn is-active" href="./catalog.html" aria-current="page">
+          <i class="sh-nav-ico" data-lucide="list" aria-hidden="true"></i>
+          <span class="sh-nav-label">目录</span>
+          <span class="sh-nav-en">Catalog</span>
+        </a>
+        <a class="sh-nav-btn" href="./request.html">
+          <i class="sh-nav-ico" data-lucide="clipboard-list" aria-hidden="true"></i>
+          <span class="sh-nav-label">缺书登记</span>
+          <span class="sh-nav-en">Request</span>
+        </a>
+        <a class="sh-nav-btn" href="./review.html">
+          <i class="sh-nav-ico" data-lucide="pen-line" aria-hidden="true"></i>
+          <span class="sh-nav-label">读后感描写</span>
+          <span class="sh-nav-en">Review</span>
+        </a>
+      </nav>
+
+      <div class="sh-tags" aria-label="合集标签">
+        <span class="sh-tag">小说</span>
+        <span class="sh-tag">爱发电</span>
+        <span class="sh-tag">近期新增</span>
+        <span class="sh-tag">个人收藏</span>
+      </div>
+
+      <div class="sh-side-foot">拖动画轴浏览板块 · 内容随卷而变</div>
+    </div>
+  </aside>
+
+  <main class="sh-main">
+    <div class="ct-bg" aria-hidden="true"></div>
+
+    <div class="ct-birds" aria-hidden="true">
+      <div class="ct-birds-ink"></div>
+    </div>
+
+    <div class="ct-wrap">
+      <div class="ct-head">
+        <span class="ct-seal-label"><span class="ct-seal-mark" aria-hidden="true"></span>卷帙</span>
+        <h1 class="ct-title">目录</h1>
+        <p class="ct-sub">按本机 textbook 文件夹自动整理成合集</p>
+      </div>
+
+      <div id="catalog-filters" class="ct-filters" role="group" aria-label="合集筛选">
+        <button class="ct-chip is-active" type="button" data-filter="all" aria-pressed="true">全部</button>
+        <button class="ct-chip" type="button" data-filter="jing" aria-pressed="false">经部</button>
+        <button class="ct-chip" type="button" data-filter="shi" aria-pressed="false">史部</button>
+        <button class="ct-chip" type="button" data-filter="zi" aria-pressed="false">子部</button>
+        <button class="ct-chip" type="button" data-filter="ji" aria-pressed="false">集部</button>
+        <button class="ct-chip" type="button" data-filter="meng" aria-pressed="false">蒙学</button>
+      </div>
+
+      <section id="catalog-list" data-dom-id="catalog-list" aria-label="古籍目录">
+        <article class="ct-row" data-cat="jing">
+          <button class="ct-row-btn" type="button" aria-expanded="false">
+            <span class="ct-no">01</span>
+            <span class="ct-main">
+              <span class="ct-book">论语·学而</span>
+              <span class="ct-meta">孔子及弟子 · 春秋</span>
+            </span>
+            <span class="ct-cat" aria-hidden="true">经</span>
+            <span class="ct-toggle">展开</span>
+          </button>
+          <p class="ct-note">开篇以「学而时习之」起问，三句自省立下儒家修身的入门次序。</p>
+        </article>
+
+        <article class="ct-row" data-cat="jing">
+          <button class="ct-row-btn" type="button" aria-expanded="false">
+            <span class="ct-no">02</span>
+            <span class="ct-main">
+              <span class="ct-book">孟子·梁惠王上</span>
+              <span class="ct-meta">孟轲 · 战国</span>
+            </span>
+            <span class="ct-cat" aria-hidden="true">经</span>
+            <span class="ct-toggle">展开</span>
+          </button>
+          <p class="ct-note">首章以「何必曰利」相答，把仁义与王道置于诸侯争霸的议题之上。</p>
+        </article>
+
+        <article class="ct-row" data-cat="jing">
+          <button class="ct-row-btn" type="button" aria-expanded="false">
+            <span class="ct-no">03</span>
+            <span class="ct-main">
+              <span class="ct-book">诗经·关雎</span>
+              <span class="ct-meta">佚名 · 先秦</span>
+            </span>
+            <span class="ct-cat" aria-hidden="true">经</span>
+            <span class="ct-toggle">展开</span>
+          </button>
+          <p class="ct-note">以雎鸠和鸣起兴，写君子求淑女之情，列于三百篇之首。</p>
+        </article>
+
+        <article class="ct-row" data-cat="jing">
+          <button class="ct-row-btn" type="button" aria-expanded="false">
+            <span class="ct-no">04</span>
+            <span class="ct-main">
+              <span class="ct-book">尚书·尧典</span>
+              <span class="ct-meta">佚名 · 先秦</span>
+            </span>
+            <span class="ct-cat" aria-hidden="true">经</span>
+            <span class="ct-toggle">展开</span>
+          </button>
+          <p class="ct-note">记尧舜禅让与历象授时，为现存最早的上古政事文献之一。</p>
+        </article>
+
+        <article class="ct-row" data-cat="shi">
+          <button class="ct-row-btn" type="button" aria-expanded="false">
+            <span class="ct-no">05</span>
+            <span class="ct-main">
+              <span class="ct-book">史记·项羽本纪</span>
+              <span class="ct-meta">司马迁 · 西汉</span>
+            </span>
+            <span class="ct-cat" aria-hidden="true">史</span>
+            <span class="ct-toggle">展开</span>
+          </button>
+          <p class="ct-note">巨鹿、鸿门、垓下三役写尽霸王一生，太史公以本纪之体叙其成败。</p>
+        </article>
+
+        <article class="ct-row" data-cat="shi">
+          <button class="ct-row-btn" type="button" aria-expanded="false">
+            <span class="ct-no">06</span>
+            <span class="ct-main">
+              <span class="ct-book">汉书·艺文志</span>
+              <span class="ct-meta">班固 · 东汉</span>
+            </span>
+            <span class="ct-cat" aria-hidden="true">史</span>
+            <span class="ct-toggle">展开</span>
+          </button>
+          <p class="ct-note">依刘歆《七略》部次群书，为后世目录之学立下分类范式。</p>
+        </article>
+
+        <article class="ct-row" data-cat="shi">
+          <button class="ct-row-btn" type="button" aria-expanded="false">
+            <span class="ct-no">07</span>
+            <span class="ct-main">
+              <span class="ct-book">资治通鉴·周纪一</span>
+              <span class="ct-meta">司马光 · 北宋</span>
+            </span>
+            <span class="ct-cat" aria-hidden="true">史</span>
+            <span class="ct-toggle">展开</span>
+          </button>
+          <p class="ct-note">起笔于三家分晋，以「臣光曰」评断礼制名分，通鉴自此开卷。</p>
+        </article>
+
+        <article class="ct-row" data-cat="shi">
+          <button class="ct-row-btn" type="button" aria-expanded="false">
+            <span class="ct-no">08</span>
+            <span class="ct-main">
+              <span class="ct-book">战国策·秦策</span>
+              <span class="ct-meta">刘向 辑 · 西汉</span>
+            </span>
+            <span class="ct-cat" aria-hidden="true">史</span>
+            <span class="ct-toggle">展开</span>
+          </button>
+          <p class="ct-note">苏秦张仪游说之辞多存于此，纵横捭阖之策可窥一斑。</p>
+        </article>
+
+        <article class="ct-row" data-cat="zi">
+          <button class="ct-row-btn" type="button" aria-expanded="false">
+            <span class="ct-no">09</span>
+            <span class="ct-main">
+              <span class="ct-book">庄子·逍遥游</span>
+              <span class="ct-meta">庄周 · 战国</span>
+            </span>
+            <span class="ct-cat" aria-hidden="true">子</span>
+            <span class="ct-toggle">展开</span>
+          </button>
+          <p class="ct-note">由鲲鹏之变说到至人无己，铺陈大小之辨与无待之境。</p>
+        </article>
+
+        <article class="ct-row" data-cat="zi">
+          <button class="ct-row-btn" type="button" aria-expanded="false">
+            <span class="ct-no">10</span>
+            <span class="ct-main">
+              <span class="ct-book">道德经·第一章</span>
+              <span class="ct-meta">李耳 · 春秋</span>
+            </span>
+            <span class="ct-cat" aria-hidden="true">子</span>
+            <span class="ct-toggle">展开</span>
+          </button>
+          <p class="ct-note">「道可道，非常道」开宗明义，为五千言立下总纲。</p>
+        </article>
+
+        <article class="ct-row" data-cat="zi">
+          <button class="ct-row-btn" type="button" aria-expanded="false">
+            <span class="ct-no">11</span>
+            <span class="ct-main">
+              <span class="ct-book">孙子兵法·计篇</span>
+              <span class="ct-meta">孙武 · 春秋</span>
+            </span>
+            <span class="ct-cat" aria-hidden="true">子</span>
+            <span class="ct-toggle">展开</span>
+          </button>
+          <p class="ct-note">首言「兵者，国之大事」，以五事七计定胜负于庙算。</p>
+        </article>
+
+        <article class="ct-row" data-cat="zi">
+          <button class="ct-row-btn" type="button" aria-expanded="false">
+            <span class="ct-no">12</span>
+            <span class="ct-main">
+              <span class="ct-book">韩非子·五蠹</span>
+              <span class="ct-meta">韩非 · 战国</span>
+            </span>
+            <span class="ct-cat" aria-hidden="true">子</span>
+            <span class="ct-toggle">展开</span>
+          </button>
+          <p class="ct-note">指儒侠商工等五类人为国之蠹，申明法术势并用之要。</p>
+        </article>
+
+        <article class="ct-row" data-cat="ji">
+          <button class="ct-row-btn" type="button" aria-expanded="false">
+            <span class="ct-no">13</span>
+            <span class="ct-main">
+              <span class="ct-book">楚辞·离骚</span>
+              <span class="ct-meta">屈原 · 战国</span>
+            </span>
+            <span class="ct-cat" aria-hidden="true">集</span>
+            <span class="ct-toggle">展开</span>
+          </button>
+          <p class="ct-note">自述身世志节，香草美人寄托不遇之愤，为辞赋之祖。</p>
+        </article>
+
+        <article class="ct-row" data-cat="ji">
+          <button class="ct-row-btn" type="button" aria-expanded="false">
+            <span class="ct-no">14</span>
+            <span class="ct-main">
+              <span class="ct-book">全唐诗·卷一</span>
+              <span class="ct-meta">李世民 · 唐</span>
+            </span>
+            <span class="ct-cat" aria-hidden="true">集</span>
+            <span class="ct-toggle">展开</span>
+          </button>
+          <p class="ct-note">卷首录太宗诸作，可窥唐初宫廷诗风与全书编纂体例。</p>
+        </article>
+
+        <article class="ct-row" data-cat="ji">
+          <button class="ct-row-btn" type="button" aria-expanded="false">
+            <span class="ct-no">15</span>
+            <span class="ct-main">
+              <span class="ct-book">文心雕龙·原道</span>
+              <span class="ct-meta">刘勰 · 南朝梁</span>
+            </span>
+            <span class="ct-cat" aria-hidden="true">集</span>
+            <span class="ct-toggle">展开</span>
+          </button>
+          <p class="ct-note">论文原于道、道见于文，为五十篇立下总论之基。</p>
+        </article>
+
+        <article class="ct-row" data-cat="zi">
+          <button class="ct-row-btn" type="button" aria-expanded="false">
+            <span class="ct-no">16</span>
+            <span class="ct-main">
+              <span class="ct-book">世说新语·德行</span>
+              <span class="ct-meta">刘义庆 · 南朝宋</span>
+            </span>
+            <span class="ct-cat" aria-hidden="true">子</span>
+            <span class="ct-toggle">展开</span>
+          </button>
+          <p class="ct-note">记汉末魏晋名士言行，德行一门居首，可见品评人物之标尺。</p>
+        </article>
+
+        <article class="ct-row" data-cat="meng">
+          <button class="ct-row-btn" type="button" aria-expanded="false">
+            <span class="ct-no">17</span>
+            <span class="ct-main">
+              <span class="ct-book">三字经·人之初</span>
+              <span class="ct-meta">王应麟 · 南宋</span>
+            </span>
+            <span class="ct-cat" aria-hidden="true">蒙</span>
+            <span class="ct-toggle">展开</span>
+          </button>
+          <p class="ct-note">三字一句、押韵成诵，自性善说到经史子集，为蒙学入门之书。</p>
+        </article>
+
+        <article class="ct-row" data-cat="meng">
+          <button class="ct-row-btn" type="button" aria-expanded="false">
+            <span class="ct-no">18</span>
+            <span class="ct-main">
+              <span class="ct-book">千字文·天地玄黄</span>
+              <span class="ct-meta">周兴嗣 · 南朝梁</span>
+            </span>
+            <span class="ct-cat" aria-hidden="true">蒙</span>
+            <span class="ct-toggle">展开</span>
+          </button>
+          <p class="ct-note">千字不重、四言成韵，自天地开辟说到修身治家。</p>
+        </article>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>if (window.lucide && typeof window.lucide.createIcons === "function") { window.lucide.createIcons(); }</script>
+<script>
+(function () {
+  var rows = Array.prototype.slice.call(document.querySelectorAll("#catalog-list .ct-row"));
+  var chips = Array.prototype.slice.call(document.querySelectorAll(".ct-chip"));
+
+  function setOpen(row, open) {
+    var btn = row.querySelector(".ct-row-btn");
+    var toggle = row.querySelector(".ct-toggle");
+    row.classList.toggle("is-open", open);
+    if (btn) { btn.setAttribute("aria-expanded", open ? "true" : "false"); }
+    if (toggle) { toggle.textContent = open ? "收起" : "展开"; }
+  }
+
+  rows.forEach(function (row) {
+    var btn = row.querySelector(".ct-row-btn");
+    if (!btn) { return; }
+    btn.addEventListener("click", function () {
+      setOpen(row, !row.classList.contains("is-open"));
+    });
+  });
+
+  chips.forEach(function (chip) {
+    chip.addEventListener("click", function () {
+      var cat = chip.getAttribute("data-filter") || "all";
+      chips.forEach(function (item) {
+        var on = item === chip;
+        item.classList.toggle("is-active", on);
+        item.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+      rows.forEach(function (row) {
+        var hit = cat === "all" || row.getAttribute("data-cat") === cat;
+        row.classList.toggle("is-filtered-out", !hit);
+        if (!hit) { setOpen(row, false); }
+      });
+    });
+  });
+})();
+</script>
+<script>
+(function () {
+  var list = document.getElementById('catalog-list');
+  var filters = document.getElementById('catalog-filters');
+  if (!list || !filters) { return; }
+  var books = [];
+  var active = 'all';
+  var page = 1;
+  var pageSize = 50;
+  var accessMode = '';
+  var returnState = null;
+  try { returnState = JSON.parse(sessionStorage.getItem('xiaomuwu-catalog-return') || 'null'); } catch (error) {}
+  if (returnState) { active = returnState.active || 'all'; page = Number(returnState.page) || 1; }
+
+  function isUnlocked() { return accessMode === 'download' || accessMode === 'reader'; }
+  function visitorId() { try { var key='cabin-visitor-id',value=localStorage.getItem(key); if(!value){value=Math.random().toString(36).slice(2);localStorage.setItem(key,value)} return value } catch(error){return 'visitor'} }
+  function bookUrl(book) { return '/books/' + String(book.searchablePath || '').split('/').map(encodeURIComponent).join('/'); }
+  function logDownload(book) { fetch('/api/events',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'download',visitor:visitorId(),detail:book.title})}).catch(function(){}); }
+
+  function collectionOf(book) {
+    var parts = (book.category || '未分类').split(' / ');
+    return parts.length > 1 ? parts[1] : parts[0];
+  }
+
+  function makeRow(book, index) {
+    var row = document.createElement('article'); row.className = 'ct-row';
+    row.dataset.bookPath = book.searchablePath || '';
+    var button = document.createElement('button'); button.className = 'ct-row-btn'; button.type = 'button'; button.setAttribute('aria-expanded', 'false');
+    var number = document.createElement('span'); number.className = 'ct-no'; number.textContent = String(index + 1).padStart(2, '0');
+    var main = document.createElement('span'); main.className = 'ct-main';
+    var title = document.createElement('span'); title.className = 'ct-book'; title.textContent = book.title;
+    var meta = document.createElement('span'); meta.className = 'ct-meta'; meta.textContent = book.format.toUpperCase() + ' · ' + (book.modifiedAt || '已收录');
+    main.append(title, meta);
+    var category = document.createElement('span'); category.className = 'ct-cat'; category.textContent = collectionOf(book).slice(0, 3); category.setAttribute('aria-hidden', 'true');
+    var readable = ['txt','pdf','docx','epub','zip'].indexOf(String(book.format).toLowerCase()) >= 0;
+    var toggle = document.createElement('span'); toggle.className = 'ct-toggle'; toggle.textContent = accessMode === 'download' ? '下载' : (accessMode === 'reader' ? (readable ? '阅读' : '不可在线') : '卡密');
+    var note = document.createElement('p'); note.className = 'ct-note'; note.textContent = book.category || '未分类';
+    button.append(number, main, category, toggle); row.append(button, note);
+    button.addEventListener('click', function () {
+      if (!isUnlocked()) { window.location.href = './search.html?q=' + encodeURIComponent(book.title); return; }
+      if(accessMode==='reader'){if(readable){try{sessionStorage.setItem('xiaomuwu-catalog-return',JSON.stringify({active:active,page:page,scrollY:window.scrollY,path:book.searchablePath}))}catch(error){}window.location.href='./reader.html?p='+encodeURIComponent(book.searchablePath)+'&title='+encodeURIComponent(book.title)+'&format='+encodeURIComponent(book.format)}return}
+      logDownload(book);window.location.href = bookUrl(book);
+    });
+    return row;
+  }
+
+  function render() {
+    var matches = active === 'all' ? books : books.filter(function (book) { return collectionOf(book) === active; });
+    var pages = Math.max(1, Math.ceil(matches.length / pageSize));
+    if (page > pages) { page = pages; }
+    list.replaceChildren();
+    matches.slice((page - 1) * pageSize, page * pageSize).forEach(function (book, index) { list.appendChild(makeRow(book, (page - 1) * pageSize + index)); });
+    if (pages > 1) {
+      var nav = document.createElement('div'); nav.className = 'ct-filters';
+      var previous = document.createElement('button'); previous.className = 'ct-chip'; previous.type = 'button'; previous.textContent = '上一页'; previous.disabled = page === 1;
+      var label = document.createElement('span'); label.className = 'ct-chip is-active'; label.textContent = page + ' / ' + pages + ' · 共 ' + matches.length + ' 本';
+      var next = document.createElement('button'); next.className = 'ct-chip'; next.type = 'button'; next.textContent = '下一页'; next.disabled = page === pages;
+      previous.onclick = function () { page -= 1; render(); }; next.onclick = function () { page += 1; render(); };
+      nav.append(previous, label, next); list.appendChild(nav);
+    }
+    if (returnState) {
+      var state = returnState;
+      returnState = null;
+      requestAnimationFrame(function () {
+        var target = Array.prototype.find.call(list.querySelectorAll('.ct-row'), function (row) { return row.dataset.bookPath === state.path; });
+        if (target) { target.scrollIntoView({ block: 'center' }); } else { window.scrollTo(0, Number(state.scrollY) || 0); }
+        try { sessionStorage.removeItem('xiaomuwu-catalog-return'); } catch (error) {}
+      });
+    }
+  }
+
+  function renderFilters() {
+    var collections = {};
+    books.forEach(function (book) { collections[collectionOf(book)] = true; });
+    filters.replaceChildren();
+    [['all', '全部']].concat(Object.keys(collections).sort().map(function (name) { return [name, name]; })).forEach(function (entry) {
+      var chip = document.createElement('button'); chip.className = 'ct-chip' + (entry[0] === active ? ' is-active' : ''); chip.type = 'button'; chip.textContent = entry[1];
+      chip.setAttribute('aria-pressed', entry[0] === active ? 'true' : 'false');
+      chip.onclick = function () { active = entry[0]; page = 1; renderFilters(); render(); };
+      filters.appendChild(chip);
+    });
+  }
+
+  list.replaceChildren(); filters.replaceChildren();
+  fetch('/api/access').then(function(r){return r.json()}).then(function(a){accessMode=a.ok?a.cardType:'';if(books.length)render()}).catch(function(){});
+  fetch('../assets/catalog.json?t=' + Date.now(), { cache: 'no-store' })
+    .then(function (response) { return response.json(); })
+    .then(function (data) { books = data; renderFilters(); render(); })
+    .catch(function () { list.textContent = '书目载入失败，请通过项目启动脚本打开。'; });
+})();
+</script>
+<script src="../site-preferences.js"></script>
+</body>
+</html>

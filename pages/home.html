@@ -1,0 +1,2249 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>小木屋 · 首页</title>
+    <style id="theme-vars">
+/* ==========================================================================
+   Palette note
+   These tokens are sampled from the artwork supplied for this project, not
+   invented. Measured mean colours of the source images:
+     IMG_1939 home hero        #766952   (dark warm olive)
+     IMG_1948 home fill        #ccc9c3   (neutral warm grey)
+     IMG_1949 left rail/search #c2bfba   (neutral warm grey)
+     IMG_1950 catalog          #dfdcd5   (pale neutral grey)
+     IMG_1950-2 request        #c7c4be   (neutral warm grey)
+     IMG_1952 review           #f3f3f3   (near white)
+     IMG_1947 birds            #e8e9e9   (near white)
+   The artwork is neutral paper, so the page base is a neutral paper grey.
+   No cream / yellow cast is applied anywhere.
+   ========================================================================== */
+
+:root {
+  /* Neutral paper base taken from the artwork itself */
+  --zhaowen-background: #c9c5be;
+  --zhaowen-foreground: #1c1a17;
+
+  --zhaowen-card: #f2efe9;
+  --zhaowen-card-foreground: #1c1a17;
+  --zhaowen-popover: #f7f5f0;
+  --zhaowen-popover-foreground: #1c1a17;
+
+  /* Ink, not red. Buttons are transparent with black text. */
+  --zhaowen-primary: #1c1a17;
+  --zhaowen-primary-foreground: #f7f5f0;
+
+  --zhaowen-muted: #d9d5ce;
+  --zhaowen-muted-foreground: #5f5a52;
+  --zhaowen-border: rgba(28, 26, 23, 0.22);
+  --zhaowen-input: rgba(28, 26, 23, 0.06);
+  --zhaowen-ring: #1c1a17;
+
+  /* Radius scale - restrained */
+  --zhaowen-radius-sm: 3px;
+  --zhaowen-radius-md: 6px;
+  --zhaowen-radius-lg: 14px;
+
+  /* Semantic surfaces */
+  --zhaowen-surface-1: #d5d1ca;
+  --zhaowen-surface-2: #dedad3;
+  --zhaowen-surface-3: #e7e3dc;
+  --zhaowen-ink-1: #1c1a17;
+  --zhaowen-ink-2: #443f38;
+  --zhaowen-ink-3: #6b655c;
+  --zhaowen-line: rgba(28, 26, 23, 0.22);
+
+  /* Per-page base tone. Each page overrides this with the tone of the
+     artwork used on that page, so the page never fights its own image. */
+  --zhaowen-page-base: #c9c5be;
+  /* How strongly the artwork shows through. Kept high so images are not washed out. */
+  --zhaowen-art-opacity: 0.92;
+  --zhaowen-art-blur: 0px;
+
+  /* Secondary accent kept neutral; legacy name retained for compatibility */
+  --zhaowen-seal: #1c1a17;
+  --zhaowen-ink-blue: #2f3a3d;
+  --zhaowen-gold: #6d6450;
+
+  /* Neutral whites: paper glow washes and the 木木书屋 orb shell.
+     Declared here so page HTML/CSS never needs a literal colour value. */
+  --zhaowen-glow: #ffffff;
+  --zhaowen-orb-base: #f1efeb;
+  --zhaowen-orb-highlight: #fdfcfa;
+  --zhaowen-orb-shade: #dcd8d1;
+
+  /* Layout rhythm */
+  --zhaowen-section-gap: 2.5rem;
+  --zhaowen-card-pad: 1.5rem;
+
+  /* Typography
+     Display = Mincho (明朝体); Body = Source Han Serif (思源宋体). */
+  --zhaowen-font-display: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Hiragino Mincho Pro",
+    "MS PMincho", "Source Han Serif SC", "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --zhaowen-font-serif: "Source Han Serif SC", "Noto Serif SC", "Source Han Serif",
+    "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Songti SC", "STSong", "SimSun", serif;
+  --zhaowen-font-sans: "Source Han Sans SC", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --zhaowen-font-mono: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
+
+  /* Slightly reduced type scale */
+  --zhaowen-text-xs: 0.68rem;
+  --zhaowen-text-sm: 0.78rem;
+  --zhaowen-text-base: 0.88rem;
+  --zhaowen-text-lg: 1.02rem;
+  --zhaowen-text-xl: 1.3rem;
+  --zhaowen-text-2xl: 1.72rem;
+  --zhaowen-text-3xl: 2.05rem;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  font-family: var(--zhaowen-font-serif);
+  background-color: var(--zhaowen-page-base);
+  color: var(--zhaowen-foreground);
+  font-size: var(--zhaowen-text-base);
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--zhaowen-font-display);
+  font-weight: 500;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--zhaowen-background);
+    --color-foreground: var(--zhaowen-foreground);
+    --color-card: var(--zhaowen-card);
+    --color-card-foreground: var(--zhaowen-card-foreground);
+    --color-popover: var(--zhaowen-popover);
+    --color-popover-foreground: var(--zhaowen-popover-foreground);
+    --color-primary: var(--zhaowen-primary);
+    --color-primary-foreground: var(--zhaowen-primary-foreground);
+    --color-muted: var(--zhaowen-muted);
+    --color-muted-foreground: var(--zhaowen-muted-foreground);
+    --color-border: var(--zhaowen-border);
+    --color-input: var(--zhaowen-input);
+    --color-ring: var(--zhaowen-ring);
+    --radius-sm: var(--zhaowen-radius-sm);
+    --radius-md: var(--zhaowen-radius-md);
+    --radius-lg: var(--zhaowen-radius-lg);
+  }
+  @layer base {
+    body { background: var(--zhaowen-background); color: var(--zhaowen-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--zhaowen-background); }
+      .text-background { color: var(--zhaowen-background); }
+      .border-background { border-color: var(--zhaowen-background); }
+      .ring-background { --tw-ring-color: var(--zhaowen-background); }
+      .bg-foreground { background-color: var(--zhaowen-foreground); }
+      .text-foreground { color: var(--zhaowen-foreground); }
+      .border-foreground { border-color: var(--zhaowen-foreground); }
+      .ring-foreground { --tw-ring-color: var(--zhaowen-foreground); }
+      .bg-card { background-color: var(--zhaowen-card); }
+      .text-card { color: var(--zhaowen-card); }
+      .border-card { border-color: var(--zhaowen-card); }
+      .ring-card { --tw-ring-color: var(--zhaowen-card); }
+      .bg-card-foreground { background-color: var(--zhaowen-card-foreground); }
+      .text-card-foreground { color: var(--zhaowen-card-foreground); }
+      .border-card-foreground { border-color: var(--zhaowen-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--zhaowen-card-foreground); }
+      .bg-popover { background-color: var(--zhaowen-popover); }
+      .text-popover { color: var(--zhaowen-popover); }
+      .border-popover { border-color: var(--zhaowen-popover); }
+      .ring-popover { --tw-ring-color: var(--zhaowen-popover); }
+      .bg-popover-foreground { background-color: var(--zhaowen-popover-foreground); }
+      .text-popover-foreground { color: var(--zhaowen-popover-foreground); }
+      .border-popover-foreground { border-color: var(--zhaowen-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--zhaowen-popover-foreground); }
+      .bg-primary { background-color: var(--zhaowen-primary); }
+      .text-primary { color: var(--zhaowen-primary); }
+      .border-primary { border-color: var(--zhaowen-primary); }
+      .ring-primary { --tw-ring-color: var(--zhaowen-primary); }
+      .bg-primary-foreground { background-color: var(--zhaowen-primary-foreground); }
+      .text-primary-foreground { color: var(--zhaowen-primary-foreground); }
+      .border-primary-foreground { border-color: var(--zhaowen-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--zhaowen-primary-foreground); }
+      .bg-muted { background-color: var(--zhaowen-muted); }
+      .text-muted { color: var(--zhaowen-muted); }
+      .border-muted { border-color: var(--zhaowen-muted); }
+      .ring-muted { --tw-ring-color: var(--zhaowen-muted); }
+      .bg-muted-foreground { background-color: var(--zhaowen-muted-foreground); }
+      .text-muted-foreground { color: var(--zhaowen-muted-foreground); }
+      .border-muted-foreground { border-color: var(--zhaowen-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--zhaowen-muted-foreground); }
+      .bg-border { background-color: var(--zhaowen-border); }
+      .text-border { color: var(--zhaowen-border); }
+      .border-border { border-color: var(--zhaowen-border); }
+      .ring-border { --tw-ring-color: var(--zhaowen-border); }
+      .bg-input { background-color: var(--zhaowen-input); }
+      .text-input { color: var(--zhaowen-input); }
+      .border-input { border-color: var(--zhaowen-input); }
+      .ring-input { --tw-ring-color: var(--zhaowen-input); }
+      .bg-ring { background-color: var(--zhaowen-ring); }
+      .text-ring { color: var(--zhaowen-ring); }
+      .border-ring { border-color: var(--zhaowen-ring); }
+      .ring-ring { --tw-ring-color: var(--zhaowen-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+<link rel="stylesheet" href="../site-preferences.css">
+</head>
+<body>
+<style id="critical-layout">
+  /* 页面兜底底色 = 本页底图 IMG_1948 实测均值（无米黄）；图片不透明度下限 0.92 */
+  :root {
+    --zhaowen-page-base: #ccc9c3;
+    --zhaowen-art-opacity: 0.94;
+  }
+
+  /* ===================================================================
+     藏书阁 · 首页 — 静态关键布局样式（不依赖 Tailwind 运行时编译）
+     =================================================================== */
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html { background: var(--zhaowen-page-base); }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--zhaowen-page-base);
+    color: var(--zhaowen-ink-1);
+    font-family: var(--zhaowen-font-serif);
+    font-size: var(--zhaowen-text-base);
+    line-height: 1.85;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .gw-ico {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
+    color: inherit;
+  }
+
+  /* ---------------- shell：左栏 sticky + 右栏文档流 ---------------- */
+  .gw-shell {
+    display: flex;
+    align-items: flex-start;
+    width: 100%;
+    min-height: 100vh;
+    background: var(--zhaowen-page-base);
+  }
+
+  /* 主栏不画左分隔线：左栏底图与主栏底图靠羽化咬合，避免硬分界 */
+  .gw-main-col {
+    flex: 1 1 auto;
+    min-width: 0;
+    position: relative;
+    background: var(--zhaowen-page-base);
+  }
+
+  /* ---------------- 左侧栏 #sidebar-nav ---------------- */
+  .gw-sidebar {
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    flex: 0 0 300px;
+    width: 300px;
+    height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 5;
+  }
+  .gw-sidebar::-webkit-scrollbar { width: 6px; }
+  .gw-sidebar::-webkit-scrollbar-track { background: transparent; }
+  .gw-sidebar::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--zhaowen-ink-3) 42%, transparent);
+    border-radius: 3px;
+  }
+
+  .gw-sidebar-bgwrap {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    margin-bottom: -100vh;
+    background: var(--zhaowen-page-base);
+    isolation: isolate;
+    pointer-events: none;
+    z-index: 0;
+  }
+  /* 底图只在最右侧 12% 收边，画面中心保持清晰，与主栏底图咬合 */
+  .gw-sidebar-bgfeather {
+    position: absolute;
+    inset: 0;
+    -webkit-mask-image: linear-gradient(to right, var(--zhaowen-ink-1) 0%, var(--zhaowen-ink-1) 88%, color-mix(in srgb, var(--zhaowen-ink-1) 52%, transparent) 94%, transparent 100%);
+    mask-image: linear-gradient(to right, var(--zhaowen-ink-1) 0%, var(--zhaowen-ink-1) 88%, color-mix(in srgb, var(--zhaowen-ink-1) 52%, transparent) 94%, transparent 100%);
+  }
+  .gw-sidebar-bg {
+    position: absolute;
+    inset: 0;
+    background-image: url("../assets/sidebar-bg.jpg");
+    background-size: cover;
+    background-position: center 30%;
+    background-repeat: no-repeat;
+    opacity: var(--zhaowen-art-opacity);
+    mix-blend-mode: multiply;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, var(--zhaowen-ink-1) 9%, var(--zhaowen-ink-1) 91%, transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0%, var(--zhaowen-ink-1) 9%, var(--zhaowen-ink-1) 91%, transparent 100%);
+  }
+  /* 只保留右缘极薄一层过渡，不再把底图压没 */
+  .gw-sidebar-veil {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to right,
+      transparent 0%,
+      transparent 64%,
+      color-mix(in srgb, var(--zhaowen-page-base) 30%, transparent) 86%,
+      color-mix(in srgb, var(--zhaowen-page-base) 58%, transparent) 100%
+    );
+  }
+
+  .gw-sidebar-inner {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    min-height: 100vh;
+    padding: 1.9rem 1.35rem 1.5rem;
+  }
+
+  /* 品牌区 */
+  .gw-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding-bottom: 1.35rem;
+    border-bottom: 1px solid var(--zhaowen-line);
+  }
+  .gw-seal {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: var(--zhaowen-ink-1);
+    font-family: var(--zhaowen-font-display);
+    font-size: 1.35rem;
+    line-height: 1;
+    border: 1px solid var(--zhaowen-line);
+    border-radius: var(--zhaowen-radius-sm);
+  }
+  .gw-brand-text { display: flex; flex-direction: column; gap: 0.22rem; min-width: 0; }
+  .gw-brand-title {
+    font-family: var(--zhaowen-font-display);
+    font-size: 1.5rem;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    line-height: 1.15;
+    color: var(--zhaowen-ink-1);
+  }
+  .gw-brand-sub {
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    color: var(--zhaowen-ink-3);
+  }
+
+  /* 导航按钮列表（可滚动） */
+  .gw-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.32rem;
+    flex: 1 1 auto;
+    min-height: 170px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 2px;
+    -webkit-mask-image: linear-gradient(to bottom, var(--zhaowen-ink-1) 0%, var(--zhaowen-ink-1) 92%, transparent 100%);
+    mask-image: linear-gradient(to bottom, var(--zhaowen-ink-1) 0%, var(--zhaowen-ink-1) 92%, transparent 100%);
+  }
+  .gw-nav::-webkit-scrollbar { width: 5px; }
+  .gw-nav::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--zhaowen-ink-3) 38%, transparent);
+    border-radius: 3px;
+  }
+  .gw-nav::-webkit-scrollbar-track { background: transparent; }
+
+  /* 按钮统一：透明底 + 黑字 + 1px 黑描边；hover 为 6% 墨色淡底；无实心色块 */
+  .gw-nav-btn {
+    position: relative;
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.7rem;
+    width: 100%;
+    margin: 0;
+    padding: 0.82rem 0.8rem 0.82rem 1rem;
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.94rem;
+    letter-spacing: 0.08em;
+    text-align: left;
+    text-decoration: none;
+    color: var(--zhaowen-ink-1);
+    background: transparent;
+    border: 1px solid var(--zhaowen-line);
+    border-radius: var(--zhaowen-radius-sm);
+    cursor: pointer;
+    transition: transform 0.18s ease, color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
+  }
+  .gw-nav-btn::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.42rem;
+    bottom: 0.42rem;
+    width: 3px;
+    background: var(--zhaowen-ink-1);
+    opacity: 0;
+    transition: opacity 0.18s ease;
+  }
+  .gw-nav-btn:hover {
+    transform: translateX(2px);
+    color: var(--zhaowen-ink-1);
+    border-color: var(--zhaowen-ink-1);
+    background: color-mix(in srgb, var(--zhaowen-ink-1) 6%, transparent);
+  }
+  .gw-nav-btn:hover::before { opacity: 1; }
+  .gw-nav-btn:focus-visible { outline: 2px solid var(--zhaowen-ink-1); outline-offset: 2px; }
+  .gw-nav-label { min-width: 0; }
+  .gw-nav-en {
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--zhaowen-ink-3);
+    white-space: nowrap;
+  }
+
+  /* 四部分类 */
+  .gw-cats { display: flex; flex-direction: column; gap: 0.6rem; }
+  .gw-cats-title {
+    margin: 0;
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
+    color: var(--zhaowen-ink-3);
+  }
+  .gw-cat-row { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+  .gw-cat {
+    padding: 0.34rem 0.7rem;
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.82rem;
+    letter-spacing: 0.06em;
+    color: var(--zhaowen-ink-1);
+    background: transparent;
+    border: 1px solid var(--zhaowen-line);
+    border-radius: var(--zhaowen-radius-sm);
+    cursor: pointer;
+    transition: color 0.16s ease, border-color 0.16s ease, background-color 0.16s ease;
+  }
+  .gw-cat:hover {
+    border-color: var(--zhaowen-ink-1);
+    color: var(--zhaowen-ink-1);
+    background: color-mix(in srgb, var(--zhaowen-ink-1) 6%, transparent);
+  }
+  .gw-cat.is-active {
+    background: color-mix(in srgb, var(--zhaowen-ink-1) 6%, transparent);
+    border-color: var(--zhaowen-ink-1);
+    color: var(--zhaowen-ink-1);
+    font-weight: 700;
+  }
+  .gw-cat:focus-visible { outline: 2px solid var(--zhaowen-ink-1); outline-offset: 2px; }
+
+  .gw-sidebar-hint {
+    margin: 0;
+    padding-top: 1rem;
+    margin-top: auto;
+    border-top: 1px solid var(--zhaowen-line);
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    line-height: 1.75;
+    color: var(--zhaowen-ink-3);
+  }
+
+  /* ---------------- 首屏 hero #hero-stage ---------------- */
+  .gw-hero {
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: 56vh;
+    min-height: 420px;
+    overflow: hidden;
+    background: var(--zhaowen-page-base);
+  }
+  .gw-hero-base {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-color: var(--zhaowen-page-base);
+    background-image:
+      radial-gradient(64% 58% at 74% 22%, color-mix(in srgb, var(--zhaowen-surface-3) 62%, transparent) 0%, color-mix(in srgb, var(--zhaowen-surface-3) 0%, transparent) 72%),
+      radial-gradient(58% 54% at 16% 84%, color-mix(in srgb, var(--zhaowen-surface-2) 46%, transparent) 0%, color-mix(in srgb, var(--zhaowen-surface-2) 0%, transparent) 76%);
+  }
+  .gw-hero-texture {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.075;
+    background-image: url("../assets/paper-texture.jpg");
+    background-size: cover;
+    background-position: center;
+  }
+  .gw-hero-art {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    opacity: var(--zhaowen-art-opacity);
+    mix-blend-mode: multiply;
+    filter: saturate(0.94) contrast(1.03);
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, var(--zhaowen-ink-1) 8%, var(--zhaowen-ink-1) 92%, transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0%, var(--zhaowen-ink-1) 8%, var(--zhaowen-ink-1) 92%, transparent 100%);
+  }
+  .gw-hero-art-img {
+    position: absolute;
+    inset: 0;
+    background-image: url("../assets/home-hero.jpg");
+    background-size: cover;
+    background-position: center 26%;
+    background-repeat: no-repeat;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, var(--zhaowen-ink-1) 8%, var(--zhaowen-ink-1) 92%, transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0%, var(--zhaowen-ink-1) 8%, var(--zhaowen-ink-1) 92%, transparent 100%);
+  }
+  /* 只在最下缘 12% 收边，其余画面保持清晰 */
+  .gw-hero-fade {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 12%;
+    z-index: 2;
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      transparent 0%,
+      color-mix(in srgb, var(--zhaowen-page-base) 62%, transparent) 100%
+    );
+  }
+
+  .gw-hero-content {
+    position: relative;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.95rem;
+    width: 100%;
+    max-width: 860px;
+    padding: 3rem clamp(1.5rem, 4vw, 4rem);
+  }
+  /* hero 文字块的局部柔光垫：只包住文字块并向外渐隐，不做整幅压盖 */
+  .gw-hero-glow {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    z-index: 2;
+    width: min(74%, 860px);
+    height: min(88%, 560px);
+    transform: translateY(-50%);
+    pointer-events: none;
+    background: radial-gradient(
+      62% 60% at 42% 50%,
+      color-mix(in srgb, var(--zhaowen-glow) 62%, transparent) 0%,
+      color-mix(in srgb, var(--zhaowen-glow) 40%, transparent) 38%,
+      color-mix(in srgb, var(--zhaowen-glow) 14%, transparent) 68%,
+      transparent 100%
+    );
+  }
+  .gw-hero-seal {
+    display: inline-block;
+    padding: 0.28rem 0.6rem 0.28rem 0.78rem;
+    background: transparent;
+    color: var(--zhaowen-ink-1);
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.72rem;
+    letter-spacing: 0.3em;
+    line-height: 1.5;
+    border: 1px solid var(--zhaowen-line);
+    border-radius: var(--zhaowen-radius-sm);
+  }
+  .gw-hero-title {
+    margin: 0;
+    font-family: var(--zhaowen-font-display);
+    font-size: clamp(1.55rem, 2.4vw, var(--zhaowen-text-3xl));
+    font-weight: 500;
+    line-height: 1.25;
+    letter-spacing: 0.14em;
+    color: var(--zhaowen-ink-1);
+  }
+  .gw-hero-sub {
+    margin: 0;
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.88rem;
+    line-height: 1.85;
+    letter-spacing: 0.14em;
+    color: var(--zhaowen-ink-2);
+  }
+
+  /* 搜索框 #home-search —— 透明底，靠上方柔光垫取对比 */
+  .gw-search {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    width: 100%;
+    max-width: 560px;
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.55rem 0.5rem 0.95rem;
+    background: transparent;
+    border: 1px solid var(--zhaowen-line);
+    border-radius: var(--zhaowen-radius-md);
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+  .gw-search:focus-within {
+    border-color: var(--zhaowen-ink-1);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--zhaowen-ink-1) 18%, transparent);
+  }
+  .gw-search .gw-ico { color: var(--zhaowen-ink-2); }
+  .gw-search input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0.4rem 0;
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.88rem;
+    line-height: 1.85;
+    letter-spacing: 0.06em;
+    color: var(--zhaowen-ink-1);
+    background: transparent;
+    border: 0;
+    outline: none;
+  }
+  .gw-search input::placeholder { color: var(--zhaowen-ink-3); }
+  .gw-search-btn {
+    flex: 0 0 auto;
+    padding: 0.45rem 1rem;
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.86rem;
+    letter-spacing: 0.12em;
+    color: var(--zhaowen-ink-1);
+    background: transparent;
+    border: 1px solid var(--zhaowen-line);
+    border-radius: var(--zhaowen-radius-sm);
+    cursor: pointer;
+    transition: background-color 0.16s ease, border-color 0.16s ease;
+  }
+  .gw-search-btn:hover {
+    background: color-mix(in srgb, var(--zhaowen-ink-1) 6%, transparent);
+    border-color: var(--zhaowen-ink-1);
+  }
+  .gw-search-btn:focus-visible { outline: 2px solid var(--zhaowen-ink-1); outline-offset: 2px; }
+
+  /* 蝴蝶层 #butterfly-layer */
+  .gw-butterflies {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
+  }
+  .gw-butterfly {
+    position: absolute;
+    left: var(--x);
+    top: var(--y);
+    width: calc(78px * var(--s));
+    margin: 0;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: var(--zhaowen-radius-sm);
+    line-height: 0;
+    color: var(--zhaowen-ink-1);
+    opacity: var(--o);
+    transform: translate(-50%, -50%) rotate(var(--r));
+    pointer-events: auto;
+    cursor: pointer;
+    transition: opacity 0.25s ease, filter 0.25s ease;
+  }
+  .gw-butterfly:hover {
+    opacity: calc(var(--o) + 0.28);
+    filter: drop-shadow(0 3px 7px color-mix(in srgb, var(--zhaowen-ink-1) 28%, transparent));
+  }
+  .gw-butterfly:focus-visible {
+    outline: 2px dashed var(--zhaowen-seal);
+    outline-offset: 5px;
+  }
+  .gw-bf { display: block; }
+  .gw-butterfly svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .gw-wing {
+    fill: currentColor;
+    fill-opacity: 0.46;
+    stroke: currentColor;
+    stroke-opacity: 0.5;
+    stroke-width: 1.4;
+    stroke-linejoin: round;
+  }
+  .gw-body { fill: currentColor; fill-opacity: 0.72; }
+  .gw-antenna {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-opacity: 0.68;
+  }
+  .gw-spot { fill: var(--zhaowen-background); fill-opacity: 0.55; }
+  .gw-bw { transform-box: view-box; }
+  .gw-bw-left { transform-origin: 48px 36px; }
+  .gw-bw-right { transform-origin: 52px 36px; }
+
+  .gw-butterfly.is-fluttering .gw-bf {
+    animation: gw-butterfly-float 1.2s cubic-bezier(0.32, 0.68, 0.42, 1) 1 both;
+  }
+  .gw-butterfly.is-fluttering .gw-bw-left {
+    animation: gw-wing-left 0.26s ease-in-out 0s 4 alternate;
+  }
+  .gw-butterfly.is-fluttering .gw-bw-right {
+    animation: gw-wing-right 0.26s ease-in-out 0s 4 alternate;
+  }
+  @keyframes gw-butterfly-float {
+    0%   { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+    22%  { transform: translate3d(10px, -22px, 0) rotate(7deg) scale(1.08); }
+    52%  { transform: translate3d(-6px, -38px, 0) rotate(-5deg) scale(1.04); }
+    76%  { transform: translate3d(4px, -18px, 0) rotate(3deg) scale(1.01); }
+    100% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+  }
+  @keyframes gw-wing-left {
+    from { transform: rotate(0deg) scaleX(1); }
+    to   { transform: rotate(16deg) scaleX(0.42); }
+  }
+  @keyframes gw-wing-right {
+    from { transform: rotate(0deg) scaleX(1); }
+    to   { transform: rotate(-16deg) scaleX(0.42); }
+  }
+
+  /* ---------------- 主内容区 #main-feed ---------------- */
+  .gw-feed {
+    /* 主栏左右留白集中在一个变量里，便于满幅区块用它做负边距，避免横向溢出 */
+    --gw-feed-pad: clamp(1.25rem, 3.4vw, 4rem);
+    display: flex;
+    flex-direction: column;
+    gap: var(--zhaowen-section-gap);
+    padding: var(--zhaowen-section-gap) var(--gw-feed-pad) 0;
+  }
+  .gw-section { display: flex; flex-direction: column; gap: 1.15rem; }
+  .gw-sec-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 0.8rem;
+    border-bottom: 1px solid var(--zhaowen-line);
+  }
+  .gw-sec-title {
+    margin: 0;
+    font-family: var(--zhaowen-font-display);
+    font-size: var(--zhaowen-text-lg);
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    color: var(--zhaowen-ink-1);
+  }
+  .gw-sec-title::before {
+    content: "";
+    display: inline-block;
+    width: 0.42rem;
+    height: 0.42rem;
+    margin-right: 0.6rem;
+    vertical-align: 0.12em;
+    background: var(--zhaowen-ink-1);
+  }
+  .gw-sec-meta {
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    color: var(--zhaowen-ink-3);
+    white-space: nowrap;
+  }
+  .gw-sec-lead {
+    margin: 0;
+    max-width: 62ch;
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.88rem;
+    line-height: 1.85;
+    letter-spacing: 0.05em;
+    color: var(--zhaowen-ink-2);
+  }
+
+  .gw-rec-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.15rem;
+  }
+  .gw-book {
+    display: grid;
+    grid-template-columns: 88px minmax(0, 1fr);
+    gap: 1.05rem;
+    padding: 1.15rem;
+    /* 中性纸面，取自本页底图与白的混合，不带黄调 */
+    background: color-mix(in srgb, var(--zhaowen-page-base) 62%, var(--zhaowen-glow));
+    border: 1px solid var(--zhaowen-line);
+    border-radius: var(--zhaowen-radius-md);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  }
+  .gw-book:hover {
+    border-color: color-mix(in srgb, var(--zhaowen-ink-1) 38%, transparent);
+    box-shadow: 0 10px 22px -14px color-mix(in srgb, var(--zhaowen-ink-1) 42%, transparent);
+    transform: translateY(-2px);
+  }
+  .gw-book-thumb { position: relative; }
+  .gw-book-thumb img {
+    display: block;
+    width: 88px;
+    height: 88px;
+    object-fit: cover;
+    background: var(--zhaowen-surface-1);
+    border: 1px solid var(--zhaowen-line);
+    border-radius: var(--zhaowen-radius-sm);
+  }
+  /* 印记类小标：透明底 + 黑细框 + 黑字 */
+  .gw-book-cat {
+    position: absolute;
+    right: -5px;
+    bottom: -5px;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.8rem;
+    line-height: 1;
+    color: var(--zhaowen-ink-1);
+    background: color-mix(in srgb, var(--zhaowen-page-base) 62%, var(--zhaowen-glow));
+    border: 1px solid var(--zhaowen-line);
+    border-radius: var(--zhaowen-radius-sm);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--zhaowen-page-base) 62%, var(--zhaowen-glow));
+  }
+  .gw-book-body { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
+  .gw-book-title {
+    margin: 0;
+    font-family: var(--zhaowen-font-display);
+    font-size: 1rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    line-height: 1.5;
+    color: var(--zhaowen-ink-1);
+  }
+  .gw-book-meta {
+    margin: 0;
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    color: var(--zhaowen-ink-3);
+  }
+  .gw-book-note {
+    margin: 0;
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.85rem;
+    line-height: 1.85;
+    color: var(--zhaowen-ink-2);
+  }
+  .gw-book-foot { margin-top: auto; padding-top: 0.5rem; }
+  .gw-link {
+    padding: 0.3rem 0.85rem;
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.86rem;
+    letter-spacing: 0.14em;
+    color: var(--zhaowen-ink-1);
+    background: transparent;
+    border: 1px solid var(--zhaowen-line);
+    border-radius: var(--zhaowen-radius-sm);
+    cursor: pointer;
+    transition: background-color 0.16s ease, border-color 0.16s ease;
+  }
+  .gw-link:hover {
+    background: color-mix(in srgb, var(--zhaowen-ink-1) 6%, transparent);
+    border-color: var(--zhaowen-ink-1);
+    color: var(--zhaowen-ink-1);
+  }
+  .gw-link:focus-visible { outline: 2px solid var(--zhaowen-ink-1); outline-offset: 2px; }
+
+  /* 满幅补白大图带：独占近一整屏、左右完全通铺到主栏边缘、与上一区块无缝隙；
+     画面中心清晰，只在四条边最外侧约 8%~10% 收边 */
+  .gw-panel {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* 拉高为近一整屏，成为首页下半部的视觉主体；超宽屏用 max-height 兜住，
+       min-height 与 max-height 冲突时以 min-height 优先 */
+    min-height: 100vh;
+    max-height: 118vh;
+    width: auto;
+    /* 用负外边距精确抵消 .gw-feed 的内边距与区块间距 → 左右不留白、与上一区块无缝隙；
+       两个方向都用同一组变量，断点下 --gw-feed-pad / --zhaowen-section-gap 改值时自动同步 */
+    margin: calc(-1 * var(--zhaowen-section-gap)) calc(-1 * var(--gw-feed-pad)) 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    overflow: hidden;
+    background: var(--zhaowen-page-base);
+  }
+  .gw-panel-art {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-color: var(--zhaowen-page-base);
+    /* 左右最外侧 8% 收边，与左栏底图咬合 */
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, var(--zhaowen-ink-1) 8%, var(--zhaowen-ink-1) 92%, transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0%, var(--zhaowen-ink-1) 8%, var(--zhaowen-ink-1) 92%, transparent 100%);
+  }
+  .gw-panel-art-img {
+    position: absolute;
+    inset: 0;
+    background-image: url("../assets/home-panel.jpg");
+    background-size: cover;
+    /* 满屏高度下让画面主体（中部）落在可视区，裁切居中 */
+    background-position: center center;
+    background-repeat: no-repeat;
+    opacity: var(--zhaowen-art-opacity);
+    mix-blend-mode: multiply;
+    /* 上下最外侧 10% 收边，画面中心保持清晰 */
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, var(--zhaowen-ink-1) 10%, var(--zhaowen-ink-1) 90%, transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0%, var(--zhaowen-ink-1) 10%, var(--zhaowen-ink-1) 90%, transparent 100%);
+  }
+  /* 文字块局部柔光垫：尺寸刚好包住文字并向外渐隐到 transparent */
+  .gw-panel-copy {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1.9rem 2.6rem;
+    text-align: center;
+    background: radial-gradient(
+      68% 76% at 50% 50%,
+      color-mix(in srgb, var(--zhaowen-glow) 58%, transparent) 0%,
+      color-mix(in srgb, var(--zhaowen-glow) 34%, transparent) 46%,
+      transparent 100%
+    );
+    border: 0;
+    border-radius: 0;
+    pointer-events: none;
+  }
+  .gw-panel-line {
+    margin: 0;
+    font-family: var(--zhaowen-font-display);
+    font-size: clamp(1.1rem, 1.8vw, 1.4rem);
+    font-weight: 500;
+    letter-spacing: 0.3em;
+    text-indent: 0.3em;
+    color: var(--zhaowen-ink-1);
+  }
+  .gw-panel-sub {
+    margin: 0;
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    line-height: 1.85;
+    color: var(--zhaowen-ink-2);
+  }
+
+  /* 页脚 */
+  .gw-footer {
+    margin-top: var(--zhaowen-section-gap);
+    padding: 1.6rem 1rem 2.4rem;
+    text-align: center;
+    border-top: 1px solid var(--zhaowen-line);
+    color: var(--zhaowen-ink-3);
+  }
+  .gw-footer-line {
+    margin: 0;
+    font-family: var(--zhaowen-font-display);
+    font-size: 0.86rem;
+    letter-spacing: 0.2em;
+    color: var(--zhaowen-ink-2);
+  }
+  .gw-footer-note {
+    margin: 0.35rem 0 0;
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+  }
+  .gw-admin-link {
+    display:inline-flex;align-items:center;justify-content:center;margin-top:.75rem;padding:.58rem 1.1rem;
+    border:1px solid color-mix(in srgb,var(--zhaowen-ink-1) 42%,transparent);border-radius:999px;
+    color:var(--zhaowen-ink-1);background:color-mix(in srgb,var(--zhaowen-paper) 78%,transparent);
+    font-family:var(--zhaowen-font-sans);font-size:.72rem;letter-spacing:.14em;text-decoration:none;
+  }
+  .gw-admin-link:hover{background:var(--zhaowen-card);transform:translateY(-1px)}
+
+  /* ---------------- 响应式 ---------------- */
+  @media (max-width: 1240px) {
+    .gw-rec-grid { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 980px) {
+    .gw-sidebar { flex: 0 0 240px; width: 240px; }
+    .gw-sidebar-inner { padding: 1.5rem 1.1rem 1.25rem; }
+    .gw-hero-content { padding: 2rem 1.5rem; }
+    .gw-feed { --gw-feed-pad: 1.5rem; }
+    .gw-hero-glow { width: min(86%, 720px); }
+    .gw-footer { margin-left: 1.5rem; margin-right: 1.5rem; }
+    .gw-panel-line { letter-spacing: 0.24em; text-indent: 0.24em; }
+  }
+  @media (max-width: 620px) {
+    .gw-hero { height:auto; min-height:clamp(360px,78svh,620px); }
+    .gw-hero-content { padding:4.5rem 1.15rem 2rem; }
+    .gw-hero-art-img { background-size:contain; background-position:center; }
+    .gw-panel-art-img { background-size:contain; background-position:center; }
+    .gw-book { grid-template-columns: 72px minmax(0, 1fr); }
+    .gw-book-thumb img { width: 72px; height: 72px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .gw-butterfly.is-fluttering .gw-bf,
+    .gw-butterfly.is-fluttering .gw-bw-left,
+    .gw-butterfly.is-fluttering .gw-bw-right { animation: none !important; }
+    .gw-butterfly, .gw-book, .gw-nav-btn { transition: none !important; }
+    .gw-book:hover { transform: none; }
+  }
+</style>
+
+<style id="gw-gate-styles">
+  /* ===================================================================
+     木木书屋 · 会员入口与卡密弹窗（本次新增，独立于既有区块样式）
+     =================================================================== */
+
+  /* ---------------- 入口区块 .gw-gate ---------------- */
+  .gw-gate {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 3.5rem clamp(1.5rem, 4vw, 4rem);
+    background: var(--zhaowen-page-base);
+    text-align: center;
+  }
+  .gw-gate::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      radial-gradient(56% 60% at 50% 46%, color-mix(in srgb, var(--zhaowen-surface-3) 56%, transparent) 0%, color-mix(in srgb, var(--zhaowen-surface-3) 0%, transparent) 74%),
+      radial-gradient(62% 54% at 92% 8%, color-mix(in srgb, var(--zhaowen-surface-2) 48%, transparent) 0%, color-mix(in srgb, var(--zhaowen-surface-2) 0%, transparent) 80%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, var(--zhaowen-ink-1) 12%, var(--zhaowen-ink-1) 88%, transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0%, var(--zhaowen-ink-1) 12%, var(--zhaowen-ink-1) 88%, transparent 100%);
+  }
+  .gw-gate::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.06;
+    background-image: url("../assets/paper-texture.jpg");
+    background-size: cover;
+    background-position: center;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, var(--zhaowen-ink-1) 26%, var(--zhaowen-ink-1) 74%, transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0%, var(--zhaowen-ink-1) 26%, var(--zhaowen-ink-1) 74%, transparent 100%);
+  }
+  .gw-gate-inner {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.95rem;
+    width: 100%;
+    max-width: 620px;
+  }
+  /* 印记类标签：透明底 + 黑细框 + 黑字 */
+  .gw-gate-seal {
+    display: inline-block;
+    padding: 0.28rem 0.6rem 0.28rem 0.78rem;
+    background: transparent;
+    color: var(--zhaowen-ink-1);
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.72rem;
+    letter-spacing: 0.3em;
+    line-height: 1.5;
+    border: 1px solid var(--zhaowen-line);
+    border-radius: var(--zhaowen-radius-sm);
+  }
+  /* 无障碍隐藏工具类：仅供已被移入球体的标题保留可解析标签 */
+  .gw-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+  .gw-gate-sub {
+    margin: 0;
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.88rem;
+    line-height: 1.85;
+    letter-spacing: 0.14em;
+    color: var(--zhaowen-ink-2);
+  }
+
+  /* 原浅色球体按钮，尺寸缩为原来的一半 */
+  .gw-gate-btn {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 98px;
+    height: 98px;
+    min-height: 0;
+    margin: 0.55rem 0 0.1rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    overflow: hidden;
+    cursor: pointer;
+    color: var(--zhaowen-ink-1);
+    -webkit-appearance: none;
+            appearance: none;
+    background-color: var(--zhaowen-orb-base);
+    background-image: radial-gradient(82% 82% at 32% 26%, var(--zhaowen-orb-highlight) 0%, color-mix(in srgb, var(--zhaowen-orb-highlight) 70%, transparent) 24%, color-mix(in srgb, var(--zhaowen-orb-base) 16%, transparent) 56%, color-mix(in srgb, var(--zhaowen-orb-shade) 60%, transparent) 84%, var(--zhaowen-orb-shade) 100%);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--zhaowen-ink-1) 22%, transparent),
+      inset -5px -7px 12px color-mix(in srgb, var(--zhaowen-ink-1) 12%, transparent),
+      inset 5px 6px 11px color-mix(in srgb, var(--zhaowen-glow) 82%, transparent),
+      0 10px 18px -14px color-mix(in srgb, var(--zhaowen-ink-1) 42%, transparent);
+    transition: transform 0.32s ease, box-shadow 0.32s ease;
+  }
+  /* 左上静态高光贴层：hover 时略微提亮 */
+  .gw-gate-btn::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: 50%;
+    pointer-events: none;
+    background: radial-gradient(68% 68% at 32% 26%, color-mix(in srgb, var(--zhaowen-glow) 60%, transparent) 0%, color-mix(in srgb, var(--zhaowen-glow) 0%, transparent) 72%);
+    opacity: 0.72;
+    transition: opacity 0.32s ease;
+  }
+  .gw-gate-btn:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--zhaowen-ink-1) 26%, transparent),
+      inset -5px -7px 12px color-mix(in srgb, var(--zhaowen-ink-1) 11%, transparent),
+      inset 5px 6px 11px color-mix(in srgb, var(--zhaowen-glow) 90%, transparent),
+      0 13px 22px -14px color-mix(in srgb, var(--zhaowen-ink-1) 46%, transparent);
+  }
+  .gw-gate-btn:hover::before { opacity: 1; }
+  .gw-gate-btn:active {
+    transform: translateY(0);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--zhaowen-ink-1) 22%, transparent),
+      inset -4px -5px 10px color-mix(in srgb, var(--zhaowen-ink-1) 14%, transparent),
+      inset 4px 5px 9px color-mix(in srgb, var(--zhaowen-glow) 78%, transparent);
+  }
+  .gw-gate-btn:focus-visible {
+    outline: 2px solid var(--zhaowen-ink-1);
+    outline-offset: 4px;
+  }
+  .gw-gate-btn.is-entered {
+    color: var(--zhaowen-ink-1);
+    background-color: var(--zhaowen-orb-base);
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--zhaowen-ink-1) 32%, transparent),
+      inset -5px -7px 13px color-mix(in srgb, var(--zhaowen-ink-1) 15%, transparent),
+      inset 5px 6px 11px color-mix(in srgb, var(--zhaowen-glow) 86%, transparent);
+  }
+  .gw-gate-btn.is-entered:hover { transform: translateY(-2px); }
+
+  /* 球面纹理层：内联 SVG 侵蚀环，裁在圆内，不拦截指针 */
+  .gw-orb-tex {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    display: block;
+    border-radius: 50%;
+    overflow: hidden;
+    /* 侵蚀环描边继承此墨色（SVG 呈现属性用 currentColor） */
+    color: var(--zhaowen-ink-1);
+    pointer-events: none;
+  }
+  .gw-orb-svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  /* 侵蚀环分组：极缓慢旋转，形成球面流转 */
+  .gw-erode-group,
+  .gw-erode-motif {
+    transform-box: view-box;
+    transform-origin: 100px 100px;
+    animation: gw-orb-erode-spin 90s linear infinite;
+  }
+  .gw-erode-motif {
+    animation-duration: 150s;
+    animation-direction: reverse;
+  }
+  @keyframes gw-orb-erode-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  /* 球心文字 */
+  .gw-gate-btn-label {
+    position: relative;
+    z-index: 2;
+    display: block;
+    font-family: var(--zhaowen-font-display);
+    font-size: 0.68rem;
+    font-weight: 500;
+    line-height: 1.4;
+    letter-spacing: 0.2em;
+    text-indent: 0.2em;
+    white-space: nowrap;
+    color: var(--zhaowen-ink-1);
+    text-align: center;
+  }
+  .gw-gate-tip {
+    margin: 0.15rem 0 0;
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    color: var(--zhaowen-ink-3);
+  }
+
+  /* ---------------- 卡密弹窗 #gw-gate-modal ---------------- */
+  body.gw-modal-open { overflow: hidden; }
+
+  .gw-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+  }
+  .gw-modal[hidden] { display: none; }
+  .gw-modal-mask {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, var(--zhaowen-ink-1) 46%, transparent);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+  .gw-modal.is-open .gw-modal-mask { opacity: 1; }
+
+  .gw-modal-panel {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 420px;
+    max-height: calc(100vh - 3rem);
+    overflow-y: auto;
+    padding: 1.6rem 1.6rem 1.3rem;
+    background: var(--zhaowen-card);
+    border: 1px solid var(--zhaowen-line);
+    border-radius: var(--zhaowen-radius-lg);
+    box-shadow: 0 26px 60px -28px color-mix(in srgb, var(--zhaowen-ink-1) 62%, transparent);
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  .gw-modal-panel.is-open { opacity: 1; transform: translateY(0); }
+  .gw-modal-panel.is-shake { animation: gw-shake 0.32s cubic-bezier(0.36, 0.07, 0.19, 0.97) 1 both; }
+  @keyframes gw-shake {
+    0%   { transform: translateX(0); }
+    12%  { transform: translateX(-8px); }
+    28%  { transform: translateX(7px); }
+    44%  { transform: translateX(-5px); }
+    60%  { transform: translateX(4px); }
+    76%  { transform: translateX(-2px); }
+    100% { transform: translateX(0); }
+  }
+
+  .gw-modal-body[hidden] { display: none; }
+  .gw-modal-title {
+    margin: 0;
+    font-family: var(--zhaowen-font-display);
+    font-size: 1.1rem;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    color: var(--zhaowen-ink-1);
+  }
+  .gw-modal-title::before {
+    content: "";
+    display: inline-block;
+    width: 0.36rem;
+    height: 0.36rem;
+    margin-right: 0.55rem;
+    vertical-align: 0.1em;
+    background: var(--zhaowen-ink-1);
+  }
+  .gw-modal-desc {
+    margin: 0.5rem 0 0;
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.86rem;
+    line-height: 1.85;
+    letter-spacing: 0.06em;
+    color: var(--zhaowen-ink-2);
+  }
+  .gw-modal-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1.15rem;
+  }
+  .gw-modal-input {
+    width: 100%;
+    padding: 0.8rem 1rem;
+    font-family: var(--zhaowen-font-mono);
+    font-size: 0.95rem;
+    letter-spacing: 0.18em;
+    color: var(--zhaowen-ink-1);
+    background: transparent;
+    border: 1px solid var(--zhaowen-line);
+    border-radius: var(--zhaowen-radius-md);
+    outline: none;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+  .gw-modal-input::placeholder { color: var(--zhaowen-ink-3); letter-spacing: 0.18em; }
+  .gw-modal-input:focus {
+    border-color: var(--zhaowen-ink-1);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--zhaowen-ink-1) 18%, transparent);
+  }
+  .gw-modal-input.is-invalid {
+    border-color: var(--zhaowen-ink-1);
+    box-shadow: inset 0 0 0 1px var(--zhaowen-ink-1);
+  }
+  /* 错误提示沿用墨色，不再用朱砂红 */
+  .gw-modal-error {
+    margin: 0;
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: var(--zhaowen-ink-1);
+  }
+  .gw-modal-error[hidden] { display: none; }
+
+  .gw-modal-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.7rem;
+    margin-top: 0.25rem;
+  }
+  .gw-modal-submit,
+  .gw-modal-cancel {
+    min-height: 40px;
+    padding: 0 1.3rem;
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.88rem;
+    letter-spacing: 0.16em;
+    border-radius: var(--zhaowen-radius-sm);
+    cursor: pointer;
+    transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+  }
+  /* 弹窗按钮：透明底 + 黑字 + 1px 黑描边 */
+  .gw-modal-submit {
+    color: var(--zhaowen-ink-1);
+    background: transparent;
+    border: 1px solid var(--zhaowen-line);
+  }
+  .gw-modal-submit:hover {
+    background: color-mix(in srgb, var(--zhaowen-ink-1) 6%, transparent);
+    border-color: var(--zhaowen-ink-1);
+  }
+  .gw-modal-cancel {
+    color: var(--zhaowen-ink-1);
+    background: transparent;
+    border: 1px solid var(--zhaowen-line);
+  }
+  .gw-modal-cancel:hover {
+    color: var(--zhaowen-ink-1);
+    background: color-mix(in srgb, var(--zhaowen-ink-1) 6%, transparent);
+    border-color: var(--zhaowen-ink-1);
+  }
+  .gw-modal-submit:focus-visible,
+  .gw-modal-cancel:focus-visible { outline: 2px solid var(--zhaowen-ink-1); outline-offset: 2px; }
+
+  .gw-modal-tip {
+    margin: 0.9rem 0 0;
+    text-align: right;
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    color: var(--zhaowen-ink-3);
+  }
+  .gw-modal-tip[hidden] { display: none; }
+
+  .gw-modal-success {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0 1rem;
+    text-align: center;
+    outline: none;
+  }
+  .gw-modal-success[hidden] { display: none; }
+  .gw-modal-success-seal {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    background: transparent;
+    color: var(--zhaowen-ink-1);
+    font-family: var(--zhaowen-font-display);
+    font-size: 1.45rem;
+    line-height: 1;
+    border: 1px solid var(--zhaowen-line);
+    border-radius: var(--zhaowen-radius-sm);
+  }
+  .gw-modal-success-title {
+    margin: 0;
+    font-family: var(--zhaowen-font-display);
+    font-size: 1.05rem;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    color: var(--zhaowen-ink-1);
+  }
+  .gw-modal-success-note {
+    margin: 0;
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.76rem;
+    letter-spacing: 0.12em;
+    color: var(--zhaowen-ink-3);
+  }
+  .gw-modal-success-actions {
+    display: flex;
+    justify-content: center;
+    gap: 0.7rem;
+    margin-top: 0.9rem;
+  }
+
+  @media (max-width: 620px) {
+    .gw-gate { padding: 2.75rem 1.5rem; }
+    .gw-gate-btn { width: 74px; height: 74px; }
+    .gw-gate-btn-label { font-size: 0.56rem; }
+    .gw-modal { padding: 1rem; }
+    .gw-modal-panel { padding: 1.35rem 1.2rem 1.15rem; }
+    .gw-modal-success-actions { flex-direction: column; align-items: stretch; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .gw-modal-mask,
+    .gw-modal-panel { transition: none !important; }
+    .gw-modal-panel.is-shake { animation: none !important; }
+    .gw-gate-btn,
+    .gw-gate-btn:hover,
+    .gw-gate-btn:active { transition: none !important; transform: none !important; }
+    .gw-gate-btn::before { transition: none !important; }
+    .gw-erode-group,
+    .gw-erode-motif { animation: none !important; }
+  }
+</style>
+
+<div class="gw-shell">
+
+  <!-- ===================== 左侧栏 ===================== -->
+  <aside id="sidebar-nav" class="gw-sidebar" data-dom-id="sidebar-nav" aria-label="小木屋导航">
+    <div class="gw-sidebar-bgwrap" aria-hidden="true">
+      <div class="gw-sidebar-bgfeather">
+        <div class="gw-sidebar-bg"></div>
+      </div>
+      <div class="gw-sidebar-veil"></div>
+    </div>
+
+    <div class="gw-sidebar-inner">
+      <div class="gw-brand">
+        <span class="gw-seal" aria-hidden="true">木</span>
+        <span class="gw-brand-text">
+          <span class="gw-brand-title">小木屋</span>
+          <span class="gw-brand-sub">私人书单 · 找文</span>
+        </span>
+      </div>
+
+      <nav class="gw-nav" aria-label="板块导航">
+        <a class="gw-nav-btn" href="./search.html">
+          <i data-lucide="search" class="gw-ico" aria-hidden="true"></i>
+          <span class="gw-nav-label">找书</span>
+          <span class="gw-nav-en">Search</span>
+        </a>
+        <a class="gw-nav-btn" href="./catalog.html">
+          <i data-lucide="list" class="gw-ico" aria-hidden="true"></i>
+          <span class="gw-nav-label">目录</span>
+          <span class="gw-nav-en">Catalog</span>
+        </a>
+        <a class="gw-nav-btn" href="./bookshelf.html">
+          <i data-lucide="library" class="gw-ico" aria-hidden="true"></i>
+          <span class="gw-nav-label">我的书架</span>
+          <span class="gw-nav-en">Bookshelf</span>
+        </a>
+        <a class="gw-nav-btn" href="./request.html">
+          <i data-lucide="clipboard-list" class="gw-ico" aria-hidden="true"></i>
+          <span class="gw-nav-label">缺书登记</span>
+          <span class="gw-nav-en">Request</span>
+        </a>
+        <a class="gw-nav-btn" href="./review.html">
+          <i data-lucide="pen-line" class="gw-ico" aria-hidden="true"></i>
+          <span class="gw-nav-label">读后感描写</span>
+          <span class="gw-nav-en">Review</span>
+        </a>
+      </nav>
+
+      <div class="gw-cats">
+        <p class="gw-cats-title">书单合集</p>
+        <div class="gw-cat-row">
+          <button class="gw-cat is-active" type="button" data-cat="全部书目">全部</button>
+          <button class="gw-cat" type="button" data-cat="小说">小说</button>
+          <button class="gw-cat" type="button" data-cat="爱发电">爱发电</button>
+          <button class="gw-cat" type="button" data-cat="近期新增">近期新增</button>
+        </div>
+      </div>
+
+      <p class="gw-sidebar-hint">拖动画轴浏览板块 · 内容随卷而变</p>
+    </div>
+  </aside>
+
+  <!-- ===================== 右侧主内容 ===================== -->
+  <div class="gw-main-col">
+
+    <!-- 首屏 -->
+    <section id="hero-stage" class="gw-hero" data-dom-id="hero-stage" aria-labelledby="gw-hero-title">
+      <div class="gw-hero-base" aria-hidden="true"></div>
+      <div class="gw-hero-texture" aria-hidden="true"></div>
+      <div class="gw-hero-art" aria-hidden="true">
+        <div class="gw-hero-art-img"></div>
+      </div>
+      <div class="gw-hero-fade" aria-hidden="true"></div>
+
+      <div class="gw-hero-content">
+        <span class="gw-hero-seal">私人书单</span>
+        <h1 id="gw-hero-title" class="gw-hero-title">小木屋</h1>
+        <p id="gw-hero-sub" class="gw-hero-sub">循着书名，找到想读的故事</p>
+        <form id="home-search" class="gw-search" data-dom-id="home-search" role="search" novalidate>
+          <i data-lucide="search" class="gw-ico" aria-hidden="true"></i>
+          <input id="gw-search-input" type="search" name="q" autocomplete="off" aria-label="搜索外部在线书源" placeholder="搜索外部书源 · 在线阅读">
+          <button class="gw-search-btn" type="submit">外部找书</button>
+        </form>
+      </div>
+
+      <!-- 文字块之后的局部柔光垫：只包住文字并向外渐隐，hero 其余区域保持清晰 -->
+      <div class="gw-hero-glow" aria-hidden="true"></div>
+
+      <div id="butterfly-layer" class="gw-butterflies" data-dom-id="butterfly-layer">
+        <button class="gw-butterfly" type="button" aria-label="蝴蝶" style="--x:7%; --y:13%; --s:.60; --r:-14deg; --o:.40;">
+          <span class="gw-bf">
+            <svg viewBox="0 0 100 80" focusable="false" role="presentation" aria-hidden="true">
+              <g class="gw-bw gw-bw-left">
+                <path class="gw-wing" d="M48 30 C40 12 26 2 12 6 C2 9 0 24 8 34 C18 44 40 42 48 40 Z"/>
+                <path class="gw-wing" d="M48 44 C36 46 22 50 16 60 C12 68 20 76 30 74 C42 71 48 58 48 50 Z"/>
+                <circle class="gw-spot" cx="26" cy="20" r="3"/>
+              </g>
+              <g class="gw-bw gw-bw-right">
+                <path class="gw-wing" d="M52 30 C60 12 74 2 88 6 C98 9 100 24 92 34 C82 44 60 42 52 40 Z"/>
+                <path class="gw-wing" d="M52 44 C64 46 78 50 84 60 C88 68 80 76 70 74 C58 71 52 58 52 50 Z"/>
+                <circle class="gw-spot" cx="74" cy="20" r="3"/>
+              </g>
+              <path class="gw-body" d="M50 22 C51.4 32 51.4 50 50 62 C48.6 50 48.6 32 50 22 Z"/>
+              <path class="gw-antenna" d="M49 24 C44 15 39 10 33 7"/>
+              <path class="gw-antenna" d="M51 24 C56 15 61 10 67 7"/>
+            </svg>
+          </span>
+        </button>
+
+        <button class="gw-butterfly" type="button" aria-label="蝴蝶" style="--x:47%; --y:52%; --s:.72; --r:10deg; --o:.30;">
+          <span class="gw-bf">
+            <svg viewBox="0 0 100 80" focusable="false" role="presentation" aria-hidden="true">
+              <g class="gw-bw gw-bw-left">
+                <path class="gw-wing" d="M48 30 C40 12 26 2 12 6 C2 9 0 24 8 34 C18 44 40 42 48 40 Z"/>
+                <path class="gw-wing" d="M48 44 C36 46 22 50 16 60 C12 68 20 76 30 74 C42 71 48 58 48 50 Z"/>
+                <circle class="gw-spot" cx="26" cy="20" r="3"/>
+              </g>
+              <g class="gw-bw gw-bw-right">
+                <path class="gw-wing" d="M52 30 C60 12 74 2 88 6 C98 9 100 24 92 34 C82 44 60 42 52 40 Z"/>
+                <path class="gw-wing" d="M52 44 C64 46 78 50 84 60 C88 68 80 76 70 74 C58 71 52 58 52 50 Z"/>
+                <circle class="gw-spot" cx="74" cy="20" r="3"/>
+              </g>
+              <path class="gw-body" d="M50 22 C51.4 32 51.4 50 50 62 C48.6 50 48.6 32 50 22 Z"/>
+              <path class="gw-antenna" d="M49 24 C44 15 39 10 33 7"/>
+              <path class="gw-antenna" d="M51 24 C56 15 61 10 67 7"/>
+            </svg>
+          </span>
+        </button>
+
+        <button class="gw-butterfly" type="button" aria-label="蝴蝶" style="--x:60%; --y:15%; --s:1; --r:-6deg; --o:.55;">
+          <span class="gw-bf">
+            <svg viewBox="0 0 100 80" focusable="false" role="presentation" aria-hidden="true">
+              <g class="gw-bw gw-bw-left">
+                <path class="gw-wing" d="M48 30 C40 12 26 2 12 6 C2 9 0 24 8 34 C18 44 40 42 48 40 Z"/>
+                <path class="gw-wing" d="M48 44 C36 46 22 50 16 60 C12 68 20 76 30 74 C42 71 48 58 48 50 Z"/>
+                <circle class="gw-spot" cx="26" cy="20" r="3"/>
+              </g>
+              <g class="gw-bw gw-bw-right">
+                <path class="gw-wing" d="M52 30 C60 12 74 2 88 6 C98 9 100 24 92 34 C82 44 60 42 52 40 Z"/>
+                <path class="gw-wing" d="M52 44 C64 46 78 50 84 60 C88 68 80 76 70 74 C58 71 52 58 52 50 Z"/>
+                <circle class="gw-spot" cx="74" cy="20" r="3"/>
+              </g>
+              <path class="gw-body" d="M50 22 C51.4 32 51.4 50 50 62 C48.6 50 48.6 32 50 22 Z"/>
+              <path class="gw-antenna" d="M49 24 C44 15 39 10 33 7"/>
+              <path class="gw-antenna" d="M51 24 C56 15 61 10 67 7"/>
+            </svg>
+          </span>
+        </button>
+
+        <button class="gw-butterfly" type="button" aria-label="蝴蝶" style="--x:76%; --y:45%; --s:.84; --r:14deg; --o:.48;">
+          <span class="gw-bf">
+            <svg viewBox="0 0 100 80" focusable="false" role="presentation" aria-hidden="true">
+              <g class="gw-bw gw-bw-left">
+                <path class="gw-wing" d="M48 30 C40 12 26 2 12 6 C2 9 0 24 8 34 C18 44 40 42 48 40 Z"/>
+                <path class="gw-wing" d="M48 44 C36 46 22 50 16 60 C12 68 20 76 30 74 C42 71 48 58 48 50 Z"/>
+                <circle class="gw-spot" cx="26" cy="20" r="3"/>
+              </g>
+              <g class="gw-bw gw-bw-right">
+                <path class="gw-wing" d="M52 30 C60 12 74 2 88 6 C98 9 100 24 92 34 C82 44 60 42 52 40 Z"/>
+                <path class="gw-wing" d="M52 44 C64 46 78 50 84 60 C88 68 80 76 70 74 C58 71 52 58 52 50 Z"/>
+                <circle class="gw-spot" cx="74" cy="20" r="3"/>
+              </g>
+              <path class="gw-body" d="M50 22 C51.4 32 51.4 50 50 62 C48.6 50 48.6 32 50 22 Z"/>
+              <path class="gw-antenna" d="M49 24 C44 15 39 10 33 7"/>
+              <path class="gw-antenna" d="M51 24 C56 15 61 10 67 7"/>
+            </svg>
+          </span>
+        </button>
+
+        <button class="gw-butterfly" type="button" aria-label="蝴蝶" style="--x:91%; --y:24%; --s:.56; --r:-20deg; --o:.38;">
+          <span class="gw-bf">
+            <svg viewBox="0 0 100 80" focusable="false" role="presentation" aria-hidden="true">
+              <g class="gw-bw gw-bw-left">
+                <path class="gw-wing" d="M48 30 C40 12 26 2 12 6 C2 9 0 24 8 34 C18 44 40 42 48 40 Z"/>
+                <path class="gw-wing" d="M48 44 C36 46 22 50 16 60 C12 68 20 76 30 74 C42 71 48 58 48 50 Z"/>
+                <circle class="gw-spot" cx="26" cy="20" r="3"/>
+              </g>
+              <g class="gw-bw gw-bw-right">
+                <path class="gw-wing" d="M52 30 C60 12 74 2 88 6 C98 9 100 24 92 34 C82 44 60 42 52 40 Z"/>
+                <path class="gw-wing" d="M52 44 C64 46 78 50 84 60 C88 68 80 76 70 74 C58 71 52 58 52 50 Z"/>
+                <circle class="gw-spot" cx="74" cy="20" r="3"/>
+              </g>
+              <path class="gw-body" d="M50 22 C51.4 32 51.4 50 50 62 C48.6 50 48.6 32 50 22 Z"/>
+              <path class="gw-antenna" d="M49 24 C44 15 39 10 33 7"/>
+              <path class="gw-antenna" d="M51 24 C56 15 61 10 67 7"/>
+            </svg>
+          </span>
+        </button>
+
+        <button class="gw-butterfly" type="button" aria-label="蝴蝶" style="--x:68%; --y:80%; --s:.66; --r:7deg; --o:.34;">
+          <span class="gw-bf">
+            <svg viewBox="0 0 100 80" focusable="false" role="presentation" aria-hidden="true">
+              <g class="gw-bw gw-bw-left">
+                <path class="gw-wing" d="M48 30 C40 12 26 2 12 6 C2 9 0 24 8 34 C18 44 40 42 48 40 Z"/>
+                <path class="gw-wing" d="M48 44 C36 46 22 50 16 60 C12 68 20 76 30 74 C42 71 48 58 48 50 Z"/>
+                <circle class="gw-spot" cx="26" cy="20" r="3"/>
+              </g>
+              <g class="gw-bw gw-bw-right">
+                <path class="gw-wing" d="M52 30 C60 12 74 2 88 6 C98 9 100 24 92 34 C82 44 60 42 52 40 Z"/>
+                <path class="gw-wing" d="M52 44 C64 46 78 50 84 60 C88 68 80 76 70 74 C58 71 52 58 52 50 Z"/>
+                <circle class="gw-spot" cx="74" cy="20" r="3"/>
+              </g>
+              <path class="gw-body" d="M50 22 C51.4 32 51.4 50 50 62 C48.6 50 48.6 32 50 22 Z"/>
+              <path class="gw-antenna" d="M49 24 C44 15 39 10 33 7"/>
+              <path class="gw-antenna" d="M51 24 C56 15 61 10 67 7"/>
+            </svg>
+          </span>
+        </button>
+      </div>
+    </section>
+
+    <!-- 木木书屋入口 -->
+    <section class="gw-gate" data-dom-id="gw-gate" aria-labelledby="gw-gate-title">
+      <div class="gw-gate-inner">
+        <h2 id="gw-gate-title" class="gw-sr-only">木木书屋</h2>
+        <span class="gw-gate-seal">会员入口</span>
+        <p class="gw-gate-sub">凭卡密入内，阅未刊之卷。</p>
+
+        <button id="gw-gate-open" class="gw-gate-btn" type="button">
+          <span class="gw-orb-tex" aria-hidden="true">
+            <svg class="gw-orb-svg" viewBox="0 0 200 200" aria-hidden="true" focusable="false">
+              <defs>
+                <clipPath id="gw-orb-clip">
+                  <circle cx="100" cy="100" r="98"/>
+                </clipPath>
+                <filter id="gw-erode" x="-15%" y="-15%" width="130%" height="130%" color-interpolation-filters="sRGB">
+                  <feTurbulence type="fractalNoise" baseFrequency="0.014" numOctaves="3" seed="7" result="gwErodeNoise"/>
+                  <feDisplacementMap in="SourceGraphic" in2="gwErodeNoise" scale="8" xChannelSelector="R" yChannelSelector="G"/>
+                </filter>
+              </defs>
+              <g clip-path="url(#gw-orb-clip)">
+                <!-- 分层同心侵蚀环：由外向内递归收缩并递归减淡 -->
+                <g class="gw-erode-group" filter="url(#gw-erode)">
+                  <circle cx="100" cy="100" r="92" fill="none" stroke="currentColor" stroke-width="1.6" stroke-opacity="0.30"/>
+                  <circle cx="100" cy="100" r="82" fill="none" stroke="currentColor" stroke-width="1.5" stroke-opacity="0.26"/>
+                  <circle cx="100" cy="100" r="73" fill="none" stroke="currentColor" stroke-width="1.45" stroke-opacity="0.23"/>
+                  <circle cx="100" cy="100" r="64" fill="none" stroke="currentColor" stroke-width="1.35" stroke-opacity="0.20"/>
+                  <circle cx="100" cy="100" r="55" fill="none" stroke="currentColor" stroke-width="1.25" stroke-opacity="0.17"/>
+                  <circle cx="100" cy="100" r="46" fill="none" stroke="currentColor" stroke-width="1.15" stroke-opacity="0.14"/>
+                  <circle cx="100" cy="100" r="37" fill="none" stroke="currentColor" stroke-width="1" stroke-opacity="0.10"/>
+                  <circle cx="100" cy="100" r="28" fill="none" stroke="currentColor" stroke-width="0.9" stroke-opacity="0.06"/>
+                </g>
+                <!-- 侵蚀颗粒：极淡的断线环 -->
+                <g class="gw-erode-motif" filter="url(#gw-erode)">
+                  <circle cx="100" cy="100" r="88" fill="none" stroke="currentColor" stroke-width="0.6" stroke-opacity="0.11" stroke-dasharray="1 5"/>
+                  <circle cx="100" cy="100" r="68" fill="none" stroke="currentColor" stroke-width="0.6" stroke-opacity="0.10" stroke-dasharray="1 4"/>
+                  <circle cx="100" cy="100" r="48" fill="none" stroke="currentColor" stroke-width="0.6" stroke-opacity="0.08" stroke-dasharray="1 3.4"/>
+                </g>
+              </g>
+            </svg>
+          </span>
+          <span id="gw-gate-open-label" class="gw-gate-btn-label">木木书屋</span>
+        </button>
+
+        <p class="gw-gate-tip">卡密请向管理员领取</p>
+      </div>
+    </section>
+
+    <!-- 主内容 -->
+    <main id="main-feed" class="gw-feed" data-dom-id="main-feed">
+
+      <section class="gw-section" aria-labelledby="gw-rec-title">
+        <div class="gw-sec-head">
+          <h2 id="gw-rec-title" class="gw-sec-title">今日推荐</h2>
+          <span id="gw-rec-count" class="gw-sec-meta">每日轮换</span>
+        </div>
+        <p id="gw-feed-lead" class="gw-sec-lead">每位读者每天会看到不同的书目组合。</p>
+
+        <div id="recommendation-list" class="gw-rec-grid" data-dom-id="recommendation-list" hidden>
+
+          <article class="gw-book">
+            <div class="gw-book-thumb">
+              <img src="../assets/ancient-book.png" alt="《论语·学而》古籍影印" loading="lazy">
+              <span class="gw-book-cat" aria-hidden="true">经</span>
+            </div>
+            <div class="gw-book-body">
+              <h3 class="gw-book-title">《论语·学而》</h3>
+              <p class="gw-book-meta">孔子及弟子 · 春秋</p>
+              <p class="gw-book-note">开篇即言「学而时习」，以论学、论政、论人三层立儒家立言之本。</p>
+              <div class="gw-book-foot"><button class="gw-link" type="button">查看</button></div>
+            </div>
+          </article>
+
+          <article class="gw-book">
+            <div class="gw-book-thumb">
+              <img src="../assets/ancient-book.png" alt="《史记·项羽本纪》古籍影印" loading="lazy">
+              <span class="gw-book-cat" aria-hidden="true">史</span>
+            </div>
+            <div class="gw-book-body">
+              <h3 class="gw-book-title">《史记·项羽本纪》</h3>
+              <p class="gw-book-meta">司马迁 · 西汉</p>
+              <p class="gw-book-note">以钜鹿、鸿门、垓下三役立传，笔力沉雄，为纪传体叙事之极则。</p>
+              <div class="gw-book-foot"><button class="gw-link" type="button">查看</button></div>
+            </div>
+          </article>
+
+          <article class="gw-book">
+            <div class="gw-book-thumb">
+              <img src="../assets/ancient-book.png" alt="《庄子·逍遥游》古籍影印" loading="lazy">
+              <span class="gw-book-cat" aria-hidden="true">子</span>
+            </div>
+            <div class="gw-book-body">
+              <h3 class="gw-book-title">《庄子·逍遥游》</h3>
+              <p class="gw-book-meta">庄周 · 战国</p>
+              <p class="gw-book-note">鲲鹏九万里而南，借寓言破小大之辨，示无待之境。</p>
+              <div class="gw-book-foot"><button class="gw-link" type="button">查看</button></div>
+            </div>
+          </article>
+
+          <article class="gw-book">
+            <div class="gw-book-thumb">
+              <img src="../assets/ancient-book.png" alt="《全唐诗·卷一》古籍影印" loading="lazy">
+              <span class="gw-book-cat" aria-hidden="true">集</span>
+            </div>
+            <div class="gw-book-body">
+              <h3 class="gw-book-title">《全唐诗·卷一》</h3>
+              <p class="gw-book-meta">李世民 · 唐</p>
+              <p class="gw-book-note">卷首诸作为御制，气象雍容，可观初唐宫体的格局与声律。</p>
+              <div class="gw-book-foot"><button class="gw-link" type="button">查看</button></div>
+            </div>
+          </article>
+
+          <article class="gw-book">
+            <div class="gw-book-thumb">
+              <img src="../assets/ancient-book.png" alt="《资治通鉴·周纪一》古籍影印" loading="lazy">
+              <span class="gw-book-cat" aria-hidden="true">史</span>
+            </div>
+            <div class="gw-book-body">
+              <h3 class="gw-book-title">《资治通鉴·周纪一》</h3>
+              <p class="gw-book-meta">司马光 · 北宋</p>
+              <p class="gw-book-note">起威烈王二十三年，以三家分晋发端，斟酌史料而定其兴替之由。</p>
+              <div class="gw-book-foot"><button class="gw-link" type="button">查看</button></div>
+            </div>
+          </article>
+
+          <article class="gw-book">
+            <div class="gw-book-thumb">
+              <img src="../assets/ancient-book.png" alt="《文心雕龙·原道》古籍影印" loading="lazy">
+              <span class="gw-book-cat" aria-hidden="true">集</span>
+            </div>
+            <div class="gw-book-body">
+              <h3 class="gw-book-title">《文心雕龙·原道》</h3>
+              <p class="gw-book-meta">刘勰 · 南朝梁</p>
+              <p class="gw-book-note">首篇推文本于道，以天地自然之文立论，全书之枢纽所在。</p>
+              <div class="gw-book-foot"><button class="gw-link" type="button">查看</button></div>
+            </div>
+          </article>
+
+        </div>
+      </section>
+
+      <section class="gw-panel" aria-label="书山有路">
+        <div class="gw-panel-art" aria-hidden="true">
+          <div class="gw-panel-art-img"></div>
+        </div>
+        <div class="gw-panel-copy">
+          <p class="gw-panel-line">书山有路，卷帙自明</p>
+          <p class="gw-panel-sub">旧籍影印与校勘小记，随书目之后依次附存</p>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="gw-footer">
+      <p class="gw-footer-line">小木屋 · 私人书单</p>
+      <p class="gw-footer-note">书目与本机 textbook 保持同步</p>
+      <a class="gw-admin-link" href="./admin.html">进入管理后台</a>
+    </footer>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var leadEl = document.getElementById('gw-feed-lead');
+  var inputEl = document.getElementById('gw-search-input');
+  var searchForm = document.getElementById('home-search');
+
+  /* ---------- 四部分类 ---------- */
+  var catBtns = Array.prototype.slice.call(document.querySelectorAll('.gw-cat'));
+  catBtns.forEach(function (cat) {
+    cat.addEventListener('click', function () {
+      var on = !cat.classList.contains('is-active');
+      catBtns.forEach(function (other) { other.classList.remove('is-active'); });
+      if (on) { cat.classList.add('is-active'); }
+      if (leadEl && on) {
+        leadEl.textContent = '已择「' + cat.getAttribute('data-cat') + '」，此为示例书目所在部类，其余三部可按同一体例展开。';
+      }
+    });
+  });
+
+  /* ---------- 检索框 ---------- */
+  if (searchForm) {
+    searchForm.addEventListener('submit', function (event) {
+      event.preventDefault();
+      var q = inputEl && inputEl.value ? inputEl.value.trim() : '';
+      if (!q) { inputEl.focus(); return; }
+      fetch('/api/access').then(function(r){return r.json()}).then(function(data){
+        if(data.ok){window.location.href='/go/read?q='+encodeURIComponent(q);return}
+        try{sessionStorage.setItem('xiaomuwu-pending-external-query',q)}catch(e){}
+        var gate=document.getElementById('gw-gate-open');if(gate)gate.click();
+      }).catch(function(){var gate=document.getElementById('gw-gate-open');if(gate)gate.click()});
+    });
+  }
+
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    window.lucide.createIcons();
+  }
+})();
+</script>
+
+<!-- ===================== 卡密弹窗 ===================== -->
+<div id="gw-gate-modal" class="gw-modal" hidden>
+  <div class="gw-modal-mask" data-gw-close="mask" aria-hidden="true"></div>
+
+  <div class="gw-modal-panel" role="dialog" aria-modal="true" aria-labelledby="gw-modal-title">
+    <div id="gw-modal-body" class="gw-modal-body">
+      <h3 id="gw-modal-title" class="gw-modal-title">请输入卡密</h3>
+      <p class="gw-modal-desc">输入有效卡密即可进入木木书屋。</p>
+
+      <form id="gw-gate-form" class="gw-modal-form" novalidate>
+        <input id="gw-gate-input" class="gw-modal-input" type="text" inputmode="text" autocomplete="off" placeholder="MUMU-XXXX" aria-label="卡密">
+        <p id="gw-gate-error" class="gw-modal-error" hidden role="alert">卡密无效，请重新输入。</p>
+        <div class="gw-modal-actions">
+          <button class="gw-modal-submit" type="submit">进入</button>
+          <button id="gw-gate-cancel" class="gw-modal-cancel" type="button">取消</button>
+        </div>
+      </form>
+
+      <p id="gw-modal-tip" class="gw-modal-tip">请输入管理员发放的卡密</p>
+    </div>
+
+    <div id="gw-modal-success" class="gw-modal-success" tabindex="-1" hidden>
+      <span class="gw-modal-success-seal" aria-hidden="true">木</span>
+      <h3 id="gw-modal-success-title" class="gw-modal-success-title">已入内 · 木木书屋</h3>
+      <p class="gw-modal-success-note">卡密已验证，点「完成」前往找书。</p>
+      <div class="gw-modal-success-actions">
+        <button id="gw-gate-done" class="gw-modal-submit" type="button">完成</button>
+        <button id="gw-gate-reset" class="gw-modal-cancel" type="button">重新输入卡密</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var openBtn = document.getElementById('gw-gate-open');
+  var modal = document.getElementById('gw-gate-modal');
+  if (!openBtn || !modal) { return; }
+
+  var panel = modal.querySelector('.gw-modal-panel');
+  var mask = modal.querySelector('.gw-modal-mask');
+  var bodyPane = document.getElementById('gw-modal-body');
+  var tipPane = document.getElementById('gw-modal-tip');
+  var successPane = document.getElementById('gw-modal-success');
+  var form = document.getElementById('gw-gate-form');
+  var input = document.getElementById('gw-gate-input');
+  var errorEl = document.getElementById('gw-gate-error');
+  var cancelBtn = document.getElementById('gw-gate-cancel');
+  var doneBtn = document.getElementById('gw-gate-done');
+  var resetBtn = document.getElementById('gw-gate-reset');
+  var openLabel = document.getElementById('gw-gate-open-label');
+
+  if (!panel || !bodyPane || !successPane || !form || !input || !errorEl) { return; }
+
+  var ENTERED_KEY = 'zhaowen-gate-entered';
+  var DEFAULT_LABEL = '木木书屋';
+  var TARGET_URL = './search.html';
+  var isOpen = false;
+  var isEntered = false;
+  var lastFocus = null;
+  var closeTimer = null;
+  var shakeTimer = null;
+
+  /* ---------------- 已进入状态持久化（sessionStorage，读写均容错） ---------------- */
+  function readEnteredFlag() {
+    try {
+      return window.sessionStorage.getItem(ENTERED_KEY) === '1';
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function writeEnteredFlag() {
+    try {
+      window.sessionStorage.setItem(ENTERED_KEY, '1');
+      window.sessionStorage.setItem('cabin-download-unlocked', '1');
+    } catch (err) {
+      /* 存储不可用时静默降级，不中断脚本 */
+    }
+  }
+
+  function clearEnteredFlag() {
+    try {
+      window.sessionStorage.removeItem(ENTERED_KEY);
+    } catch (err) {
+      /* 存储不可用时静默降级，不中断脚本 */
+    }
+  }
+
+  function applyEnteredUI(entered) {
+    if (openLabel) { openLabel.textContent = entered ? '已入内' : DEFAULT_LABEL; }
+    openBtn.classList.toggle('is-entered', entered);
+  }
+
+  /* ---------------- 状态复位 ---------------- */
+  function clearError() {
+    errorEl.hidden = true;
+    input.classList.remove('is-invalid');
+  }
+
+  function showError() {
+    errorEl.hidden = false;
+    input.classList.add('is-invalid');
+  }
+
+  function showFormPane() {
+    successPane.hidden = true;
+    bodyPane.hidden = false;
+    if (tipPane) { tipPane.hidden = false; }
+    panel.setAttribute('aria-labelledby', 'gw-modal-title');
+    input.value = '';
+    clearError();
+  }
+
+  function showSuccessPane() {
+    bodyPane.hidden = true;
+    successPane.hidden = false;
+    panel.setAttribute('aria-labelledby', 'gw-modal-success-title');
+  }
+
+  /* ---------------- 焦点范围 ---------------- */
+  function getFocusables() {
+    var nodes = panel.querySelectorAll('button, input, [href], select, textarea, [tabindex]:not([tabindex="-1"])');
+    return Array.prototype.filter.call(nodes, function (el) {
+      return !el.disabled && el.offsetParent !== null;
+    });
+  }
+
+  /* ---------------- 开关弹窗 ---------------- */
+  function openModal() {
+    if (isOpen) { return; }
+    isOpen = true;
+    window.clearTimeout(closeTimer);
+    lastFocus = document.activeElement;
+
+    if (isEntered) {
+      showSuccessPane();
+    } else {
+      showFormPane();
+    }
+
+    modal.hidden = false;
+    document.body.classList.add('gw-modal-open');
+
+    window.requestAnimationFrame(function () {
+      modal.classList.add('is-open');
+      panel.classList.add('is-open');
+    });
+
+    if (isEntered) {
+      if (doneBtn) { doneBtn.focus(); } else { successPane.focus(); }
+    } else {
+      input.focus();
+      if (input.select) { input.select(); }
+    }
+  }
+
+  function closeModal() {
+    if (!isOpen) { return; }
+    isOpen = false;
+    window.clearTimeout(closeTimer);
+    modal.classList.remove('is-open');
+    panel.classList.remove('is-open');
+    panel.classList.remove('is-shake');
+    document.body.classList.remove('gw-modal-open');
+    clearError();
+    input.value = '';
+
+    var target = (lastFocus && typeof lastFocus.focus === 'function') ? lastFocus : openBtn;
+    if (target && typeof target.focus === 'function') { target.focus(); }
+
+    closeTimer = window.setTimeout(function () {
+      modal.hidden = true;
+    }, 200);
+  }
+
+  /* ---------------- 进入找书页 ----------------
+     先关闭弹窗再跳转：即使跳转被环境拦截，弹窗也不会卡在打开状态。 */
+  function enterLibrary() {
+    closeModal();
+    var pending='';try{pending=window.sessionStorage.getItem('xiaomuwu-pending-external-query')||'';window.sessionStorage.removeItem('xiaomuwu-pending-external-query')}catch(err){}
+    window.location.href = pending ? '/go/read?q='+encodeURIComponent(pending) : TARGET_URL;
+  }
+
+  openBtn.addEventListener('click', openModal);
+  if (cancelBtn) { cancelBtn.addEventListener('click', closeModal); }
+  if (mask) { mask.addEventListener('click', closeModal); }
+
+  /* ---------------- 成功面板控件 ---------------- */
+  if (doneBtn) {
+    doneBtn.addEventListener('click', function () {
+      enterLibrary();
+    });
+  }
+
+  if (resetBtn) {
+    resetBtn.addEventListener('click', function () {
+      clearEnteredFlag();
+      isEntered = false;
+      applyEnteredUI(false);
+      showFormPane();
+      input.focus();
+      if (input.select) { input.select(); }
+    });
+  }
+
+  /* ---------------- 卡密校验 ---------------- */
+  form.addEventListener('submit', function (event) {
+    event.preventDefault();
+    if (isEntered) { return; }
+
+    var code = String(input.value || '').trim().toUpperCase().replace(/\s+/g, '');
+
+    fetch('/api/unlock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: code }) })
+      .then(function (response) { if (!response.ok) { throw new Error('invalid'); } return response.json(); })
+      .then(function () {
+        isEntered = true; writeEnteredFlag(); clearError(); showSuccessPane();
+        if (doneBtn) { doneBtn.focus(); } applyEnteredUI(true);
+      })
+      .catch(function () {
+        showError(); panel.classList.remove('is-shake'); void panel.offsetWidth; panel.classList.add('is-shake');
+        window.clearTimeout(shakeTimer); shakeTimer = window.setTimeout(function () { panel.classList.remove('is-shake'); }, 320);
+        input.focus(); if (input.select) { input.select(); }
+      });
+  });
+
+  input.addEventListener('input', function () {
+    if (!errorEl.hidden || input.classList.contains('is-invalid')) { clearError(); }
+  });
+
+  /* ---------------- 初始化：恢复本会话内已进入状态 ---------------- */
+  isEntered = readEnteredFlag();
+  applyEnteredUI(isEntered);
+  if(new URLSearchParams(window.location.search).get('card')==='required'){
+    window.setTimeout(openModal,80);
+  }
+
+  /* ---------------- 键盘：Esc 关闭 + Tab 收束 ---------------- */
+  document.addEventListener('keydown', function (event) {
+    if (!isOpen) { return; }
+
+    if (event.key === 'Escape' || event.key === 'Esc') {
+      event.preventDefault();
+      closeModal();
+      return;
+    }
+
+    if (event.key !== 'Tab') { return; }
+
+    var list = getFocusables();
+    if (!list.length) { return; }
+
+    var first = list[0];
+    var last = list[list.length - 1];
+    var active = document.activeElement;
+    var inside = list.indexOf(active) !== -1;
+
+    if (event.shiftKey) {
+      if (!inside || active === first) {
+        event.preventDefault();
+        last.focus();
+      }
+    } else if (!inside || active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
+})();
+</script>
+<script>
+(function () {
+  var list = document.getElementById('recommendation-list');
+  var count = document.getElementById('gw-rec-count');
+  if (!list) { return; }
+  try {
+    var visitorKey = 'cabin-visitor-id';
+    var visitorValue = localStorage.getItem(visitorKey);
+    if (!visitorValue) { visitorValue = Math.random().toString(36).slice(2); localStorage.setItem(visitorKey, visitorValue); }
+    fetch('/api/events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'visit', visitor: visitorValue, detail: '首页' }) }).catch(function () {});
+  } catch (error) {}
+  var preferred = [
+    { label: '朋友', keywords: ['朋友（1V3）', '朋友1V3'] },
+    { label: '白鸽', keywords: ['白鸽'] },
+    { label: '成佛', keywords: ['成佛'] },
+    { label: '被阴湿男同盯上以后', keywords: ['被阴湿男同盯上的普通人', '被阴湿男同盯上以后'] },
+    { label: '逃离禅院家', keywords: ['逃离禅院家'] }
+  ];
+
+  function visitorId() {
+    try {
+      var key = 'cabin-visitor-id';
+      var value = localStorage.getItem(key);
+      if (!value) { value = Math.random().toString(36).slice(2); localStorage.setItem(key, value); }
+      return value;
+    } catch (error) { return navigator.userAgent || 'visitor'; }
+  }
+
+  function hash(text) {
+    var value = 2166136261;
+    for (var i = 0; i < text.length; i++) { value = Math.imul(value ^ text.charCodeAt(i), 16777619); }
+    return value >>> 0;
+  }
+
+  function dailySelection(items) {
+    var day = new Date().toISOString().slice(0, 10);
+    var seed = hash(day + ':' + visitorId());
+    var copy = items.slice();
+    for (var i = copy.length - 1; i > 0; i--) {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      var j = seed % (i + 1);
+      var temp = copy[i]; copy[i] = copy[j]; copy[j] = temp;
+    }
+    return copy.slice(0, 3);
+  }
+
+  function makeCard(item) {
+    var article = document.createElement('article');
+    article.className = 'gw-book';
+    var thumb = document.createElement('div');
+    thumb.className = 'gw-book-thumb';
+    var image = document.createElement('img');
+    image.src = '../assets/ancient-book.png'; image.alt = ''; image.loading = 'lazy';
+    var tag = document.createElement('span');
+    tag.className = 'gw-book-cat'; tag.textContent = '荐'; tag.setAttribute('aria-hidden', 'true');
+    thumb.append(image, tag);
+    var body = document.createElement('div'); body.className = 'gw-book-body';
+    var title = document.createElement('h3'); title.className = 'gw-book-title'; title.textContent = '《' + item.label + '》';
+    var meta = document.createElement('p'); meta.className = 'gw-book-meta'; meta.textContent = '今日为你选中 · 外部在线查找';
+    var note = document.createElement('p'); note.className = 'gw-book-note'; note.textContent = '输入卡密后前往外部书源阅读';
+    var foot = document.createElement('div'); foot.className = 'gw-book-foot';
+    var link = document.createElement('a'); link.className = 'gw-link'; link.href = '/go/read?q=' + encodeURIComponent(item.label); link.textContent = '在线查找';
+    foot.appendChild(link); body.append(title, meta, note, foot); article.append(thumb, body);
+    return article;
+  }
+
+  var selected=dailySelection(preferred);
+  list.replaceChildren();
+  selected.forEach(function(item){list.appendChild(makeCard(item))});
+  list.hidden=false;
+  if(count){count.textContent='今日 '+selected.length+' 本 · 每人不同'}
+})();
+</script>
+<script src="../site-preferences.js"></script>
+</body>
+</html>

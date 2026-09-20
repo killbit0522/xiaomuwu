@@ -1,0 +1,1440 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>找书</title>
+    <style id="theme-vars">
+/* ==========================================================================
+   Palette note
+   These tokens are sampled from the artwork supplied for this project, not
+   invented. Measured mean colours of the source images:
+     IMG_1939 home hero        #766952   (dark warm olive)
+     IMG_1948 home fill        #ccc9c3   (neutral warm grey)
+     IMG_1949 left rail/search #c2bfba   (neutral warm grey)
+     IMG_1950 catalog          #dfdcd5   (pale neutral grey)
+     IMG_1950-2 request        #c7c4be   (neutral warm grey)
+     IMG_1952 review           #f3f3f3   (near white)
+     IMG_1947 birds            #e8e9e9   (near white)
+   The artwork is neutral paper, so the page base is a neutral paper grey.
+   No cream / yellow cast is applied anywhere.
+   ========================================================================== */
+
+:root {
+  /* Neutral paper base taken from the artwork itself */
+  --zhaowen-background: #c9c5be;
+  --zhaowen-foreground: #1c1a17;
+
+  --zhaowen-card: #f2efe9;
+  --zhaowen-card-foreground: #1c1a17;
+  --zhaowen-popover: #f7f5f0;
+  --zhaowen-popover-foreground: #1c1a17;
+
+  /* Ink, not red. Buttons are transparent with black text. */
+  --zhaowen-primary: #1c1a17;
+  --zhaowen-primary-foreground: #f7f5f0;
+
+  --zhaowen-muted: #d9d5ce;
+  --zhaowen-muted-foreground: #5f5a52;
+  --zhaowen-border: rgba(28, 26, 23, 0.22);
+  --zhaowen-input: rgba(28, 26, 23, 0.06);
+  --zhaowen-ring: #1c1a17;
+
+  /* Radius scale - restrained */
+  --zhaowen-radius-sm: 3px;
+  --zhaowen-radius-md: 6px;
+  --zhaowen-radius-lg: 14px;
+
+  /* Semantic surfaces */
+  --zhaowen-surface-1: #d5d1ca;
+  --zhaowen-surface-2: #dedad3;
+  --zhaowen-surface-3: #e7e3dc;
+  --zhaowen-ink-1: #1c1a17;
+  --zhaowen-ink-2: #443f38;
+  --zhaowen-ink-3: #6b655c;
+  --zhaowen-line: rgba(28, 26, 23, 0.22);
+
+  /* Per-page base tone. Each page overrides this with the tone of the
+     artwork used on that page, so the page never fights its own image. */
+  --zhaowen-page-base: #c9c5be;
+  /* How strongly the artwork shows through. Kept high so images are not washed out. */
+  --zhaowen-art-opacity: 0.92;
+  --zhaowen-art-blur: 0px;
+
+  /* Secondary accent kept neutral; legacy name retained for compatibility */
+  --zhaowen-seal: #1c1a17;
+  --zhaowen-ink-blue: #2f3a3d;
+  --zhaowen-gold: #6d6450;
+
+  /* Neutral whites: paper glow washes and the 木木书屋 orb shell.
+     Declared here so page HTML/CSS never needs a literal colour value. */
+  --zhaowen-glow: #ffffff;
+  --zhaowen-orb-base: #f1efeb;
+  --zhaowen-orb-highlight: #fdfcfa;
+  --zhaowen-orb-shade: #dcd8d1;
+
+  /* Layout rhythm */
+  --zhaowen-section-gap: 2.5rem;
+  --zhaowen-card-pad: 1.5rem;
+
+  /* Typography
+     Display = Mincho (明朝体); Body = Source Han Serif (思源宋体). */
+  --zhaowen-font-display: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Hiragino Mincho Pro",
+    "MS PMincho", "Source Han Serif SC", "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --zhaowen-font-serif: "Source Han Serif SC", "Noto Serif SC", "Source Han Serif",
+    "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Songti SC", "STSong", "SimSun", serif;
+  --zhaowen-font-sans: "Source Han Sans SC", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --zhaowen-font-mono: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
+
+  /* Slightly reduced type scale */
+  --zhaowen-text-xs: 0.68rem;
+  --zhaowen-text-sm: 0.78rem;
+  --zhaowen-text-base: 0.88rem;
+  --zhaowen-text-lg: 1.02rem;
+  --zhaowen-text-xl: 1.3rem;
+  --zhaowen-text-2xl: 1.72rem;
+  --zhaowen-text-3xl: 2.05rem;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  font-family: var(--zhaowen-font-serif);
+  background-color: var(--zhaowen-page-base);
+  color: var(--zhaowen-foreground);
+  font-size: var(--zhaowen-text-base);
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--zhaowen-font-display);
+  font-weight: 500;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--zhaowen-background);
+    --color-foreground: var(--zhaowen-foreground);
+    --color-card: var(--zhaowen-card);
+    --color-card-foreground: var(--zhaowen-card-foreground);
+    --color-popover: var(--zhaowen-popover);
+    --color-popover-foreground: var(--zhaowen-popover-foreground);
+    --color-primary: var(--zhaowen-primary);
+    --color-primary-foreground: var(--zhaowen-primary-foreground);
+    --color-muted: var(--zhaowen-muted);
+    --color-muted-foreground: var(--zhaowen-muted-foreground);
+    --color-border: var(--zhaowen-border);
+    --color-input: var(--zhaowen-input);
+    --color-ring: var(--zhaowen-ring);
+    --radius-sm: var(--zhaowen-radius-sm);
+    --radius-md: var(--zhaowen-radius-md);
+    --radius-lg: var(--zhaowen-radius-lg);
+  }
+  @layer base {
+    body { background: var(--zhaowen-background); color: var(--zhaowen-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--zhaowen-background); }
+      .text-background { color: var(--zhaowen-background); }
+      .border-background { border-color: var(--zhaowen-background); }
+      .ring-background { --tw-ring-color: var(--zhaowen-background); }
+      .bg-foreground { background-color: var(--zhaowen-foreground); }
+      .text-foreground { color: var(--zhaowen-foreground); }
+      .border-foreground { border-color: var(--zhaowen-foreground); }
+      .ring-foreground { --tw-ring-color: var(--zhaowen-foreground); }
+      .bg-card { background-color: var(--zhaowen-card); }
+      .text-card { color: var(--zhaowen-card); }
+      .border-card { border-color: var(--zhaowen-card); }
+      .ring-card { --tw-ring-color: var(--zhaowen-card); }
+      .bg-card-foreground { background-color: var(--zhaowen-card-foreground); }
+      .text-card-foreground { color: var(--zhaowen-card-foreground); }
+      .border-card-foreground { border-color: var(--zhaowen-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--zhaowen-card-foreground); }
+      .bg-popover { background-color: var(--zhaowen-popover); }
+      .text-popover { color: var(--zhaowen-popover); }
+      .border-popover { border-color: var(--zhaowen-popover); }
+      .ring-popover { --tw-ring-color: var(--zhaowen-popover); }
+      .bg-popover-foreground { background-color: var(--zhaowen-popover-foreground); }
+      .text-popover-foreground { color: var(--zhaowen-popover-foreground); }
+      .border-popover-foreground { border-color: var(--zhaowen-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--zhaowen-popover-foreground); }
+      .bg-primary { background-color: var(--zhaowen-primary); }
+      .text-primary { color: var(--zhaowen-primary); }
+      .border-primary { border-color: var(--zhaowen-primary); }
+      .ring-primary { --tw-ring-color: var(--zhaowen-primary); }
+      .bg-primary-foreground { background-color: var(--zhaowen-primary-foreground); }
+      .text-primary-foreground { color: var(--zhaowen-primary-foreground); }
+      .border-primary-foreground { border-color: var(--zhaowen-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--zhaowen-primary-foreground); }
+      .bg-muted { background-color: var(--zhaowen-muted); }
+      .text-muted { color: var(--zhaowen-muted); }
+      .border-muted { border-color: var(--zhaowen-muted); }
+      .ring-muted { --tw-ring-color: var(--zhaowen-muted); }
+      .bg-muted-foreground { background-color: var(--zhaowen-muted-foreground); }
+      .text-muted-foreground { color: var(--zhaowen-muted-foreground); }
+      .border-muted-foreground { border-color: var(--zhaowen-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--zhaowen-muted-foreground); }
+      .bg-border { background-color: var(--zhaowen-border); }
+      .text-border { color: var(--zhaowen-border); }
+      .border-border { border-color: var(--zhaowen-border); }
+      .ring-border { --tw-ring-color: var(--zhaowen-border); }
+      .bg-input { background-color: var(--zhaowen-input); }
+      .text-input { color: var(--zhaowen-input); }
+      .border-input { border-color: var(--zhaowen-input); }
+      .ring-input { --tw-ring-color: var(--zhaowen-input); }
+      .bg-ring { background-color: var(--zhaowen-ring); }
+      .text-ring { color: var(--zhaowen-ring); }
+      .border-ring { border-color: var(--zhaowen-ring); }
+      .ring-ring { --tw-ring-color: var(--zhaowen-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+<link rel="stylesheet" href="../site-preferences.css">
+</head>
+<body class="sh-body">
+<style id="critical-layout">
+  /* =====================================================================
+     藏书阁 · 找书页 — 静态关键布局样式
+     不依赖 Tailwind 运行时编译：Tailwind 延迟或失败时本页仍不塌陷、不重叠
+     本页兜底底色 = assets/search-bg.jpg（IMG_1949）实测均值 #c2bfba
+     ===================================================================== */
+
+  :root {
+    --zhaowen-page-base: #c2bfba;
+    --zhaowen-art-opacity: 0.94;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  [hidden] { display: none !important; }
+
+  html { background: var(--zhaowen-page-base); }
+
+  body.sh-body {
+    margin: 0;
+    min-height: 100vh;
+    max-width: 100%;
+    background: var(--zhaowen-page-base);
+    color: var(--zhaowen-ink-1);
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.88rem;
+    line-height: 1.85;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .sh-shell :focus-visible {
+    outline: 2px solid var(--zhaowen-ink-1);
+    outline-offset: 2px;
+    border-radius: var(--zhaowen-radius-sm);
+  }
+
+  /* 图标基座：lucide 未加载时也占位不塌陷 */
+  .sh-nav-ico,
+  .sm-ico {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
+    color: inherit;
+  }
+
+  /* ---------------- 共享外壳：左栏 sticky + 右栏文档流 ---------------- */
+  .sh-shell {
+    display: flex;
+    align-items: flex-start;
+    width: 100%;
+    max-width: 100%;
+    min-height: 100vh;
+    background: var(--zhaowen-page-base);
+  }
+
+  .sh-side {
+    position: sticky;
+    top: 0;
+    flex: 0 0 300px;
+    width: 300px;
+    height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--zhaowen-line);
+    background: var(--zhaowen-page-base);
+    isolation: isolate;
+    z-index: 6;
+  }
+  .sh-side::-webkit-scrollbar { width: 6px; }
+  .sh-side::-webkit-scrollbar-track { background: transparent; }
+  .sh-side::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--zhaowen-ink-3) 40%, transparent);
+    border-radius: 3px;
+  }
+
+  /* 左栏底图：与主栏同一张 IMG_1949，multiply 叠加保证两栏同色 */
+  .sh-side-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background-image: url("../assets/sidebar-bg.jpg");
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+    opacity: var(--zhaowen-art-opacity);
+    mix-blend-mode: multiply;
+    pointer-events: none;
+    -webkit-mask-image:
+      linear-gradient(to right, transparent 0%, #000 12%, #000 88%, transparent 100%),
+      linear-gradient(to bottom, transparent 0%, #000 10%, #000 90%, transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-image:
+      linear-gradient(to right, transparent 0%, #000 12%, #000 88%, transparent 100%),
+      linear-gradient(to bottom, transparent 0%, #000 10%, #000 90%, transparent 100%);
+    mask-composite: intersect;
+  }
+
+  .sh-side-inner {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 1.15rem;
+    min-height: 100vh;
+    padding: 1.8rem 1.25rem 1.5rem;
+  }
+
+  /* 文字块局部柔光垫：径向羽化，只包住文字块，不外溢遮图 */
+  .sh-brand::before,
+  .sh-cats::before,
+  .sh-side-foot::before,
+  .sm-hero::before,
+  .sm-results-head::before {
+    content: "";
+    position: absolute;
+    inset: -0.55rem -0.7rem;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(
+      120% 132% at 46% 50%,
+      color-mix(in srgb, var(--zhaowen-card) 86%, transparent) 0%,
+      color-mix(in srgb, var(--zhaowen-card) 50%, transparent) 60%,
+      transparent 100%
+    );
+  }
+
+  /* 品牌区 */
+  .sh-brand {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.3rem 0.15rem 0.75rem;
+    border-bottom: 1px solid var(--zhaowen-line);
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+  }
+  .sh-brand:focus-visible { outline: 2px solid var(--zhaowen-ink-1); outline-offset: 3px; }
+  .sh-seal {
+    flex: 0 0 auto;
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: var(--zhaowen-ink-1);
+    border: 1px solid var(--zhaowen-ink-1);
+    font-family: var(--zhaowen-font-display);
+    font-size: 1.32rem;
+    line-height: 1;
+    border-radius: var(--zhaowen-radius-sm);
+  }
+  .sh-brand-text { display: flex; flex-direction: column; gap: 0.18rem; min-width: 0; }
+  .sh-brand-title {
+    font-family: var(--zhaowen-font-display);
+    font-size: 1.16rem;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    line-height: 1.25;
+    color: var(--zhaowen-ink-1);
+  }
+  .sh-brand-sub {
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.66rem;
+    letter-spacing: 0.12em;
+    color: var(--zhaowen-ink-2);
+  }
+
+  /* 导航：每行自带局部径向柔光垫，图仍可见 */
+  .sh-nav {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .sh-nav-btn {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.82rem 0.9rem 0.82rem 1rem;
+    border-top: 1px solid var(--zhaowen-line);
+    background: radial-gradient(
+      118% 155% at 40% 50%,
+      color-mix(in srgb, var(--zhaowen-card) 74%, transparent) 0%,
+      color-mix(in srgb, var(--zhaowen-card) 38%, transparent) 64%,
+      transparent 100%
+    );
+    color: var(--zhaowen-ink-2);
+    text-decoration: none;
+    transition: transform 0.18s ease, color 0.18s ease;
+  }
+  .sh-nav-btn:last-child { border-bottom: 1px solid var(--zhaowen-line); }
+  .sh-nav-btn::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--zhaowen-ink-1);
+    opacity: 0;
+    transition: opacity 0.18s ease;
+  }
+  .sh-nav-btn:hover {
+    transform: translateX(2px);
+    background: radial-gradient(
+      118% 155% at 40% 50%,
+      color-mix(in srgb, var(--zhaowen-ink-1) 8%, transparent) 0%,
+      color-mix(in srgb, var(--zhaowen-ink-1) 4%, transparent) 64%,
+      transparent 100%
+    );
+    color: var(--zhaowen-ink-1);
+  }
+  .sh-nav-btn:hover::after { opacity: 1; }
+  .sh-nav-btn.is-active {
+    background: radial-gradient(
+      118% 155% at 40% 50%,
+      color-mix(in srgb, var(--zhaowen-ink-1) 7%, transparent) 0%,
+      color-mix(in srgb, var(--zhaowen-ink-1) 3%, transparent) 64%,
+      transparent 100%
+    );
+    color: var(--zhaowen-ink-1);
+    font-weight: 600;
+  }
+  .sh-nav-btn.is-active::after { opacity: 1; }
+  .sh-nav-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.94rem;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sh-nav-en {
+    flex: 0 0 auto;
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.6rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--zhaowen-ink-2);
+  }
+
+  /* 分类标签行 */
+  .sh-cats {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding: 0.15rem 0.1rem 0.2rem;
+  }
+  .sh-cat {
+    display: inline-block;
+    padding: 0.22rem 0.62rem;
+    border: 1px solid var(--zhaowen-line);
+    border-radius: 999px;
+    background: transparent;
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    color: var(--zhaowen-ink-2);
+  }
+
+  .sh-side-foot {
+    position: relative;
+    margin-top: auto;
+    padding: 1rem 0.1rem 0.1rem;
+    border-top: 1px solid var(--zhaowen-line);
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.7rem;
+    line-height: 1.8;
+    letter-spacing: 0.1em;
+    color: var(--zhaowen-ink-2);
+  }
+
+  /* ---------------- 主栏 ---------------- */
+  .sh-main {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    background: var(--zhaowen-page-base);
+  }
+
+  /* 满铺底图（唯一允许的绝对定位排版） */
+  .sm-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .sm-bg-img {
+    position: absolute;
+    inset: 0;
+    background-image: url("../assets/search-bg.jpg");
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+    opacity: var(--zhaowen-art-opacity);
+    mix-blend-mode: multiply;
+    -webkit-mask-image:
+      linear-gradient(to right, transparent 0%, #000 10%, #000 90%, transparent 100%),
+      linear-gradient(to bottom, transparent 0%, #000 9%, #000 91%, transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-image:
+      linear-gradient(to right, transparent 0%, #000 10%, #000 90%, transparent 100%),
+      linear-gradient(to bottom, transparent 0%, #000 9%, #000 91%, transparent 100%);
+    mask-composite: intersect;
+  }
+
+  /* 内容层 */
+  .sm-wrap {
+    position: relative;
+    z-index: 2;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 3.6rem 2.5rem 4.2rem;
+  }
+
+  /* 首屏文字块：整块一个柔光垫，非全幅遮罩 */
+  .sm-hero { position: relative; }
+
+  .sm-kicker { margin: 0 0 0.9rem; }
+  .sm-kicker-seal {
+    display: inline-block;
+    padding: 0.2rem 0.62rem;
+    background: transparent;
+    color: var(--zhaowen-ink-1);
+    border: 1px solid var(--zhaowen-ink-1);
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.64rem;
+    letter-spacing: 0.32em;
+    border-radius: var(--zhaowen-radius-sm);
+  }
+
+  .sm-title {
+    margin: 0;
+    font-family: var(--zhaowen-font-display);
+    font-size: 2.05rem;
+    font-weight: 500;
+    line-height: 1.32;
+    letter-spacing: 0.16em;
+    color: var(--zhaowen-ink-1);
+  }
+  .sm-lede {
+    margin: 0.75rem 0 0;
+    max-width: 34em;
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.88rem;
+    line-height: 1.88;
+    letter-spacing: 0.05em;
+    color: var(--zhaowen-ink-2);
+  }
+
+  /* 检索面板 */
+  .sm-panel {
+    margin-top: 2rem;
+    padding: 1.9rem;
+    background: var(--zhaowen-card);
+    border: 1px solid var(--zhaowen-line);
+    border-radius: var(--zhaowen-radius-lg);
+    box-shadow: 0 22px 44px -32px color-mix(in srgb, var(--zhaowen-ink-1) 45%, transparent);
+  }
+
+  .sm-form { display: flex; flex-direction: column; }
+  .sm-field { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
+  .sm-label,
+  .sm-fieldset legend.sm-label {
+    display: block;
+    padding: 0;
+    margin: 0 0 0.5rem;
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.76rem;
+    letter-spacing: 0.16em;
+    color: var(--zhaowen-ink-2);
+  }
+
+  .sm-input-row { position: relative; display: flex; align-items: center; }
+  .sm-input-ico {
+    position: absolute;
+    left: 1.05rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    color: var(--zhaowen-ink-3);
+    pointer-events: none;
+  }
+  .sm-input {
+    width: 100%;
+    height: 46px;
+    padding: 0 0.95rem 0 3rem;
+    border: 1px solid var(--zhaowen-line);
+    border-radius: var(--zhaowen-radius-md);
+    background: color-mix(in srgb, var(--zhaowen-surface-1) 70%, transparent);
+    color: var(--zhaowen-ink-1);
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.86rem;
+    letter-spacing: 0.04em;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+  .sm-input::placeholder { color: var(--zhaowen-ink-3); letter-spacing: 0.04em; }
+  .sm-input:focus {
+    outline: none;
+    border-color: var(--zhaowen-ink-1);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--zhaowen-ink-1) 16%, transparent);
+  }
+  .sm-input.is-invalid {
+    border-color: var(--zhaowen-ink-1);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--zhaowen-ink-1) 24%, transparent);
+  }
+
+  .sm-filters {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem 1.4rem;
+    margin-top: 1.35rem;
+  }
+  .sm-fieldset {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+  }
+
+  .sm-select {
+    width: 100%;
+    height: 44px;
+    padding: 0 2.4rem 0 0.9rem;
+    border: 1px solid var(--zhaowen-line);
+    border-radius: var(--zhaowen-radius-md);
+    background-color: color-mix(in srgb, var(--zhaowen-surface-1) 70%, transparent);
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--zhaowen-ink-2) 50%),
+      linear-gradient(135deg, var(--zhaowen-ink-2) 50%, transparent 50%);
+    background-position: calc(100% - 19px) calc(50% + 1px), calc(100% - 13px) calc(50% + 1px);
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
+    color: var(--zhaowen-ink-1);
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.86rem;
+    letter-spacing: 0.04em;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+  }
+  .sm-select:focus {
+    outline: none;
+    border-color: var(--zhaowen-ink-1);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--zhaowen-ink-1) 16%, transparent);
+  }
+
+  .sm-chipset { display: flex; flex-wrap: wrap; gap: 0.55rem; }
+  .sm-chip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.44rem 0.95rem;
+    border: 1px solid var(--zhaowen-line);
+    border-radius: 999px;
+    background: transparent;
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+    color: var(--zhaowen-ink-2);
+    cursor: pointer;
+    transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+  }
+  .sm-chip input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .sm-chip-dot {
+    flex: 0 0 auto;
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--zhaowen-ink-1);
+    opacity: 0;
+    transition: opacity 0.18s ease;
+  }
+  .sm-chip:hover { background: color-mix(in srgb, var(--zhaowen-ink-1) 6%, transparent); }
+  .sm-chip:has(input:checked),
+  .sm-chip.is-on {
+    background: color-mix(in srgb, var(--zhaowen-ink-1) 6%, transparent);
+    border-color: var(--zhaowen-ink-1);
+    color: var(--zhaowen-ink-1);
+    font-weight: 600;
+  }
+  .sm-chip:has(input:checked) .sm-chip-dot,
+  .sm-chip.is-on .sm-chip-dot { opacity: 1; }
+  .sm-chip input:focus-visible + .sm-chip-dot { outline: none; }
+  .sm-chip:has(input:focus-visible) {
+    outline: 2px solid var(--zhaowen-ink-1);
+    outline-offset: 2px;
+  }
+
+  .sm-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.85rem;
+    margin-top: 1.55rem;
+  }
+  /* 全部按钮：透明底 + 黑字 + 1px 黑描边 */
+  .sm-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-width: 8.5rem;
+    height: 44px;
+    padding: 0 1.5rem;
+    border: 1px solid var(--zhaowen-ink-1);
+    border-radius: var(--zhaowen-radius-md);
+    background: transparent;
+    color: var(--zhaowen-ink-1);
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.9rem;
+    letter-spacing: 0.14em;
+    cursor: pointer;
+    transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+  }
+  .sm-btn-primary,
+  .sm-btn-ghost {
+    background: transparent;
+    border-color: var(--zhaowen-ink-1);
+    color: var(--zhaowen-ink-1);
+    box-shadow: none;
+  }
+  .sm-btn:hover,
+  .sm-btn-primary:hover,
+  .sm-btn-ghost:hover {
+    background: color-mix(in srgb, var(--zhaowen-ink-1) 6%, transparent);
+    border-color: var(--zhaowen-ink-1);
+    color: var(--zhaowen-ink-1);
+  }
+  .sm-btn:focus-visible {
+    outline: 2px solid var(--zhaowen-ink-1);
+    outline-offset: 2px;
+  }
+
+  .sm-hint {
+    margin: 0.9rem 0 0;
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    color: var(--zhaowen-ink-3);
+  }
+  .sm-error {
+    margin: 0.85rem 0 0;
+    padding-left: 0.7rem;
+    border-left: 3px solid var(--zhaowen-ink-1);
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.82rem;
+    letter-spacing: 0.08em;
+    color: var(--zhaowen-ink-1);
+  }
+
+  /* 结果区 */
+  .sm-results { position: relative; z-index: 2; margin-top: 3rem; }
+  .sm-results-head {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.7rem;
+    padding-bottom: 0.8rem;
+    border-bottom: 1px solid var(--zhaowen-line);
+  }
+  .sm-h2 {
+    margin: 0;
+    font-family: var(--zhaowen-font-display);
+    font-size: 1.02rem;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    color: var(--zhaowen-ink-1);
+  }
+  .sm-count {
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.68rem;
+    letter-spacing: 0.16em;
+    color: var(--zhaowen-ink-2);
+  }
+
+  .sm-empty {
+    margin-top: 1.6rem;
+    padding: 2.4rem 1.25rem;
+    text-align: center;
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.84rem;
+    line-height: 1.85;
+    letter-spacing: 0.14em;
+    color: var(--zhaowen-ink-2);
+    border: 1px dashed var(--zhaowen-line);
+    border-radius: var(--zhaowen-radius-lg);
+    background: color-mix(in srgb, var(--zhaowen-card) 62%, transparent);
+  }
+
+  .sm-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+    margin-top: 1.5rem;
+  }
+  .sm-summary {
+    margin: 0;
+    padding: 0.6rem 0.95rem;
+    background: color-mix(in srgb, var(--zhaowen-card) 72%, transparent);
+    border-left: 3px solid var(--zhaowen-ink-1);
+    border-radius: var(--zhaowen-radius-sm);
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.8rem;
+    line-height: 1.8;
+    letter-spacing: 0.1em;
+    color: var(--zhaowen-ink-2);
+  }
+
+  .sm-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.15rem;
+    padding: 1.05rem 1.2rem;
+    background: color-mix(in srgb, var(--zhaowen-card) 92%, transparent);
+    border: 1px solid var(--zhaowen-line);
+    border-radius: var(--zhaowen-radius-lg);
+    transition: border-color 0.18s ease, background-color 0.18s ease;
+  }
+  .sm-card:hover {
+    border-color: var(--zhaowen-ink-1);
+    background: var(--zhaowen-card);
+  }
+  .sm-thumb {
+    flex: 0 0 auto;
+    width: 92px;
+    height: 92px;
+    overflow: hidden;
+    border: 1px solid var(--zhaowen-line);
+    border-radius: var(--zhaowen-radius-sm);
+    background: var(--zhaowen-surface-2);
+  }
+  .sm-thumb img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 36%;
+  }
+  .sm-card-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.26rem;
+  }
+  .sm-card-title {
+    margin: 0;
+    font-family: var(--zhaowen-font-display);
+    font-size: 1.02rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    line-height: 1.5;
+    color: var(--zhaowen-ink-1);
+  }
+  .sm-card-meta {
+    margin: 0;
+    font-family: var(--zhaowen-font-sans);
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    color: var(--zhaowen-ink-3);
+  }
+  .sm-card-desc {
+    margin: 0.3rem 0 0;
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.86rem;
+    line-height: 1.88;
+    color: var(--zhaowen-ink-2);
+    overflow-wrap: break-word;
+  }
+  .sm-card-cta {
+    flex: 0 0 auto;
+    align-self: flex-end;
+    margin-left: auto;
+    padding: 0.3rem 0.9rem;
+    border: 1px solid var(--zhaowen-ink-1);
+    border-radius: var(--zhaowen-radius-sm);
+    background: transparent;
+    color: var(--zhaowen-ink-1);
+    font-family: var(--zhaowen-font-serif);
+    font-size: 0.84rem;
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.18s ease;
+  }
+  .sm-card-cta:hover { background: color-mix(in srgb, var(--zhaowen-ink-1) 6%, transparent); }
+
+  /* ---------------- 响应式 ---------------- */
+  @media (max-width: 980px) {
+    .sh-side { flex-basis: 240px; width: 240px; }
+    .sm-wrap { padding: 2.8rem 1.75rem 3.4rem; }
+    .sm-title { font-size: 1.9rem; }
+    .sm-panel { padding: 1.5rem; }
+  }
+
+  @media (max-width: 620px) {
+    .sh-shell { flex-direction: column; align-items: stretch; }
+    .sh-side {
+      position: relative;
+      top: auto;
+      flex: 0 0 auto;
+      width: 100%;
+      height: auto;
+      max-height: none;
+      overflow: visible;
+      border-right: 0;
+      border-bottom: 1px solid var(--zhaowen-line);
+    }
+    .sh-side-inner { min-height: 0; gap: 0.85rem; padding: 1.05rem 1rem 0.95rem; }
+    .sh-brand { padding-bottom: 0.7rem; }
+    .sh-nav {
+      flex: 0 0 auto;
+      flex-direction: row;
+      gap: 0.5rem;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding-bottom: 0.35rem;
+      -webkit-overflow-scrolling: touch;
+    }
+    .sh-nav-btn {
+      flex: 0 0 auto;
+      border: 1px solid var(--zhaowen-line);
+      border-radius: var(--zhaowen-radius-md);
+      padding: 0.5rem 0.85rem;
+    }
+    .sh-nav-btn:last-child { border-bottom: 1px solid var(--zhaowen-line); }
+    .sh-nav-btn::after { display: none; }
+    .sh-nav-label { flex: 0 0 auto; font-size: 0.88rem; }
+    .sh-nav-en { display: none; }
+    .sh-side-foot { margin-top: 0.25rem; }
+    .sm-wrap { padding: 2.1rem 1.15rem 2.8rem; }
+    .sm-title { font-size: 1.6rem; letter-spacing: 0.1em; }
+    .sm-panel { padding: 1.2rem; }
+    .sm-filters { grid-template-columns: minmax(0, 1fr); }
+    .sm-btn { width: 100%; }
+    .sm-card { flex-wrap: wrap; }
+    .sm-thumb { width: 72px; height: 72px; }
+    .sm-card-cta { margin-left: 0; }
+  }
+</style>
+
+<div class="sh-shell">
+  <aside class="sh-side">
+    <div class="sh-side-bg" aria-hidden="true"></div>
+
+    <div class="sh-side-inner">
+      <a class="sh-brand" href="./home.html" aria-label="返回小木屋首页" title="返回首页">
+        <span class="sh-seal" aria-hidden="true">木</span>
+        <span class="sh-brand-text">
+          <span class="sh-brand-title">小木屋</span>
+          <span class="sh-brand-sub">私人书单 · 找文</span>
+        </span>
+      </a>
+
+      <nav id="sidebar-nav" data-dom-id="sidebar-nav" class="sh-nav" aria-label="全站导航">
+        <a class="sh-nav-btn is-active" href="./search.html" aria-current="page">
+          <i data-lucide="search" class="sh-nav-ico" aria-hidden="true"></i>
+          <span class="sh-nav-label">找书</span>
+          <span class="sh-nav-en">Search</span>
+        </a>
+        <a class="sh-nav-btn" href="./catalog.html">
+          <i data-lucide="list" class="sh-nav-ico" aria-hidden="true"></i>
+          <span class="sh-nav-label">目录</span>
+          <span class="sh-nav-en">Catalog</span>
+        </a>
+        <a class="sh-nav-btn" href="./request.html">
+          <i data-lucide="clipboard-list" class="sh-nav-ico" aria-hidden="true"></i>
+          <span class="sh-nav-label">缺书登记</span>
+          <span class="sh-nav-en">Request</span>
+        </a>
+        <a class="sh-nav-btn" href="./review.html">
+          <i data-lucide="pen-line" class="sh-nav-ico" aria-hidden="true"></i>
+          <span class="sh-nav-label">读后感描写</span>
+          <span class="sh-nav-en">Review</span>
+        </a>
+      </nav>
+
+      <div class="sh-cats" aria-label="分类">
+        <span class="sh-cat">小说</span>
+        <span class="sh-cat">爱发电</span>
+        <span class="sh-cat">近期新增</span>
+        <span class="sh-cat">个人收藏</span>
+      </div>
+
+      <p class="sh-side-foot">拖动画轴浏览板块 · 内容随卷而变</p>
+    </div>
+  </aside>
+
+  <main class="sh-main">
+    <div class="sm-bg" aria-hidden="true">
+      <div class="sm-bg-img"></div>
+    </div>
+
+    <div class="sm-wrap">
+      <div class="sm-hero">
+        <p class="sm-kicker"><span class="sm-kicker-seal">检索</span></p>
+        <h1 class="sm-title">找书</h1>
+        <p class="sm-lede">检索本机 textbook 中收录的书目。书目变化会自动同步到当前链接。</p>
+      </div>
+
+      <section id="search-panel" data-dom-id="search-panel" class="sm-panel" aria-labelledby="search-panel-title">
+        <h2 id="search-panel-title" hidden>检索条件</h2>
+
+        <form id="search-form" class="sm-form" novalidate>
+          <div class="sm-field">
+            <label class="sm-label" for="search-keyword">关键词</label>
+            <div class="sm-input-row">
+              <i data-lucide="search" class="sm-ico sm-input-ico" aria-hidden="true"></i>
+              <input
+                type="search"
+                id="search-keyword"
+                name="q"
+                class="sm-input"
+                autocomplete="off"
+                placeholder="书名 / 著者 / 篇目 / 关键词">
+            </div>
+          </div>
+
+          <div class="sm-filters">
+            <div class="sm-field">
+              <label class="sm-label" for="search-section">目录</label>
+              <select id="search-section" name="section" class="sm-select">
+                <option value="全部">全部</option>
+                <option value="小说">小说</option>
+                <option value="novel">novel</option>
+              </select>
+            </div>
+
+            <div class="sm-field">
+              <label class="sm-label" for="search-dynasty">格式</label>
+              <select id="search-dynasty" name="format" class="sm-select">
+                <option value="不限">不限</option>
+                <option value="txt">TXT</option>
+                <option value="docx">DOCX</option>
+                <option value="archive">压缩包</option>
+                <option value="pdf">PDF</option>
+                <option value="epub">EPUB</option>
+              </select>
+            </div>
+
+            <fieldset class="sm-fieldset">
+              <legend class="sm-label">匹配范围</legend>
+              <div class="sm-chipset">
+                <label class="sm-chip is-on">
+                  <input type="checkbox" name="scope" value="title" checked data-default="true">
+                  <span class="sm-chip-dot" aria-hidden="true"></span>
+                  <span>书名</span>
+                </label>
+                <label class="sm-chip is-on">
+                  <input type="checkbox" name="scope" value="path" checked data-default="true">
+                  <span class="sm-chip-dot" aria-hidden="true"></span>
+                  <span>目录</span>
+                </label>
+              </div>
+            </fieldset>
+          </div>
+
+          <div class="sm-actions">
+            <button type="submit" class="sm-btn sm-btn-primary">开始检索</button>
+            <button type="button" id="search-reset" class="sm-btn sm-btn-ghost">重置</button>
+          </div>
+
+          <p class="sm-hint">支持模糊匹配 · 留空可浏览全部书目</p>
+          <p id="search-error" class="sm-error" role="alert" hidden>书目载入失败，请稍后刷新。</p>
+        </form>
+      </section>
+
+      <section class="sm-results" aria-labelledby="search-result-title">
+        <div class="sm-results-head">
+          <h2 id="search-result-title" class="sm-h2">检索结果</h2>
+          <span class="sm-count" id="catalog-status">正在载入本机书目…</span>
+        </div>
+
+        <div id="search-empty" class="sm-empty">正在载入书目…</div>
+
+        <div id="search-results" class="sm-list" hidden>
+          <p id="search-summary" class="sm-summary" hidden></p>
+
+          <div id="search-cards"></div>
+          <div id="search-pagination" class="sm-actions" aria-label="书目翻页"></div>
+        </div>
+      </section>
+
+      <section class="sm-panel" aria-labelledby="daily-quotes-title">
+        <h2 id="daily-quotes-title" class="sm-h2">今日书中好句</h2>
+        <p class="sm-hint">每天换一页，与你分享两三句。</p>
+        <div id="daily-quotes"></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<dialog id="download-key-dialog" class="sm-panel" aria-labelledby="download-key-title">
+  <form id="download-key-form" class="sm-form">
+    <h2 id="download-key-title" class="sm-h2">输入小木屋卡密</h2>
+    <label class="sm-label" for="download-key-input">卡密</label>
+    <input id="download-key-input" class="sm-input" type="password" autocomplete="off" placeholder="请输入卡密">
+    <p id="download-key-error" class="sm-error" role="alert" hidden>卡密不正确，请重新输入。</p>
+    <div class="sm-actions">
+      <button class="sm-btn sm-btn-primary" type="submit">验证卡密</button>
+      <button id="download-key-cancel" class="sm-btn sm-btn-ghost" type="button">取消</button>
+    </div>
+  </form>
+</dialog>
+
+<script>(function () { if (window.lucide && typeof window.lucide.createIcons === 'function') { window.lucide.createIcons(); } })();</script>
+<script>
+(function () {
+  var form = document.getElementById('search-form');
+  if (!form) { return; }
+
+  var keyword = document.getElementById('search-keyword');
+  var section = document.getElementById('search-section');
+  var format = document.getElementById('search-dynasty');
+  var scopes = form.querySelectorAll('input[name="scope"]');
+  var titleEl = document.getElementById('search-result-title');
+  var emptyEl = document.getElementById('search-empty');
+  var listEl = document.getElementById('search-results');
+  var summaryEl = document.getElementById('search-summary');
+  var cardsEl = document.getElementById('search-cards');
+  var pagerEl = document.getElementById('search-pagination');
+  var statusEl = document.getElementById('catalog-status');
+  var errorEl = document.getElementById('search-error');
+  var resetBtn = document.getElementById('search-reset');
+  var books = [];
+  var filtered = [];
+  var page = 1;
+  var pageSize = 20;
+  var lastCatalogSignature = '';
+  var accessKey = 'cabin-download-unlocked';
+  var keyDialog = document.getElementById('download-key-dialog');
+  var keyForm = document.getElementById('download-key-form');
+  var keyInput = document.getElementById('download-key-input');
+  var keyError = document.getElementById('download-key-error');
+  var keyCancel = document.getElementById('download-key-cancel');
+  var accessMode = '';
+  var dailyQuotes = document.getElementById('daily-quotes');
+  var quoteSets = [
+    [['知之者不如好之者，好之者不如乐之者。','《论语》'],['山不在高，有仙则名；水不在深，有龙则灵。','《陋室铭》'],['海内存知己，天涯若比邻。','《送杜少府之任蜀州》']],
+    [['纸上得来终觉浅，绝知此事要躬行。','《冬夜读书示子聿》'],['长风破浪会有时，直挂云帆济沧海。','《行路难》'],['会当凌绝顶，一览众山小。','《望岳》']],
+    [['不畏浮云遮望眼，自缘身在最高层。','《登飞来峰》'],['采菊东篱下，悠然见南山。','《饮酒》'],['欲穷千里目，更上一层楼。','《登鹳雀楼》']],
+    [['路漫漫其修远兮，吾将上下而求索。','《离骚》'],['沉舟侧畔千帆过，病树前头万木春。','《酬乐天扬州初逢席上见赠》'],['读书破万卷，下笔如有神。','《奉赠韦左丞丈二十二韵》']],
+    [['桃李不言，下自成蹊。','《史记》'],['岁寒，然后知松柏之后凋也。','《论语》'],['博观而约取，厚积而薄发。','《稼说送张琥》']],
+    [['清水出芙蓉，天然去雕饰。','《经乱离后天恩流夜郎忆旧游书怀赠江夏韦太守良宰》'],['人生如逆旅，我亦是行人。','《临江仙·送钱穆父》'],['江流天地外，山色有无中。','《汉江临泛》']],
+    [['行到水穷处，坐看云起时。','《终南别业》'],['大鹏一日同风起，扶摇直上九万里。','《上李邕》'],['问渠那得清如许？为有源头活水来。','《观书有感》']]
+  ];
+  function renderDailyQuotes(){var day=Math.floor(new Date().setHours(0,0,0,0)/86400000),set=quoteSets[day%quoteSets.length];dailyQuotes.replaceChildren();set.forEach(function(item){var q=document.createElement('blockquote');q.className='sm-card';var p=document.createElement('p');p.className='sm-card-title';p.textContent='“'+item[0]+'”';var cite=document.createElement('p');cite.className='sm-card-meta';cite.textContent='— '+item[1];q.append(p,cite);dailyQuotes.appendChild(q)})}
+
+  function isUnlocked() {
+    return accessMode === 'download' || accessMode === 'reader';
+  }
+
+  function requestAccess() {
+    keyError.hidden = true;
+    keyInput.value = '';
+    keyDialog.showModal();
+    keyInput.focus();
+  }
+
+  function bookUrl(book) {
+    return '/books/' + String(book.searchablePath || '').split('/').map(encodeURIComponent).join('/');
+  }
+  function readerUrl(book){return './reader.html?p='+encodeURIComponent(book.searchablePath)+'&title='+encodeURIComponent(book.title)+'&format='+encodeURIComponent(book.format)}
+  function addShelf(book){var shelf=[];try{shelf=JSON.parse(localStorage.getItem('xiaomuwu-shelf')||'[]')}catch(e){}if(!shelf.some(function(x){return x.searchablePath===book.searchablePath})){shelf.push(book);localStorage.setItem('xiaomuwu-shelf',JSON.stringify(shelf))}}
+
+  function visitorId() {
+    try { var key = 'cabin-visitor-id', value = localStorage.getItem(key); if (!value) { value = Math.random().toString(36).slice(2); localStorage.setItem(key, value); } return value; }
+    catch (error) { return 'visitor'; }
+  }
+
+  function logEvent(type, detail) {
+    fetch('/api/events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: type, visitor: visitorId(), detail: detail }) }).catch(function () {});
+  }
+
+  function externalFallbackUrl(query) {
+    return '/go/read?q=' + encodeURIComponent(query);
+  }
+
+  function humanSize(size) {
+    if (size < 1024) { return size + ' B'; }
+    if (size < 1048576) { return (size / 1024).toFixed(1) + ' KB'; }
+    return (size / 1048576).toFixed(1) + ' MB';
+  }
+
+  function formatGroup(value) {
+    return ['zip', 'rar', '7z'].indexOf(value) >= 0 ? 'archive' : value;
+  }
+
+  function scopeValues() {
+    var out = [];
+    for (var i = 0; i < scopes.length; i++) {
+      if (scopes[i].checked) { out.push(scopes[i].value); }
+    }
+    return out;
+  }
+
+  function syncChips() {
+    for (var i = 0; i < scopes.length; i++) {
+      var chip = scopes[i].closest ? scopes[i].closest('.sm-chip') : null;
+      if (chip) { chip.classList.toggle('is-on', scopes[i].checked); }
+    }
+  }
+
+  function renderCard(book) {
+    var article = document.createElement('article');
+    article.className = 'sm-card';
+    var thumb = document.createElement('div');
+    thumb.className = 'sm-thumb';
+    var image = document.createElement('img');
+    image.src = '../assets/ancient-book.png';
+    image.alt = '';
+    thumb.appendChild(image);
+    var main = document.createElement('div');
+    main.className = 'sm-card-main';
+    var heading = document.createElement('h3');
+    heading.className = 'sm-card-title';
+    heading.textContent = book.title;
+    var meta = document.createElement('p');
+    meta.className = 'sm-card-meta';
+    meta.textContent = book.format.toUpperCase() + ' · ' + humanSize(book.size) + (book.modifiedAt ? ' · 更新于 ' + book.modifiedAt : '') + (formatGroup(book.format) === 'archive' ? ' · 解压密码可能为 1 或 123' : '');
+    var desc = document.createElement('p');
+    desc.className = 'sm-card-desc';
+    desc.textContent = book.category || '未分类';
+    main.append(heading, meta, desc);
+    var badge, actions=document.createElement('div');actions.style.cssText='display:flex;gap:.4rem;margin-left:auto;flex-wrap:wrap';
+    if (accessMode === 'download') {
+      badge = document.createElement('a');
+      badge.className = 'sm-card-cta';
+      badge.href = bookUrl(book);
+      badge.setAttribute('download', '');
+      badge.textContent = '下载';
+      badge.addEventListener('click', function () { logEvent('download', book.title); });
+      actions.appendChild(badge);
+    } else if (accessMode === 'reader' && ['txt','pdf','docx','epub','zip'].indexOf(String(book.format).toLowerCase()) >= 0) {
+      badge=document.createElement('a');badge.className='sm-card-cta';badge.href=readerUrl(book);badge.textContent='在线阅读';actions.appendChild(badge);
+      var shelf=document.createElement('button');shelf.type='button';shelf.className='sm-card-cta';shelf.textContent='加入书架';shelf.addEventListener('click',function(){addShelf(book);shelf.textContent='已加入'});actions.appendChild(shelf);
+    } else {
+      badge = document.createElement('button');
+      badge.type = 'button';
+      badge.className = 'sm-card-cta';
+      badge.textContent = accessMode === 'reader' ? '该格式暂不支持在线阅读' : '输入卡密';
+      if(accessMode !== 'reader'){badge.addEventListener('click', requestAccess)}else{badge.disabled=true}
+      actions.appendChild(badge);
+    }
+    article.append(thumb, main, actions);
+    return article;
+  }
+
+  function renderPager() {
+    pagerEl.replaceChildren();
+    var pages = Math.ceil(filtered.length / pageSize);
+    if (pages < 2) { return; }
+    var previous = document.createElement('button');
+    previous.type = 'button';
+    previous.className = 'sm-btn sm-btn-ghost';
+    previous.textContent = '上一页';
+    previous.disabled = page === 1;
+    previous.addEventListener('click', function () { page -= 1; render(); });
+    var label = document.createElement('span');
+    label.className = 'sm-summary';
+    label.textContent = page + ' / ' + pages;
+    var next = document.createElement('button');
+    next.type = 'button';
+    next.className = 'sm-btn sm-btn-ghost';
+    next.textContent = '下一页';
+    next.disabled = page === pages;
+    next.addEventListener('click', function () { page += 1; render(); });
+    pagerEl.append(previous, label, next);
+  }
+
+  function render() {
+    cardsEl.replaceChildren();
+    var start = (page - 1) * pageSize;
+    filtered.slice(start, start + pageSize).forEach(function (book) { cardsEl.appendChild(renderCard(book)); });
+    titleEl.textContent = keyword.value.trim() ? '检索结果 · ' + keyword.value.trim() : '全部书目';
+    statusEl.textContent = '找到 ' + filtered.length + ' 本 · 共收录 ' + books.length + ' 个文件';
+    summaryEl.textContent = '目录：' + section.value + ' · 格式：' + format.value;
+    summaryEl.hidden = false;
+    listEl.hidden = filtered.length === 0;
+    emptyEl.hidden = filtered.length !== 0;
+    emptyEl.textContent = books.length ? '没有找到匹配的书，换个关键词试试。' : 'textbook 中暂未发现可收录的书目文件。';
+    renderPager();
+  }
+
+  function applyFilters() {
+    var query = keyword.value.trim().toLocaleLowerCase('zh-CN');
+    var picked = scopeValues();
+    filtered = books.filter(function (book) {
+      var inSection = section.value === '全部' || book.category === section.value || book.category.indexOf(section.value + ' /') === 0;
+      var inFormat = format.value === '不限' || formatGroup(book.format) === format.value;
+      var searchText = '';
+      if (picked.indexOf('title') >= 0) { searchText += ' ' + book.title; }
+      if (picked.indexOf('path') >= 0) { searchText += ' ' + book.searchablePath; }
+      return inSection && inFormat && (!query || searchText.toLocaleLowerCase('zh-CN').indexOf(query) >= 0);
+    });
+    page = 1;
+    render();
+  }
+
+  function rebuildSections() {
+    var current = section.value;
+    var roots = {};
+    books.forEach(function (book) { roots[(book.category || '未分类').split(' / ')[0]] = true; });
+    section.replaceChildren(new Option('全部', '全部'));
+    Object.keys(roots).sort().forEach(function (name) { section.appendChild(new Option(name, name)); });
+    section.value = roots[current] ? current : '全部';
+  }
+
+  function loadCatalog(quiet) {
+    fetch('../assets/catalog.json?t=' + Date.now(), { cache: 'no-store' })
+      .then(function (response) { if (!response.ok) { throw new Error('catalog'); } return response.json(); })
+      .then(function (data) {
+        var signature = data.length + ':' + (data[0] ? data[0].id + ':' + data[0].modifiedAt : 'empty') + ':' + (data[data.length - 1] ? data[data.length - 1].id + ':' + data[data.length - 1].modifiedAt : 'empty');
+        if (signature === lastCatalogSignature) { return; }
+        lastCatalogSignature = signature;
+        books = data;
+        rebuildSections();
+        errorEl.hidden = true;
+        applyFilters();
+      })
+      .catch(function () {
+        if (!quiet) {
+          errorEl.hidden = false;
+          statusEl.textContent = '书目载入失败';
+          emptyEl.textContent = '请通过项目启动脚本打开此页面。';
+        }
+      });
+  }
+
+  var initialQuery = new URLSearchParams(window.location.search).get('q');
+  if (initialQuery) { keyword.value = initialQuery; }
+
+  for (var i = 0; i < scopes.length; i++) {
+    scopes[i].addEventListener('change', function () { syncChips(); applyFilters(); });
+  }
+  syncChips();
+
+  keyword.addEventListener('input', function () { applyFilters(); });
+  section.addEventListener('change', applyFilters);
+  format.addEventListener('change', applyFilters);
+
+  form.addEventListener('submit', function (event) {
+    event.preventDefault();
+    applyFilters();
+    var submittedQuery = keyword.value.trim();
+    logEvent('search', submittedQuery || '全部书目');
+    if (submittedQuery && filtered.length === 0) {
+      statusEl.textContent = '本地未收录，正在转到外部书源…';
+      window.setTimeout(function () { window.location.assign(externalFallbackUrl(submittedQuery)); }, 350);
+    }
+  });
+
+  keyForm.addEventListener('submit', function (event) {
+    event.preventDefault();
+    var code = keyInput.value.trim();
+    keyError.hidden = true;
+    fetch('/api/unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: code })
+    }).then(function (response) {
+      if (!response.ok) { throw new Error('invalid key'); }
+      return response.json();
+    }).then(function(data){
+      accessMode = data.cardType || '';
+      keyDialog.close();
+      render();
+    }).catch(function () {
+      keyError.hidden = false;
+      keyInput.focus();
+    });
+  });
+  keyCancel.addEventListener('click', function () { keyDialog.close(); });
+
+  if (resetBtn) {
+    resetBtn.addEventListener('click', function () {
+      keyword.value = '';
+      section.value = '全部';
+      format.value = '不限';
+      for (var i = 0; i < scopes.length; i++) {
+        scopes[i].checked = scopes[i].getAttribute('data-default') === 'true';
+      }
+      syncChips();
+      applyFilters();
+      keyword.focus();
+    });
+  }
+
+  fetch('/api/access').then(function(r){return r.json()}).then(function(data){accessMode=data.ok?data.cardType:'';render()}).catch(function(){});
+  loadCatalog(false);
+  renderDailyQuotes();
+  window.setInterval(function () { loadCatalog(true); }, 10000);
+})();
+</script>
+<script src="../site-preferences.js"></script>
+</body>
+</html>
