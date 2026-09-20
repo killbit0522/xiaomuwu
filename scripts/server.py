@@ -216,15 +216,24 @@ class LibraryHandler(SimpleHTTPRequestHandler):
         if api_path == "/api/admin/upload":
             if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
             filename = Path(unquote(self.headers.get("X-Filename", ""))).name
+            relative_header = unquote(self.headers.get("X-Relative-Path", ""))
             allowed = {".txt", ".docx", ".zip", ".rar", ".7z", ".pdf", ".epub", ".mobi"}
             length = int(self.headers.get("Content-Length", "0"))
             if not filename or Path(filename).suffix.lower() not in allowed or length < 1 or length > 104857600:
                 self.send_json(400, {"ok": False}); return
             target_dir = self.textbook_root / "管理员上传"
-            target_dir.mkdir(exist_ok=True)
-            target = target_dir / filename
+            relative = Path(relative_header.replace("\\", "/")) if relative_header else Path(filename)
+            if relative.is_absolute() or not relative.parts or any(part in ("", ".", "..") for part in relative.parts) or len(relative.parts) > 30:
+                self.send_json(400, {"ok": False}); return
+            target = (target_dir / relative).resolve()
+            try:
+                if os.path.commonpath((str(target_dir.resolve()), str(target))) != str(target_dir.resolve()):
+                    self.send_json(400, {"ok": False}); return
+            except ValueError:
+                self.send_json(400, {"ok": False}); return
+            target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(self.rfile.read(length))
-            self.send_json(200, {"ok": True, "filename": filename}); return
+            self.send_json(200, {"ok": True, "filename": filename, "relativePath": relative.as_posix()}); return
         try:
             payload = self.read_json()
         except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
