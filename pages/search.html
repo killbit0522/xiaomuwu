@@ -1321,23 +1321,35 @@ h1, h2, h3, h4 {
     summaryEl.hidden = false;
     listEl.hidden = filtered.length === 0;
     emptyEl.hidden = filtered.length !== 0;
-    emptyEl.textContent = books.length ? '没有找到匹配的书，换个关键词试试。' : 'textbook 中暂未发现可收录的书目文件。';
+    emptyEl.replaceChildren();
+    if (books.length) {
+      emptyEl.appendChild(document.createTextNode('本地书库没有找到匹配结果。'));
+      if (keyword.value.trim()) {
+        var external = document.createElement('a'); external.className = 'sm-btn sm-btn-ghost'; external.href = externalFallbackUrl(keyword.value.trim()); external.textContent = '手动去外部书源查找'; external.style.marginLeft = '12px'; emptyEl.appendChild(external);
+      }
+    } else { emptyEl.textContent = 'textbook 中暂未发现可收录的书目文件。'; }
     renderPager();
   }
 
   function applyFilters() {
-    var query = keyword.value.trim().toLocaleLowerCase('zh-CN');
-    var picked = scopeValues();
+    var query = normalizeSearch(keyword.value.trim());
+    function matchesQuery(book) { return !query || normalizeSearch((book.title || '') + ' ' + (book.searchablePath || '') + ' ' + (book.search || '')).indexOf(query) >= 0; }
     filtered = books.filter(function (book) {
       var inSection = section.value === '全部' || book.category === section.value || book.category.indexOf(section.value + ' /') === 0;
       var inFormat = format.value === '不限' || formatGroup(book.format) === format.value;
-      var searchText = '';
-      if (picked.indexOf('title') >= 0) { searchText += ' ' + book.title; }
-      if (picked.indexOf('path') >= 0) { searchText += ' ' + book.searchablePath; }
-      return inSection && inFormat && (!query || searchText.toLocaleLowerCase('zh-CN').indexOf(query) >= 0);
+      return inSection && inFormat && matchesQuery(book);
     });
+    if (query && filtered.length === 0) {
+      filtered = books.filter(matchesQuery);
+      if (filtered.length) { section.value = '全部'; format.value = '不限'; }
+    }
     page = 1;
     render();
+  }
+
+  function normalizeSearch(value) {
+    try { value = String(value || '').normalize('NFKC'); } catch (error) { value = String(value || ''); }
+    return value.toLocaleLowerCase('zh-CN').replace(/[\s·•._—–\-《》〈〉【】\[\]（）()]+/g, '');
   }
 
   function rebuildSections() {
@@ -1350,7 +1362,7 @@ h1, h2, h3, h4 {
   }
 
   function loadCatalog(quiet) {
-    fetch('../assets/catalog.json', { cache: 'default' })
+    fetch('../assets/catalog.json?v=' + Math.floor(Date.now() / 30000), { cache: 'default' })
       .then(function (response) { if (!response.ok) { throw new Error('catalog'); } return response.json(); })
       .then(function (data) {
         var signature = data.length + ':' + (data[0] ? data[0].id + ':' + data[0].modifiedAt : 'empty') + ':' + (data[data.length - 1] ? data[data.length - 1].id + ':' + data[data.length - 1].modifiedAt : 'empty');
@@ -1387,10 +1399,6 @@ h1, h2, h3, h4 {
     applyFilters();
     var submittedQuery = keyword.value.trim();
     logEvent('search', submittedQuery || '全部书目');
-    if (submittedQuery && filtered.length === 0) {
-      statusEl.textContent = '本地未收录，正在转到外部书源…';
-      window.setTimeout(function () { window.location.assign(externalFallbackUrl(submittedQuery)); }, 350);
-    }
   });
 
   keyForm.addEventListener('submit', function (event) {
