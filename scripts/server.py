@@ -490,16 +490,20 @@ def watch_textbook(handler):
             if signature != previous:
                 items = []
                 seen_books = set()
-                for path in sorted(files, key=lambda item: (len(item.relative_to(handler.textbook_root).parts), str(item))):
+                def normalized_title(path):
+                    return re.sub(r"(?:\s*[（(]\s*\d+\s*[）)])+$", "", path.stem).strip()
+
+                for path in sorted(files, key=lambda item: (bool(re.search(r"[（(]\s*\d+\s*[）)]$", item.stem)), len(item.relative_to(handler.textbook_root).parts), str(item))):
                     relative = path.relative_to(handler.textbook_root).as_posix()
                     stat = path.stat()
-                    duplicate_key = (path.stem.strip().casefold(), path.suffix.lower(), stat.st_size)
+                    title = normalized_title(path) or path.stem
+                    duplicate_key = (title.casefold(), path.suffix.lower())
                     if duplicate_key in seen_books:
                         continue
                     seen_books.add(duplicate_key)
                     category_path = Path(relative).parent
                     category = "uncategorized" if str(category_path) == "." else " / ".join(category_path.parts)
-                    items.append({"id": hashlib.sha256(relative.encode("utf-8")).hexdigest()[:16], "title": path.stem, "category": category, "format": path.suffix.lstrip(".").lower(), "size": stat.st_size, "modifiedAt": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"), "searchablePath": relative, "search": (path.stem + " " + relative).lower(), "downloadable": True, "url": "/books/" + relative})
+                    items.append({"id": hashlib.sha256(relative.encode("utf-8")).hexdigest()[:16], "title": title, "category": category, "format": path.suffix.lstrip(".").lower(), "size": stat.st_size, "modifiedAt": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"), "searchablePath": relative, "search": (title + " " + relative).lower(), "downloadable": True, "url": "/books/" + relative})
                 items.sort(key=lambda item: (item["title"], item["searchablePath"]))
                 output = handler.site_root / "assets" / "catalog.json"
                 temporary = output.with_suffix(".json.tmp")
