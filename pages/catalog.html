@@ -727,9 +727,6 @@ h1, h2, h3, h4 {
   <main class="sh-main">
     <div class="ct-bg" aria-hidden="true"></div>
 
-    <div class="ct-birds" aria-hidden="true">
-      <div class="ct-birds-ink"></div>
-    </div>
 
     <div class="ct-wrap">
       <div class="ct-head">
@@ -1065,7 +1062,7 @@ h1, h2, h3, h4 {
     button.append(number, main, category, toggle); row.append(button, note);
     button.addEventListener('click', function () {
       if (!isUnlocked()) { window.location.href = './search.html?q=' + encodeURIComponent(book.title); return; }
-      if(accessMode==='reader'){if(readable){try{sessionStorage.setItem('xiaomuwu-catalog-return',JSON.stringify({active:active,page:page,scrollY:window.scrollY,path:book.searchablePath}))}catch(error){}window.location.href='./reader.html?p='+encodeURIComponent(book.searchablePath)+'&title='+encodeURIComponent(book.title)+'&format='+encodeURIComponent(book.format)}return}
+      if(accessMode==='reader'){if(readable){try{sessionStorage.setItem('xiaomuwu-catalog-return',JSON.stringify({active:active,page:page,scrollY:window.scrollY,path:book.searchablePath}))}catch(error){}window.location.href='./reader.html?p='+encodeURIComponent(book.searchablePath)+'&title='+encodeURIComponent(book.title)+'&format='+encodeURIComponent(book.format)+'&return='+encodeURIComponent(location.pathname+location.search)}return}
       logDownload(book);window.location.href = bookUrl(book);
     });
     return row;

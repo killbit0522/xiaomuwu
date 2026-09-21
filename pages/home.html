@@ -2135,8 +2135,11 @@ h1, h2, h3, h4 {
   /* ---------------- 初始化：恢复本会话内已进入状态 ---------------- */
   isEntered = readEnteredFlag();
   applyEnteredUI(isEntered);
-  if(new URLSearchParams(window.location.search).get('card')==='required'){
-    window.setTimeout(openModal,80);
+  var cardRequired=new URLSearchParams(window.location.search).get('card')==='required';
+  if(cardRequired){
+    clearEnteredFlag(); isEntered=false; applyEnteredUI(false); window.setTimeout(openModal,80);
+  }else{
+    fetch('/api/access').then(function(r){return r.json()}).then(function(a){isEntered=!!a.ok;if(isEntered)writeEnteredFlag();else clearEnteredFlag();applyEnteredUI(isEntered)}).catch(function(){});
   }
 
   /* ---------------- 键盘：Esc 关闭 + Tab 收束 ---------------- */

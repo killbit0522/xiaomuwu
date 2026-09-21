@@ -1203,7 +1203,7 @@ h1, h2, h3, h4 {
   function bookUrl(book) {
     return '/books/' + String(book.searchablePath || '').split('/').map(encodeURIComponent).join('/');
   }
-  function readerUrl(book){return './reader.html?p='+encodeURIComponent(book.searchablePath)+'&title='+encodeURIComponent(book.title)+'&format='+encodeURIComponent(book.format)}
+  function readerUrl(book){return './reader.html?p='+encodeURIComponent(book.searchablePath)+'&title='+encodeURIComponent(book.title)+'&format='+encodeURIComponent(book.format)+'&return='+encodeURIComponent(location.pathname+location.search)}
   function addShelf(book){var shelf=[];try{shelf=JSON.parse(localStorage.getItem('xiaomuwu-shelf')||'[]')}catch(e){}if(!shelf.some(function(x){return x.searchablePath===book.searchablePath})){shelf.push(book);localStorage.setItem('xiaomuwu-shelf',JSON.stringify(shelf))}}
 
   function visitorId() {

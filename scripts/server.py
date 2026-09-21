@@ -15,6 +15,7 @@ from html.parser import HTMLParser
 from xml.etree import ElementTree
 from datetime import timedelta
 from datetime import datetime, timezone
+from email.utils import format_datetime
 from pathlib import Path
 from urllib.parse import unquote, urlsplit, parse_qs, urlencode, quote
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
@@ -225,6 +226,8 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 self.send_json(400, {"ok": False}); return
             target_dir = self.textbook_root / "管理员上传"
             relative = Path(relative_header.replace("\\", "/")) if relative_header else Path(filename)
+            if len(relative.parts) > 1 and relative.parts[0].casefold() in {"textbook", "书库"}:
+                relative = Path(*relative.parts[1:])
             if relative.is_absolute() or not relative.parts or any(part in ("", ".", "..") for part in relative.parts) or len(relative.parts) > 30:
                 self.send_json(400, {"ok": False}); return
             target = (target_dir / relative).resolve()
@@ -299,7 +302,14 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 self.send_json(401, {"ok": False}); return
             token = secrets.token_urlsafe(32)
             db.execute("INSERT INTO download_sessions(token,card_id,created_at,last_used_at) VALUES(?,?,?,?)", (token, card["id"], datetime.now(timezone.utc).isoformat(), ""))
-        self.send_json(200, {"ok": True, "remaining": card["remaining"], "cardType": card["card_type"], "expiresAt": card["expires_at"]}, f"cabin_download={token}; Path=/; HttpOnly; SameSite=Strict"); return
+        if card["card_type"] == "reader" and card["expires_at"]:
+            cookie_expires = datetime.fromisoformat(card["expires_at"])
+            max_age = max(0, int((cookie_expires - datetime.now(timezone.utc)).total_seconds()))
+        else:
+            cookie_expires = datetime.now(timezone.utc) + timedelta(days=30)
+            max_age = 30 * 24 * 60 * 60
+        cookie = f"cabin_download={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={max_age}; Expires={format_datetime(cookie_expires, usegmt=True)}"
+        self.send_json(200, {"ok": True, "remaining": card["remaining"], "cardType": card["card_type"], "expiresAt": card["expires_at"]}, cookie); return
 
     def do_GET(self):
         request_path = urlsplit(self.path).path
@@ -411,7 +421,13 @@ class LibraryHandler(SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "same-origin")
-        self.send_header("Cache-Control", "no-store")
+        request_path = urlsplit(self.path).path
+        if request_path == "/assets/catalog.json":
+            self.send_header("Cache-Control", "public, max-age=10, must-revalidate")
+        elif request_path.startswith("/assets/") or request_path.endswith((".css", ".js")):
+            self.send_header("Cache-Control", "public, max-age=86400")
+        else:
+            self.send_header("Cache-Control", "no-store")
         super().end_headers()
 
 
@@ -424,9 +440,14 @@ def watch_textbook(handler):
             signature = tuple(sorted((str(p.relative_to(handler.textbook_root)), p.stat().st_size, p.stat().st_mtime_ns) for p in files))
             if signature != previous:
                 items = []
-                for path in files:
+                seen_books = set()
+                for path in sorted(files, key=lambda item: (len(item.relative_to(handler.textbook_root).parts), str(item))):
                     relative = path.relative_to(handler.textbook_root).as_posix()
                     stat = path.stat()
+                    duplicate_key = (path.stem.strip().casefold(), path.suffix.lower(), stat.st_size)
+                    if duplicate_key in seen_books:
+                        continue
+                    seen_books.add(duplicate_key)
                     category_path = Path(relative).parent
                     category = "uncategorized" if str(category_path) == "." else " / ".join(category_path.parts)
                     items.append({"id": hashlib.sha256(relative.encode("utf-8")).hexdigest()[:16], "title": path.stem, "category": category, "format": path.suffix.lstrip(".").lower(), "size": stat.st_size, "modifiedAt": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"), "searchablePath": relative, "search": (path.stem + " " + relative).lower(), "downloadable": True, "url": "/books/" + relative})
