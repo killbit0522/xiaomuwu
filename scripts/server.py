@@ -7,6 +7,7 @@ import sqlite3
 import threading
 import time
 import base64
+import gzip
 import io
 import re
 import zipfile
@@ -28,12 +29,30 @@ def decode_book_text(raw):
         return raw.decode("utf-8-sig")
     if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
         return raw.decode("utf-16")
-    for encoding in ("utf-8", "gb18030"):
+    # Some TXT exports are UTF-16 without a BOM.  A high proportion of NUL
+    # bytes on one side of each byte pair is a reliable signal for Chinese
+    # prose while avoiding false positives for ordinary UTF-8/GBK files.
+    sample = raw[:8192]
+    if len(sample) >= 8:
+        even_nuls = sample[0::2].count(0)
+        odd_nuls = sample[1::2].count(0)
+        pairs = max(1, len(sample) // 2)
+        if odd_nuls / pairs > 0.18:
+            try:
+                return raw.decode("utf-16-le")
+            except UnicodeDecodeError:
+                pass
+        if even_nuls / pairs > 0.18:
+            try:
+                return raw.decode("utf-16-be")
+            except UnicodeDecodeError:
+                pass
+    for encoding in ("utf-8", "gb18030", "big5"):
         try:
             return raw.decode(encoding)
         except UnicodeDecodeError:
             continue
-    return raw.decode("utf-8", errors="replace")
+    raise ValueError("无法识别正文编码，请将该书另存为 UTF-8 后重新上传")
 
 
 def decode_docx(raw):
@@ -356,7 +375,11 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 self.send_error(404, "Book file unavailable")
                 return
             if source.suffix.lower() == ".txt":
-                body = b"\xef\xbb\xbf" + decode_book_text(raw).encode("utf-8")
+                try:
+                    body = b"\xef\xbb\xbf" + decode_book_text(raw).encode("utf-8")
+                except ValueError as error:
+                    self.send_error(422, str(error))
+                    return
                 content_type = "text/plain; charset=utf-8"
             else:
                 body = raw
@@ -382,6 +405,11 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                     return
                 self.send_response(200)
                 self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.send_header("Cache-Control", "private, max-age=300")
+                self.send_header("Vary", "Accept-Encoding")
+                if "gzip" in self.headers.get("Accept-Encoding", "").lower() and len(body) > 1024:
+                    body = gzip.compress(body, compresslevel=5)
+                    self.send_header("Content-Encoding", "gzip")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)

@@ -1350,7 +1350,7 @@ h1, h2, h3, h4 {
   }
 
   function loadCatalog(quiet) {
-    fetch('../assets/catalog.json?t=' + Date.now(), { cache: 'no-store' })
+    fetch('../assets/catalog.json', { cache: 'default' })
       .then(function (response) { if (!response.ok) { throw new Error('catalog'); } return response.json(); })
       .then(function (data) {
         var signature = data.length + ':' + (data[0] ? data[0].id + ':' + data[0].modifiedAt : 'empty') + ':' + (data[data.length - 1] ? data[data.length - 1].id + ':' + data[data.length - 1].modifiedAt : 'empty');

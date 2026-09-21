@@ -1107,7 +1107,7 @@ h1, h2, h3, h4 {
 
   list.replaceChildren(); filters.replaceChildren();
   fetch('/api/access').then(function(r){return r.json()}).then(function(a){accessMode=a.ok?a.cardType:'';if(books.length)render()}).catch(function(){});
-  fetch('../assets/catalog.json?t=' + Date.now(), { cache: 'no-store' })
+  fetch('../assets/catalog.json', { cache: 'default' })
     .then(function (response) { return response.json(); })
     .then(function (data) { books = data; renderFilters(); render(); })
     .catch(function () { list.textContent = '书目载入失败，请通过项目启动脚本打开。'; });
