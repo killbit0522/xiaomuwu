@@ -129,7 +129,8 @@ class LibraryHandler(SimpleHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         if cookie:
-            self.send_header("Set-Cookie", cookie)
+            secure = "; Secure" if self.headers.get("X-Forwarded-Proto", "").lower() == "https" else ""
+            self.send_header("Set-Cookie", cookie + secure)
         self.end_headers()
         self.wfile.write(body)
 
@@ -379,6 +380,10 @@ class LibraryHandler(SimpleHTTPRequestHandler):
 
     def do_HEAD(self):
         super().do_HEAD()
+
+    def list_directory(self, path):
+        self.send_error(404, "Directory listing is disabled")
+        return None
 
     def translate_path(self, path):
         request_path = unquote(urlsplit(path).path)
