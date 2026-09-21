@@ -310,6 +310,27 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             except (TypeError, ValueError):
                 self.send_json(400, {"ok": False, "message": "数量必须是整数"}); return
             self.send_json(200, {"ok": True, "codes": self.create_cards(count, download_limit, card_type, months), "downloadLimit": download_limit, "months": months, "cardType": card_type}); return
+        if api_path == "/api/admin/cards/delete":
+            if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
+            codes = payload.get("codes", [])
+            if not isinstance(codes, list):
+                self.send_json(400, {"ok": False, "message": "卡密列表格式不正确"}); return
+            codes = list(dict.fromkeys(str(code).strip().upper() for code in codes if str(code).strip()))[:500]
+            if not codes:
+                self.send_json(400, {"ok": False, "message": "请先选择卡密"}); return
+            now = datetime.now(timezone.utc).isoformat()
+            placeholders = ",".join("?" for _ in codes)
+            with sqlite3.connect(self.db_path) as db:
+                rows = db.execute(
+                    f"SELECT id FROM access_cards WHERE code IN ({placeholders}) AND (active=0 OR (card_type='reader' AND expires_at<>'' AND expires_at<=?) OR (card_type<>'reader' AND remaining=0))",
+                    (*codes, now),
+                ).fetchall()
+                card_ids = [row[0] for row in rows]
+                if card_ids:
+                    id_placeholders = ",".join("?" for _ in card_ids)
+                    db.execute(f"DELETE FROM download_sessions WHERE card_id IN ({id_placeholders})", card_ids)
+                    db.execute(f"DELETE FROM access_cards WHERE id IN ({id_placeholders})", card_ids)
+            self.send_json(200, {"ok": True, "deleted": len(card_ids)}); return
         if api_path != "/api/unlock":
             self.send_error(404); return
         code = str(payload.get("code", "")).strip()
