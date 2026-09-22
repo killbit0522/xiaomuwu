@@ -1336,23 +1336,30 @@ h1, h2, h3, h4 {
     section.value = roots[current] ? current : '全部';
   }
 
-  function loadCatalog(quiet) {
-    fetch('../assets/catalog.json?v=' + Math.floor(Date.now() / 30000), { cache: 'default' })
-      .then(function (response) { if (!response.ok) { throw new Error('catalog'); } return response.json(); })
+  function loadCatalog(quiet, attempt) {
+    attempt = attempt || 0;
+    fetch('../assets/catalog.json', { cache: 'default', credentials: 'same-origin' })
+      .then(function (response) {
+        if (response.redirected && response.url.indexOf('/pages/home.html') >= 0) { location.href = '/pages/home.html?card=required'; throw new Error('access'); }
+        if (!response.ok || !(response.headers.get('content-type') || '').includes('application/json')) { throw new Error('catalog'); }
+        return response.json();
+      })
       .then(function (data) {
-        var signature = data.length + ':' + (data[0] ? data[0].id + ':' + data[0].modifiedAt : 'empty') + ':' + (data[data.length - 1] ? data[data.length - 1].id + ':' + data[data.length - 1].modifiedAt : 'empty');
+        var signature = data.length + ':' + (data[0] ? data[0].searchablePath + ':' + data[0].modifiedAt : 'empty') + ':' + (data[data.length - 1] ? data[data.length - 1].searchablePath + ':' + data[data.length - 1].modifiedAt : 'empty');
         if (signature === lastCatalogSignature) { return; }
         lastCatalogSignature = signature;
-        books = data.map(function(book){book._category=searchCategory(book);book._searchNormalized=normalizeSearch((book.title||'')+' '+(book.searchablePath||'')+' '+(book.search||''));return book});
+        books = data.map(function(book){book._category=searchCategory(book);book._searchNormalized=normalizeSearch((book.title||'')+' '+(book.searchablePath||''));return book});
         rebuildSections();
         errorEl.hidden = true;
         applyFilters();
       })
-      .catch(function () {
+      .catch(function (error) {
+        if (error.message === 'access') { return; }
+        if (attempt < 2) { setTimeout(function(){loadCatalog(quiet, attempt + 1)}, 500 * (attempt + 1)); return; }
         if (!quiet) {
           errorEl.hidden = false;
-          statusEl.textContent = '书目载入失败';
-          emptyEl.textContent = '请通过项目启动脚本打开此页面。';
+          statusEl.textContent = '书目暂时未载入';
+          emptyEl.textContent = '网络可能有短暂波动，正在自动重试；也可以刷新页面。';
         }
       });
   }

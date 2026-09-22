@@ -1,4 +1,5 @@
 import http.cookiejar
+import gzip
 import json
 import sqlite3
 import tempfile
@@ -26,7 +27,10 @@ class BookAccessIntegrationTests(unittest.TestCase):
         cls.books.mkdir()
         cls.data.mkdir()
         (cls.site / "pages").mkdir()
+        (cls.site / "assets").mkdir()
         (cls.site / "pages" / "home.html").write_text("home", encoding="utf-8")
+        cls.catalog_bytes = json.dumps([{"title": "白鸽", "searchablePath": f"分类/{index}/白鸽.txt"} for index in range(100)], ensure_ascii=False).encode("utf-8")
+        (cls.site / "assets" / "catalog.json").write_bytes(cls.catalog_bytes)
 
         cls.samples = {
             "utf8.txt": "白鸽飞过屋檐。",
@@ -86,6 +90,16 @@ class BookAccessIntegrationTests(unittest.TestCase):
                 with client.open(url) as response:
                     self.assertEqual(response.headers.get_content_charset(), "utf-8")
                     self.assertEqual(response.read().decode("utf-8"), expected)
+
+    def test_catalog_uses_compression_and_requires_valid_access(self):
+        with urllib.request.urlopen(self.base + "/assets/catalog.json") as response:
+            self.assertIn("/pages/home.html?card=required", response.geturl())
+        client = self.client()
+        self.unlock(client, "TEST-READER")
+        request = urllib.request.Request(self.base + "/assets/catalog.json", headers={"Accept-Encoding": "gzip"})
+        with client.open(request) as response:
+            self.assertEqual(response.headers.get("Content-Encoding"), "gzip")
+            self.assertEqual(gzip.decompress(response.read()), self.catalog_bytes)
 
     def test_valid_reader_card_can_be_entered_again_but_expired_card_cannot(self):
         self.assertTrue(self.unlock(self.client(), "TEST-READER")["ok"])

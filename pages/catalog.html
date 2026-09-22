@@ -1113,10 +1113,21 @@ h1, h2, h3, h4 {
 
   list.replaceChildren(); filters.replaceChildren();
   fetch('/api/access').then(function(r){return r.json()}).then(function(a){accessMode=a.ok?a.cardType:'';if(books.length)render()}).catch(function(){});
-  fetch('../assets/catalog.json', { cache: 'default' })
-    .then(function (response) { return response.json(); })
-    .then(function (data) { books = data; renderFilters(); render(); })
-    .catch(function () { list.textContent = '书目载入失败，请通过项目启动脚本打开。'; });
+  function loadCatalog(attempt) {
+    fetch('../assets/catalog.json', { cache: 'default', credentials: 'same-origin' })
+      .then(function (response) {
+        if (response.redirected && response.url.indexOf('/pages/home.html') >= 0) { location.href='/pages/home.html?card=required';throw new Error('access'); }
+        if (!response.ok || !(response.headers.get('content-type') || '').includes('application/json')) throw new Error('catalog');
+        return response.json();
+      })
+      .then(function (data) { books = data; renderFilters(); render(); })
+      .catch(function (error) {
+        if (error.message === 'access') return;
+        if (attempt < 2) { list.textContent='书目正在重新载入…';setTimeout(function(){loadCatalog(attempt+1)},500*(attempt+1));return; }
+        list.textContent = '书目暂时未载入，请刷新页面重试。';
+      });
+  }
+  loadCatalog(0);
 })();
 </script>
 <script src="../site-preferences.js"></script>

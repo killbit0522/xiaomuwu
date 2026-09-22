@@ -371,6 +371,31 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             self.send_header("Location", "/pages/home.html?card=required")
             self.end_headers()
             return
+        if request_path == "/assets/catalog.json":
+            source = self.site_root / "assets" / "catalog.json"
+            try:
+                stat = source.stat()
+                etag = '"%x-%x"' % (stat.st_mtime_ns, stat.st_size)
+                if self.headers.get("If-None-Match") == etag:
+                    self.send_response(304)
+                    self.send_header("ETag", etag)
+                    self.end_headers()
+                    return
+                body = source.read_bytes()
+            except OSError:
+                self.send_error(404, "Catalog unavailable")
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("ETag", etag)
+            self.send_header("Vary", "Accept-Encoding")
+            if "gzip" in self.headers.get("Accept-Encoding", "").lower() and len(body) > 1024:
+                body = gzip.compress(body, compresslevel=5)
+                self.send_header("Content-Encoding", "gzip")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if request_path == "/go/read":
             if not self.access_info():
                 self.send_response(302)
@@ -472,7 +497,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
         self.send_header("Referrer-Policy", "same-origin")
         request_path = urlsplit(self.path).path
         if request_path == "/assets/catalog.json":
-            self.send_header("Cache-Control", "public, max-age=10, must-revalidate")
+            self.send_header("Cache-Control", "private, max-age=60, stale-while-revalidate=300")
         elif request_path.startswith("/assets/") or request_path.endswith((".css", ".js")):
             self.send_header("Cache-Control", "public, max-age=86400")
         else:
@@ -503,7 +528,7 @@ def watch_textbook(handler):
                     seen_books.add(duplicate_key)
                     category_path = Path(relative).parent
                     category = "uncategorized" if str(category_path) == "." else " / ".join(category_path.parts)
-                    items.append({"id": hashlib.sha256(relative.encode("utf-8")).hexdigest()[:16], "title": title, "category": category, "format": path.suffix.lstrip(".").lower(), "size": stat.st_size, "modifiedAt": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"), "searchablePath": relative, "search": (title + " " + relative).lower(), "downloadable": True, "url": "/books/" + relative})
+                    items.append({"title": title, "category": category, "format": path.suffix.lstrip(".").lower(), "size": stat.st_size, "modifiedAt": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"), "searchablePath": relative})
                 items.sort(key=lambda item: (item["title"], item["searchablePath"]))
                 output = handler.site_root / "assets" / "catalog.json"
                 temporary = output.with_suffix(".json.tmp")
