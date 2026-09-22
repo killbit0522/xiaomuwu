@@ -1081,21 +1081,6 @@ h1, h2, h3, h4 {
               </select>
             </div>
 
-            <fieldset class="sm-fieldset">
-              <legend class="sm-label">匹配范围</legend>
-              <div class="sm-chipset">
-                <label class="sm-chip is-on">
-                  <input type="checkbox" name="scope" value="title" checked data-default="true">
-                  <span class="sm-chip-dot" aria-hidden="true"></span>
-                  <span>书名</span>
-                </label>
-                <label class="sm-chip is-on">
-                  <input type="checkbox" name="scope" value="path" checked data-default="true">
-                  <span class="sm-chip-dot" aria-hidden="true"></span>
-                  <span>目录</span>
-                </label>
-              </div>
-            </fieldset>
           </div>
 
           <div class="sm-actions">
@@ -1155,7 +1140,6 @@ h1, h2, h3, h4 {
   var keyword = document.getElementById('search-keyword');
   var section = document.getElementById('search-section');
   var format = document.getElementById('search-dynasty');
-  var scopes = form.querySelectorAll('input[name="scope"]');
   var titleEl = document.getElementById('search-result-title');
   var emptyEl = document.getElementById('search-empty');
   var listEl = document.getElementById('search-results');
@@ -1227,21 +1211,6 @@ h1, h2, h3, h4 {
 
   function formatGroup(value) {
     return ['zip', 'rar', '7z'].indexOf(value) >= 0 ? 'archive' : value;
-  }
-
-  function scopeValues() {
-    var out = [];
-    for (var i = 0; i < scopes.length; i++) {
-      if (scopes[i].checked) { out.push(scopes[i].value); }
-    }
-    return out;
-  }
-
-  function syncChips() {
-    for (var i = 0; i < scopes.length; i++) {
-      var chip = scopes[i].closest ? scopes[i].closest('.sm-chip') : null;
-      if (chip) { chip.classList.toggle('is-on', scopes[i].checked); }
-    }
   }
 
   function renderCard(book) {
@@ -1333,9 +1302,9 @@ h1, h2, h3, h4 {
 
   function applyFilters() {
     var query = normalizeSearch(keyword.value.trim());
-    function matchesQuery(book) { return !query || normalizeSearch((book.title || '') + ' ' + (book.searchablePath || '') + ' ' + (book.search || '')).indexOf(query) >= 0; }
+    function matchesQuery(book) { return !query || book._searchNormalized.indexOf(query) >= 0; }
     filtered = books.filter(function (book) {
-      var inSection = section.value === '全部' || book.category === section.value || book.category.indexOf(section.value + ' /') === 0;
+      var category = book._category, inSection = section.value === '全部' || category === section.value || category.indexOf(section.value + ' /') === 0;
       var inFormat = format.value === '不限' || formatGroup(book.format) === format.value;
       return inSection && inFormat && matchesQuery(book);
     });
@@ -1352,12 +1321,18 @@ h1, h2, h3, h4 {
     return value.toLocaleLowerCase('zh-CN').replace(/[\s·•._—–\-《》〈〉【】\[\]（）()]+/g, '');
   }
 
+  function searchCategory(book) {
+    var parts = String(book.category || '未分类').split(' / ');
+    if (parts[0] === '管理员上传' && parts.length > 1) { parts.shift(); }
+    return parts.slice(0, 4).join(' / ') || '未分类';
+  }
+
   function rebuildSections() {
     var current = section.value;
     var roots = {};
-    books.forEach(function (book) { roots[(book.category || '未分类').split(' / ')[0]] = true; });
+    books.forEach(function (book) { var parts=searchCategory(book).split(' / ');for(var depth=1;depth<=parts.length;depth++)roots[parts.slice(0,depth).join(' / ')]=true; });
     section.replaceChildren(new Option('全部', '全部'));
-    Object.keys(roots).sort().forEach(function (name) { section.appendChild(new Option(name, name)); });
+    Object.keys(roots).sort().forEach(function (name) { var depth=name.split(' / ').length,label=(depth>1?'　↳ ':'')+name.split(' / ').pop();section.appendChild(new Option(label, name)); });
     section.value = roots[current] ? current : '全部';
   }
 
@@ -1368,7 +1343,7 @@ h1, h2, h3, h4 {
         var signature = data.length + ':' + (data[0] ? data[0].id + ':' + data[0].modifiedAt : 'empty') + ':' + (data[data.length - 1] ? data[data.length - 1].id + ':' + data[data.length - 1].modifiedAt : 'empty');
         if (signature === lastCatalogSignature) { return; }
         lastCatalogSignature = signature;
-        books = data;
+        books = data.map(function(book){book._category=searchCategory(book);book._searchNormalized=normalizeSearch((book.title||'')+' '+(book.searchablePath||'')+' '+(book.search||''));return book});
         rebuildSections();
         errorEl.hidden = true;
         applyFilters();
@@ -1385,12 +1360,8 @@ h1, h2, h3, h4 {
   var initialQuery = new URLSearchParams(window.location.search).get('q');
   if (initialQuery) { keyword.value = initialQuery; }
 
-  for (var i = 0; i < scopes.length; i++) {
-    scopes[i].addEventListener('change', function () { syncChips(); applyFilters(); });
-  }
-  syncChips();
-
-  keyword.addEventListener('input', function () { applyFilters(); });
+  var searchTimer;
+  keyword.addEventListener('input', function () { clearTimeout(searchTimer);searchTimer=setTimeout(applyFilters,90); });
   section.addEventListener('change', applyFilters);
   format.addEventListener('change', applyFilters);
 
@@ -1428,10 +1399,6 @@ h1, h2, h3, h4 {
       keyword.value = '';
       section.value = '全部';
       format.value = '不限';
-      for (var i = 0; i < scopes.length; i++) {
-        scopes[i].checked = scopes[i].getAttribute('data-default') === 'true';
-      }
-      syncChips();
       applyFilters();
       keyword.focus();
     });

@@ -1043,7 +1043,8 @@ h1, h2, h3, h4 {
 
   function collectionOf(book) {
     var parts = (book.category || '未分类').split(' / ');
-    return parts[0] === '管理员上传' && parts.length > 1 ? parts[1] : parts[0];
+    if (parts[0] === '管理员上传' && parts.length > 1) { parts.shift(); }
+    return parts.slice(0, 4).join(' / ') || '未分类';
   }
 
   function makeRow(book, index) {
@@ -1055,7 +1056,7 @@ h1, h2, h3, h4 {
     var title = document.createElement('span'); title.className = 'ct-book'; title.textContent = book.title;
     var meta = document.createElement('span'); meta.className = 'ct-meta'; meta.textContent = book.format.toUpperCase() + ' · ' + (book.modifiedAt || '已收录');
     main.append(title, meta);
-    var category = document.createElement('span'); category.className = 'ct-cat'; category.textContent = collectionOf(book).slice(0, 3); category.setAttribute('aria-hidden', 'true');
+    var category = document.createElement('span'); category.className = 'ct-cat'; category.textContent = collectionOf(book).split(' / ').pop().slice(0, 6); category.setAttribute('aria-hidden', 'true');
     var readable = ['txt','pdf','docx','epub','zip'].indexOf(String(book.format).toLowerCase()) >= 0;
     var toggle = document.createElement('span'); toggle.className = 'ct-toggle'; toggle.textContent = accessMode === 'download' ? '下载' : (accessMode === 'reader' ? (readable ? '阅读' : '不可在线') : '卡密');
     var note = document.createElement('p'); note.className = 'ct-note'; note.textContent = book.category || '未分类';
@@ -1069,7 +1070,7 @@ h1, h2, h3, h4 {
   }
 
   function render() {
-    var matches = active === 'all' ? books : books.filter(function (book) { return collectionOf(book) === active; });
+    var matches = active === 'all' ? books : books.filter(function (book) { var category=collectionOf(book); return category===active||category.indexOf(active+' /')===0; });
     var pages = Math.max(1, Math.ceil(matches.length / pageSize));
     if (page > pages) { page = pages; }
     list.replaceChildren();
@@ -1079,8 +1080,12 @@ h1, h2, h3, h4 {
       var previous = document.createElement('button'); previous.className = 'ct-chip'; previous.type = 'button'; previous.textContent = '上一页'; previous.disabled = page === 1;
       var label = document.createElement('span'); label.className = 'ct-chip is-active'; label.textContent = page + ' / ' + pages + ' · 共 ' + matches.length + ' 本';
       var next = document.createElement('button'); next.className = 'ct-chip'; next.type = 'button'; next.textContent = '下一页'; next.disabled = page === pages;
+      var jump = document.createElement('input'); jump.type = 'number'; jump.min = '1'; jump.max = String(pages); jump.value = String(page); jump.className = 'ct-chip'; jump.style.width = '5.5rem'; jump.setAttribute('aria-label', '输入要跳转的页码');
+      var jumpButton = document.createElement('button'); jumpButton.className = 'ct-chip'; jumpButton.type = 'button'; jumpButton.textContent = '跳转';
+      function jumpToPage(){var wanted=Math.max(1,Math.min(pages,Number(jump.value)||1));page=wanted;render();window.scrollTo({top:list.offsetTop-90,behavior:'smooth'})}
+      jumpButton.onclick = jumpToPage; jump.onkeydown = function(event){if(event.key==='Enter'){event.preventDefault();jumpToPage()}};
       previous.onclick = function () { page -= 1; render(); }; next.onclick = function () { page += 1; render(); };
-      nav.append(previous, label, next); list.appendChild(nav);
+      nav.append(previous, label, next, jump, jumpButton); list.appendChild(nav);
     }
     if (returnState) {
       var state = returnState;
@@ -1095,10 +1100,11 @@ h1, h2, h3, h4 {
 
   function renderFilters() {
     var collections = {};
-    books.forEach(function (book) { collections[collectionOf(book)] = true; });
+    books.forEach(function (book) { var parts=collectionOf(book).split(' / ');for(var depth=1;depth<=parts.length;depth++){var key=parts.slice(0,depth).join(' / ');collections[key]=(collections[key]||0)+1} });
     filters.replaceChildren();
-    [['all', '全部']].concat(Object.keys(collections).sort().map(function (name) { return [name, name]; })).forEach(function (entry) {
+    [['all', '全部 ('+books.length+')']].concat(Object.keys(collections).sort().map(function (name) { var depth=name.split(' / ').length,label=(depth>1?'↳ ':'')+name.split(' / ').pop()+' ('+collections[name]+')';return [name,label]; })).forEach(function (entry) {
       var chip = document.createElement('button'); chip.className = 'ct-chip' + (entry[0] === active ? ' is-active' : ''); chip.type = 'button'; chip.textContent = entry[1];
+      if(entry[0]!=='all')chip.title=entry[0];
       chip.setAttribute('aria-pressed', entry[0] === active ? 'true' : 'false');
       chip.onclick = function () { active = entry[0]; page = 1; renderFilters(); render(); };
       filters.appendChild(chip);
