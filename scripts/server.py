@@ -10,6 +10,7 @@ import base64
 import gzip
 import io
 import re
+import shutil
 import zipfile
 import mimetypes
 from html.parser import HTMLParser
@@ -85,11 +86,16 @@ def decode_epub(raw):
     with zipfile.ZipFile(io.BytesIO(raw)) as archive:
         names = sorted(name for name in archive.namelist() if name.lower().endswith((".xhtml", ".html", ".htm")))
         for name in names:
-            parser = _BookHTMLParser()
-            parser.feed(decode_book_text(archive.read(name)))
-            text = re.sub(r"\n{3,}", "\n\n", "".join(parser.parts)).strip()
-            if text:
-                sections.append(text)
+            try:
+                parser = _BookHTMLParser()
+                parser.feed(decode_book_text(archive.read(name)))
+                text = re.sub(r"\n{3,}", "\n\n", "".join(parser.parts)).strip()
+                if text:
+                    sections.append(text)
+            except (KeyError, UnicodeError, ValueError):
+                continue
+    if not sections:
+        raise ValueError("No readable text in EPUB")
     return "\n\n".join(sections)
 
 
@@ -101,24 +107,31 @@ def decode_zip_book(raw, depth=0):
         if not names:
             raise ValueError("No readable document in archive")
         names.sort(key=lambda name: (0 if name.lower().endswith(".txt") else 1, len(name)))
-        name = names[0]
-        content = None
-        for password in (None, b"1", b"123"):
-            try:
-                content = archive.read(name, pwd=password)
-                break
-            except (RuntimeError, NotImplementedError):
+        for name in names:
+            content = None
+            for password in (None, b"1", b"123"):
+                try:
+                    content = archive.read(name, pwd=password)
+                    break
+                except (RuntimeError, NotImplementedError, zipfile.BadZipFile):
+                    continue
+            if content is None:
                 continue
-        if content is None:
-            raise ValueError("Archive password unsupported")
-    suffix = Path(name).suffix.lower()
-    if suffix == ".docx":
-        return decode_docx(content)
-    if suffix == ".epub":
-        return decode_epub(content)
-    if suffix == ".zip":
-        return decode_zip_book(content, depth + 1)
-    return decode_book_text(content)
+            try:
+                suffix = Path(name).suffix.lower()
+                if suffix == ".docx":
+                    text = decode_docx(content)
+                elif suffix == ".epub":
+                    text = decode_epub(content)
+                elif suffix == ".zip":
+                    text = decode_zip_book(content, depth + 1)
+                else:
+                    text = decode_book_text(content)
+                if text.strip():
+                    return text
+            except (KeyError, UnicodeError, ValueError, zipfile.BadZipFile):
+                continue
+    raise ValueError("No readable document in archive")
 
 
 def decode_readable_book(path):
@@ -142,6 +155,47 @@ class LibraryHandler(SimpleHTTPRequestHandler):
     admin_token = ""
     admin_key = ""
     db_path = Path("library.db")
+    read_cache_root = Path(".read-cache")
+    read_cache_lock = threading.Lock()
+
+    def cached_readable_book(self, source):
+        stat = source.stat()
+        fingerprint = f"{source.resolve()}:{stat.st_mtime_ns}:{stat.st_size}"
+        key = hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()
+        plain = self.read_cache_root / f"{key}.txt"
+        compressed = self.read_cache_root / f"{key}.txt.gz"
+        if plain.exists() and compressed.exists():
+            return plain, compressed
+        with self.read_cache_lock:
+            if plain.exists() and compressed.exists():
+                return plain, compressed
+            body = decode_readable_book(source).encode("utf-8")
+            plain_tmp = plain.with_suffix(".tmp")
+            gzip_tmp = compressed.with_suffix(".tmp")
+            plain_tmp.write_bytes(body)
+            gzip_tmp.write_bytes(gzip.compress(body, compresslevel=5))
+            plain_tmp.replace(plain)
+            gzip_tmp.replace(compressed)
+        return plain, compressed
+
+    def send_cached_text(self, source):
+        plain, compressed = self.cached_readable_book(source)
+        use_gzip = "gzip" in self.headers.get("Accept-Encoding", "").lower()
+        payload = compressed if use_gzip else plain
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Cache-Control", "private, max-age=300")
+        self.send_header("Vary", "Accept-Encoding")
+        if use_gzip:
+            self.send_header("Content-Encoding", "gzip")
+        self.send_header("Content-Length", str(payload.stat().st_size))
+        self.end_headers()
+        with payload.open("rb") as stream:
+            try:
+                shutil.copyfileobj(stream, self.wfile, length=1024 * 256)
+            except (BrokenPipeError, ConnectionResetError):
+                # A reader may close or change pages before a large book finishes.
+                return
 
     def send_json(self, status, payload, cookie=None):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -184,6 +238,8 @@ class LibraryHandler(SimpleHTTPRequestHandler):
         return item.value if item else ""
 
     def access_info(self):
+        if self.has_admin_access():
+            return {"id": 0, "card_type": "reader", "remaining": -1, "expires_at": "", "active": 1}
         token = self.download_session()
         if not token: return None
         with sqlite3.connect(self.db_path) as db:
@@ -331,6 +387,22 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                     db.execute(f"DELETE FROM download_sessions WHERE card_id IN ({id_placeholders})", card_ids)
                     db.execute(f"DELETE FROM access_cards WHERE id IN ({id_placeholders})", card_ids)
             self.send_json(200, {"ok": True, "deleted": len(card_ids)}); return
+        if api_path == "/api/admin/cards/disable":
+            if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
+            codes = payload.get("codes", [])
+            if not isinstance(codes, list):
+                self.send_json(400, {"ok": False, "message": "卡密列表格式不正确"}); return
+            codes = list(dict.fromkeys(str(code).strip().upper() for code in codes if str(code).strip()))[:500]
+            if not codes:
+                self.send_json(400, {"ok": False, "message": "请先选择卡密"}); return
+            placeholders = ",".join("?" for _ in codes)
+            with sqlite3.connect(self.db_path) as db:
+                card_ids = [row[0] for row in db.execute(f"SELECT id FROM access_cards WHERE code IN ({placeholders}) AND active=1", codes)]
+                if card_ids:
+                    id_placeholders = ",".join("?" for _ in card_ids)
+                    db.execute(f"UPDATE access_cards SET active=0 WHERE id IN ({id_placeholders})", card_ids)
+                    db.execute(f"DELETE FROM download_sessions WHERE card_id IN ({id_placeholders})", card_ids)
+            self.send_json(200, {"ok": True, "disabled": len(card_ids)}); return
         if api_path != "/api/unlock":
             self.send_error(404); return
         code = str(payload.get("code", "")).strip()
@@ -445,20 +517,9 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             if not info or info["card_type"] != "reader": self.send_error(403, "Reader card required"); return
             if Path(request_path).suffix.lower() in {".txt", ".docx", ".epub", ".zip"}:
                 try:
-                    body = decode_readable_book(Path(self.translate_path(self.path))).encode("utf-8")
+                    self.send_cached_text(Path(self.translate_path(self.path)))
                 except (OSError, UnicodeError, ValueError, KeyError, zipfile.BadZipFile):
                     self.send_error(404, "Book text unavailable")
-                    return
-                self.send_response(200)
-                self.send_header("Content-Type", "text/plain; charset=utf-8")
-                self.send_header("Cache-Control", "private, max-age=300")
-                self.send_header("Vary", "Accept-Encoding")
-                if "gzip" in self.headers.get("Accept-Encoding", "").lower() and len(body) > 1024:
-                    body = gzip.compress(body, compresslevel=5)
-                    self.send_header("Content-Encoding", "gzip")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
                 return
         super().do_GET()
 
@@ -537,7 +598,7 @@ def watch_textbook(handler):
                 previous = signature
         except (OSError, ValueError):
             pass
-        time.sleep(2)
+        time.sleep(max(5, int(os.environ.get("CATALOG_SCAN_INTERVAL", "15"))))
 
 
 def main():
@@ -558,6 +619,8 @@ def main():
     data_dir = Path(args.data).resolve() if args.data else LibraryHandler.site_root / ".data"
     data_dir.mkdir(parents=True, exist_ok=True)
     LibraryHandler.db_path = data_dir / "library.db"
+    LibraryHandler.read_cache_root = data_dir / "read-cache"
+    LibraryHandler.read_cache_root.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(LibraryHandler.db_path) as db:
         db.execute("CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY, type TEXT, visitor TEXT, detail TEXT, created_at TEXT)")
         db.execute("CREATE TABLE IF NOT EXISTS reviews(id INTEGER PRIMARY KEY, book TEXT, title TEXT, body TEXT, visitor TEXT, created_at TEXT)")

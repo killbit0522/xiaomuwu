@@ -8,6 +8,7 @@ import unittest
 import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from http.server import ThreadingHTTPServer
@@ -54,10 +55,14 @@ class BookAccessIntegrationTests(unittest.TestCase):
             db.execute("INSERT INTO access_cards(code,card_type,download_limit,remaining,used,expires_at,active,created_at) VALUES(?,?,?,?,?,?,?,?)", ("TEST-READER", "reader", 0, 0, 0, (now + timedelta(days=2)).isoformat(), 1, now.isoformat()))
             db.execute("INSERT INTO access_cards(code,card_type,download_limit,remaining,used,expires_at,active,created_at) VALUES(?,?,?,?,?,?,?,?)", ("TEST-EXPIRED", "reader", 0, 0, 0, (now - timedelta(seconds=1)).isoformat(), 1, now.isoformat()))
             db.execute("INSERT INTO access_cards(code,card_type,download_limit,remaining,used,expires_at,active,created_at) VALUES(?,?,?,?,?,?,?,?)", ("TEST-DOWNLOAD", "download", 2, 2, 0, "", 1, now.isoformat()))
+            db.execute("INSERT INTO access_cards(code,card_type,download_limit,remaining,used,expires_at,active,created_at) VALUES(?,?,?,?,?,?,?,?)", ("TEST-DISABLE", "reader", 0, 0, 0, (now + timedelta(days=2)).isoformat(), 1, now.isoformat()))
 
         LibraryHandler.site_root = cls.site.resolve()
         LibraryHandler.textbook_root = cls.books.resolve()
         LibraryHandler.db_path = cls.db
+        LibraryHandler.admin_token = "test-admin-token"
+        LibraryHandler.read_cache_root = cls.data / "read-cache"
+        LibraryHandler.read_cache_root.mkdir()
         cls.httpd = ThreadingHTTPServer(("127.0.0.1", 0), LibraryHandler)
         cls.base = f"http://127.0.0.1:{cls.httpd.server_port}"
         cls.thread = threading.Thread(target=cls.httpd.serve_forever, daemon=True)
@@ -125,6 +130,44 @@ class BookAccessIntegrationTests(unittest.TestCase):
         with sqlite3.connect(self.db) as db:
             remaining, used = db.execute("SELECT remaining,used FROM access_cards WHERE code='TEST-DOWNLOAD'").fetchone()
         self.assertEqual((remaining, used), (0, 2))
+
+    def test_admin_can_enter_and_read_without_reader_card(self):
+        headers = {"Cookie": "cabin_admin=test-admin-token"}
+        with urllib.request.urlopen(urllib.request.Request(self.base + "/api/access", headers=headers)) as response:
+            access = json.loads(response.read())
+        self.assertTrue(access["ok"])
+        self.assertEqual(access["cardType"], "reader")
+        with urllib.request.urlopen(urllib.request.Request(self.base + "/read/utf8.txt", headers=headers)) as response:
+            self.assertEqual(response.read().decode("utf-8"), self.samples["utf8.txt"])
+
+    def test_admin_can_disable_card_and_invalidate_its_session(self):
+        client = self.client()
+        self.unlock(client, "TEST-DISABLE")
+        payload = json.dumps({"codes": ["TEST-DISABLE"]}).encode()
+        request = urllib.request.Request(
+            self.base + "/api/admin/cards/disable",
+            data=payload,
+            headers={"Content-Type": "application/json", "Cookie": "cabin_admin=test-admin-token"},
+        )
+        with urllib.request.urlopen(request) as response:
+            self.assertEqual(json.loads(response.read())["disabled"], 1)
+        with client.open(self.base + "/api/access") as response:
+            self.assertFalse(json.loads(response.read())["ok"])
+        with sqlite3.connect(self.db) as db:
+            active = db.execute("SELECT active FROM access_cards WHERE code='TEST-DISABLE'").fetchone()[0]
+            sessions = db.execute("SELECT COUNT(*) FROM download_sessions JOIN access_cards ON access_cards.id=download_sessions.card_id WHERE access_cards.code='TEST-DISABLE'").fetchone()[0]
+        self.assertEqual(active, 0)
+        self.assertEqual(sessions, 0)
+
+    def test_zip_reader_skips_broken_member_and_opens_next_book(self):
+        archive = self.books / "fallback.zip"
+        with zipfile.ZipFile(archive, "w") as bundle:
+            bundle.writestr("a.txt", b"\x81\x30")
+            bundle.writestr("second-book.txt", "压缩包里的正文可以阅读。".encode("utf-8"))
+        client = self.client()
+        self.unlock(client, "TEST-READER")
+        with client.open(self.base + "/read/fallback.zip") as response:
+            self.assertEqual(response.read().decode("utf-8"), "压缩包里的正文可以阅读。")
 
 
 if __name__ == "__main__":

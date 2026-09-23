@@ -79,3 +79,29 @@ body[data-mode="page"] .page-turn-zone{display:block}.page-turn-prev{left:0}.pag
 .page-turn-cover.active{display:block}.page-turn-cover.turn-next{animation:page-cover-next .36s ease-in-out}.page-turn-cover.turn-prev{animation:page-cover-prev .36s ease-in-out}
 @keyframes page-cover-next{0%{opacity:0;clip-path:inset(0 0 0 100%)}45%{opacity:.96;clip-path:inset(0 0 0 0)}100%{opacity:0;clip-path:inset(0 100% 0 0)}}
 @keyframes page-cover-prev{0%{opacity:0;clip-path:inset(0 100% 0 0)}45%{opacity:.96;clip-path:inset(0 0 0 0)}100%{opacity:0;clip-path:inset(0 0 0 100%)}}
+html {
+  width: 100%;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+img, svg, video, canvas, iframe {
+  max-width: 100%;
+}
+
+@media (max-width: 768px) {
+  input, select, textarea, button {
+    font-size: 16px !important;
+  }
+
+  main, section, article, header, footer, nav, div {
+    min-width: 0;
+  }
+}
