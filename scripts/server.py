@@ -434,9 +434,8 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             info = self.access_info()
             self.send_json(200, {"ok": bool(info), "cardType": info["card_type"] if info else "", "remaining": info["remaining"] if info else 0, "expiresAt": info["expires_at"] if info else ""}); return
         protected_pages = {
-            "/pages/search.html", "/pages/catalog.html", "/pages/request.html",
+            "/pages/search.html", "/pages/request.html",
             "/pages/review.html", "/pages/bookshelf.html", "/pages/reader.html",
-            "/assets/catalog.json",
         }
         if request_path in protected_pages and not self.access_info():
             self.send_response(302)
@@ -601,6 +600,13 @@ def watch_textbook(handler):
         time.sleep(max(5, int(os.environ.get("CATALOG_SCAN_INTERVAL", "15"))))
 
 
+class LibraryHTTPServer(ThreadingHTTPServer):
+    """Accept short traffic bursts without intermittently refusing readers."""
+    request_queue_size = 128
+    daemon_threads = True
+    allow_reuse_address = True
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", "4173")))
@@ -634,7 +640,7 @@ def main():
         initial_admin_hash = hashlib.sha256(LibraryHandler.admin_key.encode("utf-8")).hexdigest()
         db.execute("INSERT OR IGNORE INTO settings(key,value) VALUES('admin_password_hash',?)", (initial_admin_hash,))
     threading.Thread(target=watch_textbook, args=(LibraryHandler,), daemon=True).start()
-    server = ThreadingHTTPServer(("0.0.0.0", args.port), LibraryHandler)
+    server = LibraryHTTPServer(("0.0.0.0", args.port), LibraryHandler)
     print(f"Serving on port {args.port}", flush=True)
     server.serve_forever()
 
