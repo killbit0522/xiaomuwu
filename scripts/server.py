@@ -157,6 +157,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
     db_path = Path("library.db")
     read_cache_root = Path(".read-cache")
     read_cache_lock = threading.Lock()
+    upload_lock = threading.Lock()
 
     def cached_readable_book(self, source):
         stat = source.stat()
@@ -299,21 +300,35 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
             if not filename or Path(filename).suffix.lower() not in allowed or length < 1 or length > 104857600:
                 self.send_json(400, {"ok": False}); return
-            target_dir = self.textbook_root / "管理员上传"
             relative = Path(relative_header.replace("\\", "/")) if relative_header else Path(filename)
             if len(relative.parts) > 1 and relative.parts[0].casefold() in {"textbook", "书库"}:
                 relative = Path(*relative.parts[1:])
             if relative.is_absolute() or not relative.parts or any(part in ("", ".", "..") for part in relative.parts) or len(relative.parts) > 30:
                 self.send_json(400, {"ok": False}); return
-            target = (target_dir / relative).resolve()
-            try:
-                if os.path.commonpath((str(target_dir.resolve()), str(target))) != str(target_dir.resolve()):
+            body = self.rfile.read(length)
+            upload_root = self.textbook_root / "管理员上传"
+            with self.upload_lock:
+                upload_root.mkdir(parents=True, exist_ok=True)
+                numbered = []
+                for child in upload_root.iterdir():
+                    match = re.fullmatch(r"新上传(\d+)", child.name) if child.is_dir() else None
+                    if match:
+                        numbered.append((int(match.group(1)), child))
+                group_number, target_dir = max(numbered, default=(0, None), key=lambda item: item[0])
+                current_count = sum(1 for item in target_dir.rglob("*") if item.is_file()) if target_dir else 20
+                if target_dir is None or current_count >= 20:
+                    group_number += 1
+                    target_dir = upload_root / f"新上传{group_number}"
+                target = (target_dir / relative).resolve()
+                try:
+                    if os.path.commonpath((str(target_dir.resolve()), str(target))) != str(target_dir.resolve()):
+                        self.send_json(400, {"ok": False}); return
+                except ValueError:
                     self.send_json(400, {"ok": False}); return
-            except ValueError:
-                self.send_json(400, {"ok": False}); return
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(self.rfile.read(length))
-            self.send_json(200, {"ok": True, "filename": filename, "relativePath": relative.as_posix()}); return
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(body)
+            grouped_path = (Path(target_dir.name) / relative).as_posix()
+            self.send_json(200, {"ok": True, "filename": filename, "relativePath": grouped_path, "uploadGroup": target_dir.name}); return
         try:
             payload = self.read_json()
         except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
@@ -346,7 +361,9 @@ class LibraryHandler(SimpleHTTPRequestHandler):
         if api_path == "/api/admin/login":
             if not self.verify_admin_password(str(payload.get("code", ""))):
                 self.send_json(401, {"ok": False}); return
-            self.send_json(200, {"ok": True}, f"cabin_admin={self.admin_token}; Path=/; HttpOnly; SameSite=Strict"); return
+            expires = datetime.now(timezone.utc) + timedelta(hours=24)
+            cookie = f"cabin_admin={self.admin_token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400; Expires={format_datetime(expires, usegmt=True)}"
+            self.send_json(200, {"ok": True}, cookie); return
         if api_path == "/api/admin/password":
             if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
             new_password = str(payload.get("newPassword", ""))

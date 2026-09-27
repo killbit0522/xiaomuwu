@@ -1,4 +1,5 @@
 import http.cookiejar
+import hashlib
 import gzip
 import json
 import sqlite3
@@ -53,6 +54,8 @@ class BookAccessIntegrationTests(unittest.TestCase):
             db.execute("CREATE TABLE events(id INTEGER PRIMARY KEY, type TEXT, visitor TEXT, detail TEXT, created_at TEXT)")
             db.execute("CREATE TABLE reviews(id INTEGER PRIMARY KEY, book TEXT, title TEXT, body TEXT, visitor TEXT, created_at TEXT)")
             db.execute("CREATE TABLE book_requests(id INTEGER PRIMARY KEY, title TEXT, author TEXT, edition TEXT, section TEXT, purpose TEXT, contact TEXT, note TEXT, visitor TEXT, created_at TEXT)")
+            db.execute("CREATE TABLE settings(key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+            db.execute("INSERT INTO settings(key,value) VALUES('admin_password_hash',?)", (hashlib.sha256(b"test-admin-password").hexdigest(),))
             now = datetime.now(timezone.utc)
             db.execute("INSERT INTO access_cards(code,card_type,download_limit,remaining,used,expires_at,active,created_at) VALUES(?,?,?,?,?,?,?,?)", ("TEST-READER", "reader", 0, 0, 0, (now + timedelta(days=2)).isoformat(), 1, now.isoformat()))
             db.execute("INSERT INTO access_cards(code,card_type,download_limit,remaining,used,expires_at,active,created_at) VALUES(?,?,?,?,?,?,?,?)", ("TEST-EXPIRED", "reader", 0, 0, 0, (now - timedelta(seconds=1)).isoformat(), 1, now.isoformat()))
@@ -170,6 +173,33 @@ class BookAccessIntegrationTests(unittest.TestCase):
         self.unlock(client, "TEST-READER")
         with client.open(self.base + "/read/fallback.zip") as response:
             self.assertEqual(response.read().decode("utf-8"), "压缩包里的正文可以阅读。")
+
+    def test_admin_login_cookie_is_remembered_for_24_hours(self):
+        payload = json.dumps({"code": "test-admin-password"}).encode()
+        request = urllib.request.Request(self.base + "/api/admin/login", data=payload, headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(request) as response:
+            cookie = response.headers.get("Set-Cookie", "")
+        self.assertIn("Max-Age=86400", cookie)
+        self.assertIn("HttpOnly", cookie)
+
+    def test_admin_uploads_are_grouped_twenty_books_per_new_folder(self):
+        for index in range(21):
+            body = f"第{index + 1}本".encode("utf-8")
+            request = urllib.request.Request(
+                self.base + "/api/admin/upload",
+                data=body,
+                headers={
+                    "Cookie": "cabin_admin=test-admin-token",
+                    "X-Filename": f"book-{index:02d}.txt",
+                    "X-Relative-Path": f"book-{index:02d}.txt",
+                },
+            )
+            with urllib.request.urlopen(request) as response:
+                self.assertTrue(json.loads(response.read())["ok"])
+        first = self.books / "管理员上传" / "新上传1"
+        second = self.books / "管理员上传" / "新上传2"
+        self.assertEqual(sum(1 for path in first.rglob("*") if path.is_file()), 20)
+        self.assertEqual(sum(1 for path in second.rglob("*") if path.is_file()), 1)
 
 
 if __name__ == "__main__":
