@@ -113,8 +113,6 @@ h1, h2, h3, h4 {
 }
 
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
-    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
     <style type="text/tailwindcss">
   @theme inline {
     --color-background: var(--zhaowen-background);
@@ -1063,7 +1061,7 @@ h1, h2, h3, h4 {
   }
 
   if(bookInput){bookInput.addEventListener('input',function(){if(bookNow){bookNow.textContent=bookInput.value.trim()||'请选择一本书'}})}
-  fetch('../assets/catalog.json?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.json()}).then(function(items){var seen={};items.forEach(function(book){if(!seen[book.title]){seen[book.title]=true;var option=document.createElement('option');option.value=book.title;bookList.appendChild(option)}})}).catch(function(){});
+  fetch('../assets/catalog.json',{cache:'default'}).then(function(r){return r.json()}).then(function(items){var seen={};items.forEach(function(book){if(!seen[book.title]){seen[book.title]=true;var option=document.createElement('option');option.value=book.title;bookList.appendChild(option)}})}).catch(function(){});
 
   if (bodyEl) {
     bodyEl.addEventListener('input', function () {

@@ -101,6 +101,25 @@ class BookAccessIntegrationTests(unittest.TestCase):
                     self.assertEqual(response.headers.get_content_charset(), "utf-8")
                     self.assertEqual(response.read().decode("utf-8"), expected)
 
+    def test_reader_text_uses_etag_cache_and_pdf_supports_byte_ranges(self):
+        client = self.client()
+        self.unlock(client, "TEST-READER")
+        text_url = self.base + "/read/utf8.txt"
+        with client.open(text_url) as response:
+            etag = response.headers.get("ETag")
+            self.assertIn("max-age=3600", response.headers.get("Cache-Control", ""))
+            self.assertTrue(etag)
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            client.open(urllib.request.Request(text_url, headers={"If-None-Match": etag}))
+        self.assertEqual(caught.exception.code, 304)
+        caught.exception.close()
+
+        pdf_request = urllib.request.Request(self.base + "/read/sample.pdf", headers={"Range": "bytes=2-7"})
+        with client.open(pdf_request) as response:
+            self.assertEqual(response.status, 206)
+            self.assertEqual(response.headers.get("Content-Range"), f"bytes 2-7/{len(self.binary)}")
+            self.assertEqual(response.read(), self.binary[2:8])
+
     def test_catalog_is_public_and_compressed_but_reader_stays_protected(self):
         request = urllib.request.Request(self.base + "/assets/catalog.json", headers={"Accept-Encoding": "gzip"})
         with urllib.request.urlopen(request) as response:

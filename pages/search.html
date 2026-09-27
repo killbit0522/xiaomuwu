@@ -113,8 +113,6 @@ h1, h2, h3, h4 {
 }
 
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
-    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
     <style type="text/tailwindcss">
   @theme inline {
     --color-background: var(--zhaowen-background);
@@ -1414,7 +1412,7 @@ h1, h2, h3, h4 {
   fetch('/api/access').then(function(r){return r.json()}).then(function(data){accessMode=data.ok?data.cardType:'';render()}).catch(function(){});
   loadCatalog(false);
   renderDailyQuotes();
-  window.setInterval(function () { loadCatalog(true); }, 10000);
+  window.setInterval(function () { loadCatalog(true); }, 60000);
 })();
 </script>
 <script src="../site-preferences.js"></script>

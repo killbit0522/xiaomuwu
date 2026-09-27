@@ -157,7 +157,25 @@ class LibraryHandler(SimpleHTTPRequestHandler):
     db_path = Path("library.db")
     read_cache_root = Path(".read-cache")
     read_cache_lock = threading.Lock()
+    catalog_cache_lock = threading.Lock()
     upload_lock = threading.Lock()
+
+    def cached_gzip_file(self, source, prefix="asset"):
+        """Build large gzip responses once instead of recompressing per visitor."""
+        stat = source.stat()
+        fingerprint = f"{source.resolve()}:{stat.st_mtime_ns}:{stat.st_size}"
+        key = hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()
+        compressed = self.read_cache_root / f"{prefix}-{key}.gz"
+        if compressed.exists():
+            return compressed
+        with self.catalog_cache_lock:
+            if compressed.exists():
+                return compressed
+            temporary = compressed.with_suffix(".tmp")
+            with source.open("rb") as input_stream, gzip.open(temporary, "wb", compresslevel=5) as output_stream:
+                shutil.copyfileobj(input_stream, output_stream, length=1024 * 256)
+            temporary.replace(compressed)
+        return compressed
 
     def cached_readable_book(self, source):
         stat = source.stat()
@@ -180,12 +198,21 @@ class LibraryHandler(SimpleHTTPRequestHandler):
         return plain, compressed
 
     def send_cached_text(self, source):
+        source_stat = source.stat()
+        etag = '"%x-%x"' % (source_stat.st_mtime_ns, source_stat.st_size)
+        if self.headers.get("If-None-Match") == etag:
+            self.send_response(304)
+            self.send_header("ETag", etag)
+            self.send_header("Cache-Control", "private, max-age=3600, stale-while-revalidate=86400")
+            self.end_headers()
+            return
         plain, compressed = self.cached_readable_book(source)
         use_gzip = "gzip" in self.headers.get("Accept-Encoding", "").lower()
         payload = compressed if use_gzip else plain
         self.send_response(200)
         self.send_header("Content-Type", "text/plain; charset=utf-8")
-        self.send_header("Cache-Control", "private, max-age=300")
+        self.send_header("Cache-Control", "private, max-age=3600, stale-while-revalidate=86400")
+        self.send_header("ETag", etag)
         self.send_header("Vary", "Accept-Encoding")
         if use_gzip:
             self.send_header("Content-Encoding", "gzip")
@@ -196,6 +223,57 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 shutil.copyfileobj(stream, self.wfile, length=1024 * 256)
             except (BrokenPipeError, ConnectionResetError):
                 # A reader may close or change pages before a large book finishes.
+                return
+
+    def send_file_range(self, source, content_type=None):
+        """Serve large readable files in byte ranges so PDFs open immediately."""
+        stat = source.stat()
+        size = stat.st_size
+        etag = '"%x-%x"' % (stat.st_mtime_ns, size)
+        if self.headers.get("If-None-Match") == etag and not self.headers.get("Range"):
+            self.send_response(304)
+            self.send_header("ETag", etag)
+            self.end_headers()
+            return
+        start, end = 0, max(0, size - 1)
+        range_header = self.headers.get("Range", "")
+        partial = False
+        match = re.fullmatch(r"bytes=(\d*)-(\d*)", range_header.strip()) if range_header else None
+        if match and size:
+            first, last = match.groups()
+            if first:
+                start = int(first)
+                end = min(size - 1, int(last)) if last else size - 1
+            elif last:
+                start = max(0, size - int(last))
+                end = size - 1
+            if start >= size or end < start:
+                self.send_response(416)
+                self.send_header("Content-Range", f"bytes */{size}")
+                self.end_headers()
+                return
+            partial = True
+        length = max(0, end - start + 1)
+        self.send_response(206 if partial else 200)
+        self.send_header("Content-Type", content_type or mimetypes.guess_type(source.name)[0] or "application/octet-stream")
+        self.send_header("Accept-Ranges", "bytes")
+        self.send_header("ETag", etag)
+        self.send_header("Cache-Control", "private, max-age=3600, stale-while-revalidate=86400")
+        if partial:
+            self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+        self.send_header("Content-Length", str(length))
+        self.end_headers()
+        with source.open("rb") as stream:
+            stream.seek(start)
+            remaining = length
+            try:
+                while remaining:
+                    chunk = stream.read(min(1024 * 256, remaining))
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+                    remaining -= len(chunk)
+            except (BrokenPipeError, ConnectionResetError):
                 return
 
     def send_json(self, status, payload, cookie=None):
@@ -469,20 +547,28 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                     self.send_header("ETag", etag)
                     self.end_headers()
                     return
-                body = source.read_bytes()
             except OSError:
                 self.send_error(404, "Catalog unavailable")
+                return
+            use_gzip = "gzip" in self.headers.get("Accept-Encoding", "").lower() and stat.st_size > 1024
+            try:
+                payload = self.cached_gzip_file(source, "catalog") if use_gzip else source
+            except OSError:
+                self.send_error(503, "Catalog cache unavailable")
                 return
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("ETag", etag)
             self.send_header("Vary", "Accept-Encoding")
-            if "gzip" in self.headers.get("Accept-Encoding", "").lower() and len(body) > 1024:
-                body = gzip.compress(body, compresslevel=5)
+            if use_gzip:
                 self.send_header("Content-Encoding", "gzip")
-            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Content-Length", str(payload.stat().st_size))
             self.end_headers()
-            self.wfile.write(body)
+            with payload.open("rb") as stream:
+                try:
+                    shutil.copyfileobj(stream, self.wfile, length=1024 * 256)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
             return
         if request_path == "/go/read":
             if not self.access_info():
@@ -503,20 +589,19 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 self.send_error(403, "Download card required or download limit exhausted")
                 return
             source = Path(self.translate_path(self.path))
-            try:
-                raw = source.read_bytes()
-            except OSError:
+            if not source.is_file():
                 self.send_error(404, "Book file unavailable")
                 return
             if source.suffix.lower() == ".txt":
                 try:
+                    raw = source.read_bytes()
                     body = b"\xef\xbb\xbf" + decode_book_text(raw).encode("utf-8")
-                except ValueError as error:
+                except (OSError, ValueError) as error:
                     self.send_error(422, str(error))
                     return
                 content_type = "text/plain; charset=utf-8"
             else:
-                body = raw
+                body = None
                 content_type = mimetypes.guess_type(source.name)[0] or "application/octet-stream"
             if not self.consume_download():
                 self.send_error(403, "Download limit exhausted")
@@ -524,9 +609,16 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Disposition", "attachment; filename=book%s; filename*=UTF-8''%s" % (source.suffix, quote(source.name)))
-            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Content-Length", str(len(body) if body is not None else source.stat().st_size))
             self.end_headers()
-            self.wfile.write(body)
+            try:
+                if body is not None:
+                    self.wfile.write(body)
+                else:
+                    with source.open("rb") as stream:
+                        shutil.copyfileobj(stream, self.wfile, length=1024 * 256)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
             return
         if request_path.startswith("/read/"):
             info = self.access_info()
@@ -537,6 +629,15 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 except (OSError, UnicodeError, ValueError, KeyError, zipfile.BadZipFile):
                     self.send_error(404, "Book text unavailable")
                 return
+            if Path(request_path).suffix.lower() == ".pdf":
+                source = Path(self.translate_path(self.path))
+                if not source.is_file():
+                    self.send_error(404, "Book file unavailable")
+                    return
+                self.send_file_range(source, "application/pdf")
+                return
+            self.send_error(415, "This format is not available for online reading")
+            return
         super().do_GET()
 
     def do_HEAD(self):
@@ -574,7 +675,10 @@ class LibraryHandler(SimpleHTTPRequestHandler):
         self.send_header("Referrer-Policy", "same-origin")
         request_path = urlsplit(self.path).path
         if request_path == "/assets/catalog.json":
-            self.send_header("Cache-Control", "private, max-age=60, stale-while-revalidate=300")
+            self.send_header("Cache-Control", "private, max-age=300, stale-while-revalidate=3600")
+        elif request_path.startswith("/read/"):
+            # Reader responses set their own private cache policy and ETag.
+            pass
         elif request_path.startswith("/assets/") or request_path.endswith((".css", ".js")):
             self.send_header("Cache-Control", "public, max-age=86400")
         else:
