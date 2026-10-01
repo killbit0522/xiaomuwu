@@ -13,6 +13,13 @@ test('all changed browser scripts parse', () => {
     for (const match of fs.readFileSync(file,'utf8').matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)) new vm.Script(match[1]);
   }
 });
+test('tap zones and chapter controls are present in the reader', () => {
+  assert.match(html, /id="chapter-prev"[^>]*>上一章/);
+  assert.match(html, /id="chapter-next"[^>]*>下一章/);
+  assert.match(source, /if\(y>=\.72\)\{stepRead\(1\);return\}/);
+  assert.match(source, /if\(x>\.28&&x<\.72\)\{controlsPanel\.classList\.toggle\('open'\);return\}/);
+  assert.match(source, /function stepChapter\(direction\)/);
+});
 function saveContext() {
   const writes = new Map();
   const ctx = {restoring:false,layoutReady:true,content:{hidden:false},saveTimer:null,clearTimeout(){},setTimeout(fn){ctx.pending=fn;},localStorage:{setItem(k,v){writes.set(k,JSON.parse(v));}},key:'book',mode:'scroll',size:18,paperTone:'cream',progress:{value:'620'},path:'book.txt',bookTitle:'测试',format:'txt',onlineId:'',sourceName:'',sourceUrl:''};
