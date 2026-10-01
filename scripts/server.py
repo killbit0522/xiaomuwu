@@ -30,6 +30,10 @@ except ImportError:
 
 def decode_book_text(raw):
     """Decode the common encodings used by collected Chinese TXT books."""
+    # Some exports prepend ASCII whitespace before the Unicode BOM.
+    prefixed = raw.lstrip(b"\r\n\t ")
+    if prefixed.startswith((b"\xef\xbb\xbf", b"\xff\xfe", b"\xfe\xff")):
+        raw = prefixed
     if raw.startswith(b"\xef\xbb\xbf"):
         return raw.decode("utf-8-sig")
     if raw.startswith((b"\xff\xfe", b"\xfe\xff")):

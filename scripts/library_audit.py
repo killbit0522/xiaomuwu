@@ -48,10 +48,17 @@ def start(handler, decode):
                     elif path.suffix.lower() in {'.txt', '.docx', '.epub', '.zip'}:
                         if path.suffix.lower() != '.txt':
                             with zipfile.ZipFile(path) as archive:
-                                if sum(item.file_size for item in archive.infolist()) > 64 * 1024 * 1024 or any(item.filename.lower().endswith('.zip') for item in archive.infolist()):
-                                    raise ValueError('Archive needs manual inspection')
-                        if not decode(path).strip():
-                            message = '正文为空'
+                                names = [item.filename.lower() for item in archive.infolist() if not item.is_dir()]
+                                if sum(item.file_size for item in archive.infolist()) > 64 * 1024 * 1024:
+                                    message = '解压后体积较大：已跳过正文检查，不代表文件损坏'
+                                elif any(name.endswith('.zip') for name in names):
+                                    message = '包含嵌套压缩包：待进一步检查，不代表文件损坏'
+                                elif path.suffix.lower() == '.zip' and not any(name.endswith(('.txt', '.docx', '.epub')) for name in names):
+                                    message = ('图片型压缩包：当前文字阅读器不支持' if any(name.endswith(('.png', '.jpg', '.jpeg', '.webp')) for name in names) else '压缩包内没有当前支持的正文格式')
+                                elif path.suffix.lower() == '.docx' and not decode(path).strip():
+                                    message = ('图片型 Word：未提取到文字，需要图片阅读支持' if any(name.startswith('word/media/') for name in names) else '未提取到文字：需要进一步检查文档结构')
+                        if not message and not decode(path).strip():
+                            message = '未提取到文字：需要进一步检查'
                     elif path.suffix.lower() == '.pdf':
                         with path.open('rb') as stream:
                             if not stream.read(1024).lstrip().startswith(b'%PDF-'):
