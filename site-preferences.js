@@ -1,4 +1,9 @@
 (function () {
+  if (/\/pages\/(admin|reader)\.html$/.test(location.pathname)) {
+    var enhancement = document.createElement('script');
+    enhancement.src = '../reading-support.js?v=20261001';
+    document.head.appendChild(enhancement);
+  }
   var storageKey = 'xiaomuwu-theme';
   var root = document.documentElement;
   function savedTheme() { try { return localStorage.getItem(storageKey) || 'day'; } catch (error) { return 'day'; } }

@@ -22,6 +22,10 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit, parse_qs, urlencode, quote
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from http.cookies import SimpleCookie
+try:
+    from . import library_audit
+except ImportError:
+    import library_audit
 
 
 def decode_book_text(raw):
@@ -370,6 +374,11 @@ class LibraryHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         api_path = urlsplit(self.path).path
+        if api_path == '/api/admin/audit':
+            if not self.has_admin_access():
+                self.send_json(403, {'ok': False}); return
+            library_audit.start(type(self), decode_readable_book)
+            self.send_json(202, {'ok': True}); return
         if api_path == "/api/admin/upload":
             if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
             filename = Path(unquote(self.headers.get("X-Filename", ""))).name
@@ -414,9 +423,11 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             return
         if api_path == "/api/events":
             event_type = str(payload.get("type", ""))
-            if event_type not in ("visit", "search", "download"):
+            if event_type not in ("visit", "search", "download", "reading_error", "reading_feedback"):
                 self.send_error(400); return
-            self.save_event(event_type, str(payload.get("visitor", "")), str(payload.get("detail", "")))
+            if event_type.startswith('reading_') and not self.access_info():
+                self.send_json(403, {'ok': False}); return
+            self.save_event(event_type, str(payload.get("visitor", ""))[:80], str(payload.get("detail", ""))[:2000])
             self.send_json(200, {"ok": True}); return
         if api_path == "/api/reviews":
             body = str(payload.get("body", "")).strip()
@@ -520,6 +531,17 @@ class LibraryHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         request_path = urlsplit(self.path).path
+        if request_path == '/api/admin/reading-errors':
+            if not self.has_admin_access():
+                self.send_json(403, {'ok': False}); return
+            with sqlite3.connect(self.db_path) as db:
+                db.row_factory = sqlite3.Row
+                rows = [dict(row) for row in db.execute("SELECT type,detail,created_at FROM events WHERE type IN ('reading_error','reading_feedback') ORDER BY id DESC LIMIT 100")]
+            self.send_json(200, {'items': rows}); return
+        if request_path == '/api/admin/audit':
+            if not self.has_admin_access():
+                self.send_json(403, {'ok': False}); return
+            self.send_json(200, library_audit.report(type(self))); return
         if request_path == "/api/admin/data":
             if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
             self.send_json(200, self.admin_data()); return
