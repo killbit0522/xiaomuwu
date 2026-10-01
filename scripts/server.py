@@ -652,8 +652,12 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             if Path(request_path).suffix.lower() in {".txt", ".docx", ".epub", ".zip"}:
                 try:
                     self.send_cached_text(Path(self.translate_path(self.path)))
-                except (OSError, UnicodeError, ValueError, KeyError, zipfile.BadZipFile):
+                except FileNotFoundError:
                     self.send_error(404, "Book text unavailable")
+                except (UnicodeError, ValueError, KeyError, zipfile.BadZipFile, ElementTree.ParseError):
+                    self.send_error(422, "Book text could not be parsed")
+                except OSError:
+                    self.send_error(503, "Book storage temporarily unavailable")
                 return
             if Path(request_path).suffix.lower() == ".pdf":
                 source = Path(self.translate_path(self.path))

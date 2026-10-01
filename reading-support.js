@@ -84,15 +84,21 @@
   function schedule() { clearTimeout(pending); pending=setTimeout(capture,250); }
   var observer = new MutationObserver(function () {
     if (!ready && !content.hidden && content.querySelector('.chapter-text')) {
-      ready=true; observer.disconnect();
-      setTimeout(function(){restore(saved);capture();},500);
+      observer.disconnect();
+      setTimeout(function(){ready=true;restore(saved);capture();},500);
     }
   }); observer.observe(content,{childList:true,attributes:true});
-  if (!content.hidden && content.querySelector('.chapter-text')) {ready=true;setTimeout(function(){restore(saved);capture();},500);}
+  if (!content.hidden && content.querySelector('.chapter-text')) {observer.disconnect();setTimeout(function(){ready=true;restore(saved);capture();},500);}
   window.addEventListener('scroll',schedule,{passive:true}); paper.addEventListener('scroll',schedule,{passive:true});
   window.addEventListener('pagehide',capture); document.addEventListener('visibilitychange',function(){if(document.hidden)capture();});
-  var resizeTimer;
-  window.addEventListener('resize',function(){var anchor=last||saved;clearTimeout(resizeTimer);resizeTimer=setTimeout(function(){restore(anchor);},550);});
+  var resizeTimer, viewportWidth=innerWidth, resizeAnchor;
+  window.addEventListener('resize',function(){
+    if(!ready || innerWidth===viewportWidth)return;
+    viewportWidth=innerWidth;
+    if(!resizeTimer)resizeAnchor=last||saved;
+    restoring=true;clearTimeout(pending);clearTimeout(resizeTimer);
+    resizeTimer=setTimeout(function(){resizeTimer=null;restoring=false;restore(resizeAnchor);},550);
+  });
   var controls=document.getElementById('controls');
   var resume=text('button','继续上次阅读'), report=text('button','反馈本书问题'); resume.type=report.type='button';
   resume.onclick=function(){restore(saved||last);};
@@ -103,5 +109,5 @@
   report.onclick=function(){var message=prompt('请描述这本书的问题（例如乱码、缺章或跳页）：');if(!message)return;report.disabled=true;reportIssue('reading_feedback',message.slice(0,800)).then(function(){report.textContent='反馈已发送';}).catch(function(){report.textContent='发送失败，点击重试';report.disabled=false;});};
   controls.append(resume,report);
   var status=document.getElementById('status');
-  new MutationObserver(function(){if(!sent && status.textContent.includes('无法解析')){sent=true;reportIssue('reading_error',status.textContent.slice(0,300)).catch(function(){});}}).observe(status,{childList:true,subtree:true,characterData:true});
+  document.addEventListener('reader-load-error',function(event){if(!sent){sent=true;reportIssue('reading_error',event.detail.message+' (HTTP '+event.detail.code+')').catch(function(){sent=false;});}});
 })();
