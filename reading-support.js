@@ -1,5 +1,7 @@
 (function () {
   'use strict';
+  if (window.cabinReadingSupportLoaded) return;
+  window.cabinReadingSupportLoaded = true;
   function text(tag, value) { var el = document.createElement(tag); el.textContent = value; return el; }
   if (location.pathname.endsWith('/admin.html')) {
     var dashboard = document.getElementById('dashboard');
@@ -7,7 +9,8 @@
     var panel = text('section', ''); panel.className = 'panel';
     var start = text('button', '开始书库体检'), state = text('p', '检查文件、正文解析和不支持的格式。'), list = text('div', '');
     start.type = 'button';
-    panel.append(text('h2', '书库体检'), start, state, list); dashboard.append(panel);
+    panel.id = 'library-audit';
+    panel.append(text('h2', '书库体检'), start, state, list); dashboard.prepend(panel);
     var faultPanel=text('section',''), faultList=text('div',''), faultRefresh=text('button','刷新故障记录');
     faultPanel.className='panel'; faultRefresh.type='button'; faultPanel.append(text('h2','阅读故障与读者反馈'),faultRefresh,faultList);dashboard.append(faultPanel);
     async function loadFaults(){
