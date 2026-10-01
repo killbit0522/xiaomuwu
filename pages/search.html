@@ -1198,7 +1198,7 @@ h1, h2, h3, h4 {
   }
 
   function externalFallbackUrl(query) {
-    return '/go/read?q=' + encodeURIComponent(query);
+    return './online-search.html?q=' + encodeURIComponent(query);
   }
 
   function humanSize(size) {
@@ -1292,7 +1292,7 @@ h1, h2, h3, h4 {
     if (books.length) {
       emptyEl.appendChild(document.createTextNode('本地书库没有找到匹配结果。'));
       if (keyword.value.trim()) {
-        var external = document.createElement('a'); external.className = 'sm-btn sm-btn-ghost'; external.href = externalFallbackUrl(keyword.value.trim()); external.textContent = '手动去外部书源查找'; external.style.marginLeft = '12px'; emptyEl.appendChild(external);
+        var external = document.createElement('a'); external.className = 'sm-btn sm-btn-ghost'; external.href = externalFallbackUrl(keyword.value.trim()); external.textContent = '去公开书源联网查找'; external.style.marginLeft = '12px'; emptyEl.appendChild(external);
       }
     } else { emptyEl.textContent = 'textbook 中暂未发现可收录的书目文件。'; }
     renderPager();

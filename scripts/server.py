@@ -24,8 +24,10 @@ from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from http.cookies import SimpleCookie
 try:
     from . import library_audit
+    from . import online_library
 except ImportError:
     import library_audit
+    import online_library
 
 
 def decode_book_text(raw):
@@ -164,6 +166,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
     admin_key = ""
     db_path = Path("library.db")
     read_cache_root = Path(".read-cache")
+    online_cache_root = Path(".online-cache")
     read_cache_lock = threading.Lock()
     catalog_cache_lock = threading.Lock()
     upload_lock = threading.Lock()
@@ -294,6 +297,29 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             self.send_header("Set-Cookie", cookie + secure)
         self.end_headers()
         self.wfile.write(body)
+
+    def send_online_text(self, page):
+        source = page["path"]
+        stat = source.stat()
+        etag = '"online-%x-%x"' % (stat.st_mtime_ns, stat.st_size)
+        if self.headers.get("If-None-Match") == etag:
+            self.send_response(304)
+            self.send_header("ETag", etag)
+            self.send_header("Cache-Control", "private, max-age=3600, stale-while-revalidate=86400")
+            self.end_headers()
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Content-Length", str(stat.st_size))
+        self.send_header("ETag", etag)
+        self.send_header("Cache-Control", "private, max-age=3600, stale-while-revalidate=86400")
+        self.send_header("X-Book-Source", quote(page["source"]))
+        self.end_headers()
+        with source.open("rb") as stream:
+            try:
+                shutil.copyfileobj(stream, self.wfile, length=1024 * 256)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
 
     def read_json(self):
         length = min(int(self.headers.get("Content-Length", "0")), 65536)
@@ -535,6 +561,23 @@ class LibraryHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         request_path = urlsplit(self.path).path
+        if request_path == "/api/online/search":
+            query = parse_qs(urlsplit(self.path).query).get("q", [""])[0]
+            try:
+                self.send_json(200, online_library.search(query, self.online_cache_root))
+            except online_library.OnlineLibraryError as error:
+                self.send_json(error.status, {"ok": False, "message": str(error)})
+            return
+        if request_path == "/api/online/read":
+            info = self.access_info()
+            if not info or info["card_type"] != "reader":
+                self.send_json(403, {"ok": False, "message": "需要有效阅读卡"}); return
+            title = parse_qs(urlsplit(self.path).query).get("id", [""])[0]
+            try:
+                self.send_online_text(online_library.read(title, self.online_cache_root))
+            except online_library.OnlineLibraryError as error:
+                self.send_json(error.status, {"ok": False, "message": str(error)})
+            return
         if request_path == '/api/admin/reading-errors':
             if not self.has_admin_access():
                 self.send_json(403, {'ok': False}); return
@@ -709,6 +752,9 @@ class LibraryHandler(SimpleHTTPRequestHandler):
         elif request_path.startswith("/read/"):
             # Reader responses set their own private cache policy and ETag.
             pass
+        elif request_path == "/api/online/read":
+            # Online reader responses set their own private cache policy and ETag.
+            pass
         elif request_path.startswith("/assets/") or request_path.endswith((".css", ".js")):
             self.send_header("Cache-Control", "public, max-age=86400")
         else:
@@ -778,6 +824,8 @@ def main():
     LibraryHandler.db_path = data_dir / "library.db"
     LibraryHandler.read_cache_root = data_dir / "read-cache"
     LibraryHandler.read_cache_root.mkdir(parents=True, exist_ok=True)
+    LibraryHandler.online_cache_root = data_dir / "online-cache"
+    LibraryHandler.online_cache_root.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(LibraryHandler.db_path) as db:
         db.execute("CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY, type TEXT, visitor TEXT, detail TEXT, created_at TEXT)")
         db.execute("CREATE TABLE IF NOT EXISTS reviews(id INTEGER PRIMARY KEY, book TEXT, title TEXT, body TEXT, visitor TEXT, created_at TEXT)")

@@ -8,7 +8,9 @@
     panel.style.cssText = 'position:relative;margin:16px auto;padding:14px;width:calc(100% - 28px);max-width:800px;box-sizing:border-box;background:#f4f1e9;color:#26231f;border:1px solid #aaa;border-radius:10px;';
     var label = document.createElement('p'); label.textContent = '上次读到：《' + book.title + '》';label.style.margin='0 0 8px';
     var link = document.createElement('a');link.textContent = '继续上次阅读';link.style.color='inherit';
-    link.href = './reader.html?' + new URLSearchParams({p:book.path,title:book.title,format:book.format||'',return:location.pathname});
+    var readerParams={p:book.path,title:book.title,format:book.format||'',return:location.pathname};
+    if(book.onlineId){readerParams.onlineId=book.onlineId;readerParams.source=book.source||'';readerParams.sourceUrl=book.sourceUrl||'';}
+    link.href = './reader.html?' + new URLSearchParams(readerParams);
     var note=document.createElement('small');note.textContent='（此浏览器保存的记录）';
     panel.append(label,link,note);
     var main=document.querySelector('main');(main||document.body).prepend(panel);

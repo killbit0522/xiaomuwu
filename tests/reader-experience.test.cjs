@@ -9,13 +9,13 @@ const loader = source.slice(source.indexOf('async function loadBook('), source.i
 test('all changed browser scripts parse', () => {
   new vm.Script(source);
   for (const file of ['reading-support.js','recent-reading.js']) new vm.Script(fs.readFileSync(file,'utf8'));
-  for (const file of ['pages/home.html','pages/bookshelf.html']) {
+  for (const file of ['pages/home.html','pages/bookshelf.html','pages/online-search.html']) {
     for (const match of fs.readFileSync(file,'utf8').matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)) new vm.Script(match[1]);
   }
 });
 function saveContext() {
   const writes = new Map();
-  const ctx = {restoring:false,layoutReady:true,content:{hidden:false},saveTimer:null,clearTimeout(){},setTimeout(fn){ctx.pending=fn;},localStorage:{setItem(k,v){writes.set(k,JSON.parse(v));}},key:'book',mode:'scroll',size:18,paperTone:'cream',progress:{value:'620'},path:'book.txt',bookTitle:'测试',format:'txt'};
+  const ctx = {restoring:false,layoutReady:true,content:{hidden:false},saveTimer:null,clearTimeout(){},setTimeout(fn){ctx.pending=fn;},localStorage:{setItem(k,v){writes.set(k,JSON.parse(v));}},key:'book',mode:'scroll',size:18,paperTone:'cream',progress:{value:'620'},path:'book.txt',bookTitle:'测试',format:'txt',onlineId:'',sourceName:'',sourceUrl:''};
   vm.createContext(ctx);vm.runInContext(save,ctx);return {ctx,writes};
 }
 test('failed loading and initial restoration cannot overwrite progress', () => {
@@ -34,7 +34,7 @@ test('delayed save rechecks restoration guard', () => {
 });
 function loadContext(code) {
   const scheduled=[];
-  const ctx={status:{append(){}},src:'/read/test',AbortController,clearTimeout(){},setTimeout(fn,delay){scheduled.push(delay);return 1;},fetch:async()=>({ok:false,status:code}),document:{createElement(){return {};},createTextNode(){return {};},dispatchEvent(){}},CustomEvent:class{},bookTitle:'测试',path:'test',renderText(){throw Error('unexpected render');}};
+  const ctx={status:{append(){}},src:'/read/test',onlineId:'',AbortController,clearTimeout(){},setTimeout(fn,delay){scheduled.push(delay);return 1;},fetch:async()=>({ok:false,status:code}),document:{createElement(){return {};},createTextNode(){return {};},dispatchEvent(){}},CustomEvent:class{},bookTitle:'测试',path:'test',renderText(){throw Error('unexpected render');}};
   vm.createContext(ctx);vm.runInContext(loader,ctx);return {ctx,scheduled};
 }
 test('permission and missing-file failures do not retry automatically', async () => {

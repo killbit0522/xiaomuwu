@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>小木屋 · 联网找书</title>
+  <link rel="stylesheet" href="../site-preferences.css">
+  <style>
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;color:#28241f;background:#d8d4cb url('../assets/search-bg.jpg') center/cover fixed;font-family:"Noto Serif SC","Songti SC",serif}.veil{min-height:100vh;padding:18px;background:#eeeae2b8}.wrap{width:min(900px,100%);margin:auto}.head{display:flex;align-items:center;justify-content:space-between;gap:14px}.head a{color:inherit}.head h1{margin:.4em 0}.intro{line-height:1.8;color:#4e4942}.search{display:grid;grid-template-columns:1fr auto;gap:8px;margin:22px 0}.search input,.search button,.result a{font:inherit;border:1px solid #5d574d;background:#f6f3ed;color:inherit;border-radius:8px;padding:11px 13px}.search button,.result a{cursor:pointer}.state{min-height:28px}.results{display:grid;gap:10px}.result{padding:15px;background:#f5f1e9e8;border:1px solid #7775;border-radius:12px}.result h2{margin:0 0 7px;font-size:1.08rem}.result p{margin:5px 0;line-height:1.7}.result .source{font-size:.78rem;opacity:.7}.result a{display:inline-block;margin-top:7px;text-decoration:none}.notice{margin-top:22px;padding:12px;border-left:3px solid #625b51;background:#f5f1e9b8;font-size:.8rem;line-height:1.7}@media(max-width:520px){.veil{padding:12px 8px}.head h1{font-size:1.55rem}.search{grid-template-columns:1fr}.search button{width:100%}.result{padding:12px}}
+  </style>
+</head>
+<body><div class="veil"><main class="wrap">
+  <header class="head"><div><p>公开书源 · 独立服务</p><h1>联网找书</h1></div><a href="./home.html">返回首页</a></header>
+  <p class="intro">搜索中文维基文库中的公开作品。搜索不会影响本地书库；阅读时需要有效阅读卡。</p>
+  <form id="form" class="search"><input id="query" type="search" maxlength="80" autocomplete="off" placeholder="输入书名或作者，例如：红楼梦" aria-label="联网搜索书名或作者"><button type="submit">开始搜索</button></form>
+  <p id="state" class="state">请输入书名或作者。</p><section id="results" class="results"></section>
+  <p class="notice">目前只接入有明确公开许可的中文维基文库。正文会短期缓存以保证稳定阅读，并在阅读页标明来源；不会抓取付费、登录或需要验证码的网站。</p>
+</main></div>
+<script>
+(function(){
+  var form=document.getElementById('form'),query=document.getElementById('query'),state=document.getElementById('state'),results=document.getElementById('results'),controller;
+  function readerUrl(item){var key='online:wikisource:'+item.id;return './reader.html?'+new URLSearchParams({p:key,title:item.title,format:'txt',onlineId:item.id,source:item.source,sourceUrl:item.sourceUrl,return:'/pages/online-search.html?q='+encodeURIComponent(query.value.trim())});}
+  function render(data){results.replaceChildren();if(!data.items.length){state.textContent='公开书源暂时没有找到匹配作品。可以换一个书名、作者或使用本地找书。';return}state.textContent='找到 '+data.items.length+' 条结果'+(data.stale?'（当前使用已有缓存）':'')+'。';data.items.forEach(function(item){var card=document.createElement('article');card.className='result';var h=document.createElement('h2');h.textContent=item.title;var snippet=document.createElement('p');snippet.textContent=item.snippet||'公开作品';var source=document.createElement('p');source.className='source';source.textContent='来源：'+item.source;var link=document.createElement('a');link.href=readerUrl(item);link.textContent='在线阅读';card.append(h,snippet,source,link);results.append(card)})}
+  async function search(){var value=query.value.trim();if(!value){state.textContent='请输入书名或作者。';query.focus();return}if(controller)controller.abort();controller=new AbortController();results.replaceChildren();state.textContent='正在连接公开书源…';var timer=setTimeout(function(){controller.abort()},15000);try{var response=await fetch('/api/online/search?q='+encodeURIComponent(value),{cache:'no-store',signal:controller.signal});var data=await response.json();if(!response.ok)throw new Error(data.message||'搜索失败');render(data);history.replaceState(null,'','?q='+encodeURIComponent(value))}catch(error){if(error.name==='AbortError')state.textContent='联网搜索超时，请稍后重试；本地书库不受影响。';else state.textContent=error.message||'联网搜索暂时不可用，请稍后重试。'}finally{clearTimeout(timer)}}
+  form.addEventListener('submit',function(event){event.preventDefault();search()});var initial=new URLSearchParams(location.search).get('q');if(initial){query.value=initial;search()}
+})();
+</script><script src="../site-preferences.js?v=online1"></script>
+</body></html>

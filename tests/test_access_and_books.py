@@ -10,6 +10,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
+from unittest.mock import patch
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from http.server import ThreadingHTTPServer
@@ -68,6 +69,8 @@ class BookAccessIntegrationTests(unittest.TestCase):
         LibraryHandler.admin_token = "test-admin-token"
         LibraryHandler.read_cache_root = cls.data / "read-cache"
         LibraryHandler.read_cache_root.mkdir()
+        LibraryHandler.online_cache_root = cls.data / "online-cache"
+        LibraryHandler.online_cache_root.mkdir()
         cls.httpd = ThreadingHTTPServer(("127.0.0.1", 0), LibraryHandler)
         cls.base = f"http://127.0.0.1:{cls.httpd.server_port}"
         cls.thread = threading.Thread(target=cls.httpd.serve_forever, daemon=True)
@@ -163,6 +166,23 @@ class BookAccessIntegrationTests(unittest.TestCase):
         self.assertEqual(access["cardType"], "reader")
         with urllib.request.urlopen(urllib.request.Request(self.base + "/read/utf8.txt", headers=headers)) as response:
             self.assertEqual(response.read().decode("utf-8"), self.samples["utf8.txt"])
+
+    def test_online_search_is_public_but_online_reading_requires_reader_card(self):
+        result = {"query": "红楼梦", "items": [{"id": "红楼梦", "title": "红楼梦"}], "source": "中文维基文库"}
+        with patch("scripts.server.online_library.search", return_value=result):
+            with urllib.request.urlopen(self.base + "/api/online/search?q=" + urllib.parse.quote("红楼梦")) as response:
+                self.assertEqual(json.loads(response.read())["items"][0]["title"], "红楼梦")
+        with self.assertRaises(urllib.error.HTTPError) as denied:
+            urllib.request.urlopen(self.base + "/api/online/read?id=" + urllib.parse.quote("红楼梦"))
+        self.assertEqual(denied.exception.code, 403)
+        denied.exception.close()
+        cached = self.data / "online-cache" / "test.txt"
+        cached.write_text("稳定的联网阅读正文。", encoding="utf-8")
+        client = self.client(); self.unlock(client, "TEST-READER")
+        page = {"title": "红楼梦", "path": cached, "source": "中文维基文库", "sourceUrl": "https://zh.wikisource.org/wiki/红楼梦"}
+        with patch("scripts.server.online_library.read", return_value=page):
+            with client.open(self.base + "/api/online/read?id=" + urllib.parse.quote("红楼梦")) as response:
+                self.assertEqual(response.read().decode("utf-8"), "稳定的联网阅读正文。")
 
     def test_admin_can_disable_card_and_invalidate_its_session(self):
         client = self.client()

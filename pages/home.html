@@ -1884,11 +1884,7 @@ h1, h2, h3, h4 {
       event.preventDefault();
       var q = inputEl && inputEl.value ? inputEl.value.trim() : '';
       if (!q) { inputEl.focus(); return; }
-      fetch('/api/access').then(function(r){return r.json()}).then(function(data){
-        if(data.ok){window.location.href='/go/read?q='+encodeURIComponent(q);return}
-        try{sessionStorage.setItem('xiaomuwu-pending-external-query',q)}catch(e){}
-        var gate=document.getElementById('gw-gate-open');if(gate)gate.click();
-      }).catch(function(){var gate=document.getElementById('gw-gate-open');if(gate)gate.click()});
+      window.location.href='/pages/online-search.html?q='+encodeURIComponent(q);
     });
   }
 
@@ -2081,7 +2077,7 @@ h1, h2, h3, h4 {
   function enterLibrary() {
     closeModal();
     var pending='';try{pending=window.sessionStorage.getItem('xiaomuwu-pending-external-query')||'';window.sessionStorage.removeItem('xiaomuwu-pending-external-query')}catch(err){}
-    window.location.href = pending ? '/go/read?q='+encodeURIComponent(pending) : TARGET_URL;
+    window.location.href = pending ? '/pages/online-search.html?q='+encodeURIComponent(pending) : TARGET_URL;
   }
 
   openBtn.addEventListener('click', openModal);
@@ -2233,7 +2229,7 @@ h1, h2, h3, h4 {
     var meta = document.createElement('p'); meta.className = 'gw-book-meta'; meta.textContent = '今日为你选中 · 外部在线查找';
     var note = document.createElement('p'); note.className = 'gw-book-note'; note.textContent = '输入卡密后前往外部书源阅读';
     var foot = document.createElement('div'); foot.className = 'gw-book-foot';
-    var link = document.createElement('a'); link.className = 'gw-link'; link.href = '/go/read?q=' + encodeURIComponent(item.label); link.textContent = '在线查找';
+    var link = document.createElement('a'); link.className = 'gw-link'; link.href = '/pages/online-search.html?q=' + encodeURIComponent(item.label); link.textContent = '联网查找';
     foot.appendChild(link); body.append(title, meta, note, foot); article.append(thumb, body);
     return article;
   }
