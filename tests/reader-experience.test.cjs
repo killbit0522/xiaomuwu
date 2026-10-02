@@ -16,8 +16,9 @@ test('all changed browser scripts parse', () => {
 test('tap zones and chapter controls are present in the reader', () => {
   assert.match(html, /id="chapter-prev"[^>]*>上一章/);
   assert.match(html, /id="chapter-next"[^>]*>下一章/);
-  assert.match(source, /if\(y>=\.72\)\{stepRead\(1\);return\}/);
-  assert.match(source, /if\(x>\.28&&x<\.72\)\{controlsPanel\.classList\.toggle\('open'\);return\}/);
+  assert.match(source, /document\.addEventListener\('pointerup',finishTap,true\)/);
+  assert.match(source, /if\(y>=\.66\)\{stepRead\(1\);return\}/);
+  assert.match(source, /if\(x>\.22&&x<\.78&&y>\.20&&y<\.80\)\{controlsPanel\.classList\.toggle\('open'\);return\}/);
   assert.match(source, /function stepChapter\(direction\)/);
 });
 function saveContext() {
