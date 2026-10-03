@@ -9,7 +9,7 @@ const loader = source.slice(source.indexOf('async function loadBook('), source.i
 test('all changed browser scripts parse', () => {
   new vm.Script(source);
   for (const file of ['reading-support.js','recent-reading.js']) new vm.Script(fs.readFileSync(file,'utf8'));
-  for (const file of ['pages/home.html','pages/bookshelf.html','pages/online-search.html']) {
+  for (const file of ['pages/home.html','pages/bookshelf.html','pages/online-search.html','pages/admin.html']) {
     for (const match of fs.readFileSync(file,'utf8').matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)) new vm.Script(match[1]);
   }
 });
@@ -20,6 +20,11 @@ test('tap zones and chapter controls are present in the reader', () => {
   assert.match(source, /if\(y>=\.66\)\{stepRead\(1\);return\}/);
   assert.match(source, /if\(x>\.22&&x<\.78&&y>\.20&&y<\.80\)\{controlsPanel\.classList\.toggle\('open'\);return\}/);
   assert.match(source, /function stepChapter\(direction\)/);
+});
+test('reader batches large-book DOM work and lets the loading notice paint first', () => {
+  assert.match(source, /document\.createDocumentFragment\(\)/);
+  assert.match(source, /status\.textContent='正文已收到，正在排版…'/);
+  assert.match(source, /await new Promise\(function\(resolve\)\{requestAnimationFrame\(resolve\)\}\)/);
 });
 function saveContext() {
   const writes = new Map();
