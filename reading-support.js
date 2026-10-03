@@ -3,45 +3,9 @@
   if (window.cabinReadingSupportLoaded) return;
   window.cabinReadingSupportLoaded = true;
   function text(tag, value) { var el = document.createElement(tag); el.textContent = value; return el; }
-  if (location.pathname.endsWith('/admin.html')) {
-    var dashboard = document.getElementById('dashboard');
-    if (!dashboard) return;
-    var panel = text('section', ''); panel.className = 'panel';
-    var start = text('button', '开始书库体检'), state = text('p', '检查文件、正文解析和不支持的格式。'), list = text('div', '');
-    start.type = 'button';
-    panel.id = 'library-audit';
-    panel.append(text('h2', '书库体检'), start, state, list); dashboard.prepend(panel);
-    var faultPanel=text('section',''), faultList=text('div',''), faultRefresh=text('button','刷新故障记录');
-    faultPanel.className='panel'; faultRefresh.type='button'; faultPanel.append(text('h2','阅读故障与读者反馈'),faultRefresh,faultList);dashboard.append(faultPanel);
-    async function loadFaults(){
-      try{var r=await fetch('/api/admin/reading-errors',{cache:'no-store'});if(!r.ok)throw 0;var data=await r.json();faultList.replaceChildren();data.items.forEach(function(item){var detail;try{detail=JSON.parse(item.detail);}catch(_){detail={message:item.detail};}faultList.append(text('p',item.created_at+' · '+(detail.title||'')+' · '+detail.message));});if(!data.items.length)faultList.textContent='暂时没有阅读故障或反馈。';}
-      catch(_){faultList.textContent='无法读取，请登录后重试。';}
-    }
-    faultRefresh.onclick=loadFaults;
-    var timer;
-    async function refresh() {
-      clearTimeout(timer);
-      try {
-        var response = await fetch('/api/admin/audit', {cache:'no-store'});
-        if (!response.ok) throw new Error('请先登录后台');
-        var data = await response.json();
-        start.disabled = data.running;
-        state.textContent = (data.running ? '检查中：' : '最近检查：') + data.checked + ' / ' + data.total + ' 本；需处理或进一步检查 ' + data.issues.length + ' 本' + (data.error ? '；检查未完成，请重试' : '');
-        list.replaceChildren();
-        data.issues.forEach(function (issue) { var row = text('p', issue.title + ' — ' + issue.message); row.append(text('small', '（' + issue.path + '）')); list.append(row); });
-        if (data.running) timer = setTimeout(refresh, 5000);
-      } catch (error) { state.textContent = error.message; start.disabled = false; }
-    }
-    start.onclick = async function () {
-      start.disabled = true;
-      try { var response = await fetch('/api/admin/audit', {method:'POST'}); if (!response.ok) throw 0; await refresh(); }
-      catch (_) { state.textContent = '未能开始检查，请确认登录状态后重试。'; start.disabled = false; }
-    };
-    var loginObserver = new MutationObserver(function () { if (!dashboard.hidden) {refresh();loadFaults();} });
-    loginObserver.observe(dashboard, {attributes:true, attributeFilter:['hidden']});
-    if (!dashboard.hidden) {refresh();loadFaults();}
-    return;
-  }
+  // 管理后台已有自己的体检和反馈面板；这里必须退出，避免重复插入
+  // 两套按钮而造成空白按钮、错位或重复请求。
+  if (location.pathname.endsWith('/admin.html')) return;
   var content = document.getElementById('content'), paper = document.getElementById('paper');
   if (!content || !paper) return;
   var query = new URLSearchParams(location.search), path = query.get('p') || '', title = query.get('title') || path;

@@ -26,6 +26,12 @@ test('reader batches large-book DOM work and lets the loading notice paint first
   assert.match(source, /status\.textContent='正文已收到，正在排版…'/);
   assert.match(source, /await new Promise\(function\(resolve\)\{requestAnimationFrame\(resolve\)\}\)/);
 });
+test('reader offers stable in-book search from the settings panel', () => {
+  assert.match(html, /id="search-text"/);
+  assert.match(html, /id="search-next"/);
+  assert.match(source, /function findText\(\)/);
+  assert.match(source, /function jumpText\(i,offset\)/);
+});
 function saveContext() {
   const writes = new Map();
   const ctx = {restoring:false,layoutReady:true,content:{hidden:false},saveTimer:null,clearTimeout(){},setTimeout(fn){ctx.pending=fn;},localStorage:{setItem(k,v){writes.set(k,JSON.parse(v));}},key:'book',mode:'scroll',size:18,paperTone:'cream',progress:{value:'620'},path:'book.txt',bookTitle:'测试',format:'txt',onlineId:'',sourceName:'',sourceUrl:''};
