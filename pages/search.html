@@ -1336,7 +1336,7 @@ h1, h2, h3, h4 {
 
   function loadCatalog(quiet, attempt) {
     attempt = attempt || 0;
-    fetch('../assets/catalog.json', { cache: 'default', credentials: 'same-origin' })
+    fetch('../assets/catalog.json', { cache: 'no-store', credentials: 'same-origin' })
       .then(function (response) {
         if (response.redirected && response.url.indexOf('/pages/home.html') >= 0) { location.href = '/pages/home.html?card=required'; throw new Error('access'); }
         if (!response.ok || !(response.headers.get('content-type') || '').includes('application/json')) { throw new Error('catalog'); }

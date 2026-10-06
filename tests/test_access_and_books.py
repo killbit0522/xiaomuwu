@@ -2,6 +2,7 @@ import http.cookiejar
 import hashlib
 import gzip
 import json
+import shutil
 import sqlite3
 import tempfile
 import threading
@@ -93,6 +94,10 @@ class BookAccessIntegrationTests(unittest.TestCase):
     def client(self):
         jar = http.cookiejar.CookieJar()
         return urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+
+    def setUp(self):
+        (self.site / "assets" / "catalog.json").write_bytes(self.catalog_bytes)
+        shutil.rmtree(self.books / "管理员上传", ignore_errors=True)
 
     def unlock(self, client, code):
         payload = json.dumps({"code": code}).encode()
@@ -252,6 +257,9 @@ class BookAccessIntegrationTests(unittest.TestCase):
         second = self.books / "管理员上传" / "新上传2"
         self.assertEqual(sum(1 for path in first.rglob("*") if path.is_file()), 20)
         self.assertEqual(sum(1 for path in second.rglob("*") if path.is_file()), 1)
+        with urllib.request.urlopen(self.base + "/assets/catalog.json") as response:
+            titles = {item["title"] for item in json.loads(response.read())}
+        self.assertIn("book-20", titles)
 
 
 if __name__ == "__main__":

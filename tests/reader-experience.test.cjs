@@ -38,6 +38,11 @@ test('new-book notice uses the update endpoint and limits the message to two boo
   assert.match(preferences,/data\.items\.slice\(0,2\)/);
   assert.match(preferences,/xiaomuwu-last-update-notice/);
 });
+test('catalog and search always request a fresh book index after uploads', () => {
+  for (const page of ['pages/catalog.html','pages/search.html']) {
+    assert.match(fs.readFileSync(page,'utf8'), /catalog\.json', \{ cache: 'no-store'/);
+  }
+});
 function saveContext() {
   const writes = new Map();
   const ctx = {restoring:false,layoutReady:true,content:{hidden:false},saveTimer:null,clearTimeout(){},setTimeout(fn){ctx.pending=fn;},localStorage:{setItem(k,v){writes.set(k,JSON.parse(v));}},key:'book',mode:'scroll',size:18,paperTone:'cream',progress:{value:'620'},path:'book.txt',bookTitle:'测试',format:'txt',onlineId:'',sourceName:'',sourceUrl:''};

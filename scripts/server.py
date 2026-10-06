@@ -169,6 +169,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
     online_cache_root = Path(".online-cache")
     read_cache_lock = threading.Lock()
     catalog_cache_lock = threading.Lock()
+    catalog_build_lock = threading.Lock()
     upload_lock = threading.Lock()
 
     def cached_gzip_file(self, source, prefix="asset"):
@@ -444,8 +445,9 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                     self.send_json(400, {"ok": False}); return
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(body)
+                catalog_count = rebuild_catalog(type(self))
             grouped_path = (Path(target_dir.name) / relative).as_posix()
-            self.send_json(200, {"ok": True, "filename": filename, "relativePath": grouped_path, "uploadGroup": target_dir.name}); return
+            self.send_json(200, {"ok": True, "filename": filename, "relativePath": grouped_path, "uploadGroup": target_dir.name, "catalogCount": catalog_count}); return
         try:
             payload = self.read_json()
         except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
@@ -766,7 +768,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
         self.send_header("Referrer-Policy", "same-origin")
         request_path = urlsplit(self.path).path
         if request_path == "/assets/catalog.json":
-            self.send_header("Cache-Control", "private, max-age=300, stale-while-revalidate=3600")
+            self.send_header("Cache-Control", "private, no-cache, max-age=0, must-revalidate")
         elif request_path.startswith("/read/"):
             # Reader responses set their own private cache policy and ETag.
             pass
@@ -780,6 +782,38 @@ class LibraryHandler(SimpleHTTPRequestHandler):
         super().end_headers()
 
 
+def rebuild_catalog(handler):
+    extensions = {".txt", ".docx", ".zip", ".rar", ".7z", ".pdf", ".epub", ".mobi"}
+    with handler.catalog_build_lock:
+        try:
+            files = [p for p in handler.textbook_root.rglob("*") if p.is_file() and p.suffix.lower() in extensions and not {"novel-library", "node_modules", ".git"}.intersection(p.parts)]
+            items = []
+            seen_books = set()
+            def normalized_title(path):
+                return re.sub(r"(?:\s*[（(]\s*\d+\s*[）)])+$", "", path.stem).strip()
+
+            for path in sorted(files, key=lambda item: (bool(re.search(r"[（(]\s*\d+\s*[）)]$", item.stem)), len(item.relative_to(handler.textbook_root).parts), str(item))):
+                relative = path.relative_to(handler.textbook_root).as_posix()
+                stat = path.stat()
+                title = normalized_title(path) or path.stem
+                duplicate_key = (title.casefold(), path.suffix.lower())
+                if duplicate_key in seen_books:
+                    continue
+                seen_books.add(duplicate_key)
+                category_path = Path(relative).parent
+                category = "uncategorized" if str(category_path) == "." else " / ".join(category_path.parts)
+                items.append({"title": title, "category": category, "format": path.suffix.lstrip(".").lower(), "size": stat.st_size, "modifiedAt": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"), "searchablePath": relative})
+            items.sort(key=lambda item: (item["title"], item["searchablePath"]))
+            output = handler.site_root / "assets" / "catalog.json"
+            output.parent.mkdir(parents=True, exist_ok=True)
+            temporary = output.with_suffix(".json.tmp")
+            temporary.write_text(json.dumps(items, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+            temporary.replace(output)
+            return len(items)
+        except (OSError, ValueError):
+            return 0
+
+
 def watch_textbook(handler):
     extensions = {".txt", ".docx", ".zip", ".rar", ".7z", ".pdf", ".epub", ".mobi"}
     previous = None
@@ -788,27 +822,7 @@ def watch_textbook(handler):
             files = [p for p in handler.textbook_root.rglob("*") if p.is_file() and p.suffix.lower() in extensions and not {"novel-library", "node_modules", ".git"}.intersection(p.parts)]
             signature = tuple(sorted((str(p.relative_to(handler.textbook_root)), p.stat().st_size, p.stat().st_mtime_ns) for p in files))
             if signature != previous:
-                items = []
-                seen_books = set()
-                def normalized_title(path):
-                    return re.sub(r"(?:\s*[（(]\s*\d+\s*[）)])+$", "", path.stem).strip()
-
-                for path in sorted(files, key=lambda item: (bool(re.search(r"[（(]\s*\d+\s*[）)]$", item.stem)), len(item.relative_to(handler.textbook_root).parts), str(item))):
-                    relative = path.relative_to(handler.textbook_root).as_posix()
-                    stat = path.stat()
-                    title = normalized_title(path) or path.stem
-                    duplicate_key = (title.casefold(), path.suffix.lower())
-                    if duplicate_key in seen_books:
-                        continue
-                    seen_books.add(duplicate_key)
-                    category_path = Path(relative).parent
-                    category = "uncategorized" if str(category_path) == "." else " / ".join(category_path.parts)
-                    items.append({"title": title, "category": category, "format": path.suffix.lstrip(".").lower(), "size": stat.st_size, "modifiedAt": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"), "searchablePath": relative})
-                items.sort(key=lambda item: (item["title"], item["searchablePath"]))
-                output = handler.site_root / "assets" / "catalog.json"
-                temporary = output.with_suffix(".json.tmp")
-                temporary.write_text(json.dumps(items, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-                temporary.replace(output)
+                rebuild_catalog(handler)
                 previous = signature
         except (OSError, ValueError):
             pass
