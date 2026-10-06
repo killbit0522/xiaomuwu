@@ -8,7 +8,7 @@ const save = source.slice(source.indexOf('function save('), source.indexOf('func
 const loader = source.slice(source.indexOf('async function loadBook('), source.indexOf("if(format==='pdf'){status.hidden"));
 test('all changed browser scripts parse', () => {
   new vm.Script(source);
-  for (const file of ['reading-support.js','recent-reading.js']) new vm.Script(fs.readFileSync(file,'utf8'));
+  for (const file of ['reading-support.js','recent-reading.js','site-preferences.js']) new vm.Script(fs.readFileSync(file,'utf8'));
   for (const file of ['pages/home.html','pages/bookshelf.html','pages/online-search.html','pages/admin.html']) {
     for (const match of fs.readFileSync(file,'utf8').matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)) new vm.Script(match[1]);
   }
@@ -31,6 +31,12 @@ test('reader offers stable in-book search from the settings panel', () => {
   assert.match(html, /id="search-next"/);
   assert.match(source, /function findText\(\)/);
   assert.match(source, /function jumpText\(i,offset\)/);
+});
+test('new-book notice uses the update endpoint and limits the message to two books', () => {
+  const preferences=fs.readFileSync('site-preferences.js','utf8');
+  assert.match(preferences,/\/api\/updates/);
+  assert.match(preferences,/data\.items\.slice\(0,2\)/);
+  assert.match(preferences,/xiaomuwu-last-update-notice/);
 });
 function saveContext() {
   const writes = new Map();

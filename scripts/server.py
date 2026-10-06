@@ -561,6 +561,24 @@ class LibraryHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         request_path = urlsplit(self.path).path
+        if request_path == "/api/updates":
+            source = self.site_root / "assets" / "catalog.json"
+            try:
+                books = json.loads(source.read_text(encoding="utf-8"))
+                books = [book for book in books if isinstance(book, dict) and book.get("title") and book.get("modifiedAt")]
+                books.sort(key=lambda book: (str(book.get("modifiedAt", "")), str(book.get("searchablePath", ""))), reverse=True)
+                latest = books[:2]
+                fingerprint = hashlib.sha256(json.dumps(
+                    [(book.get("searchablePath", ""), book.get("modifiedAt", "")) for book in latest],
+                    ensure_ascii=False, separators=(",", ":")
+                ).encode("utf-8")).hexdigest()[:16] if latest else "empty"
+                self.send_json(200, {"version": fingerprint, "items": [
+                    {"title": book["title"], "category": book.get("category", "")}
+                    for book in latest
+                ]})
+            except (OSError, ValueError, TypeError):
+                self.send_json(200, {"version": "empty", "items": []})
+            return
         if request_path == "/api/online/search":
             query = parse_qs(urlsplit(self.path).query).get("q", [""])[0]
             try:

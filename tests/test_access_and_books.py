@@ -34,7 +34,14 @@ class BookAccessIntegrationTests(unittest.TestCase):
         (cls.site / "pages" / "home.html").write_text("home", encoding="utf-8")
         (cls.site / "pages" / "catalog.html").write_text("catalog", encoding="utf-8")
         (cls.site / "pages" / "reader.html").write_text("reader", encoding="utf-8")
-        cls.catalog_bytes = json.dumps([{"title": "白鸽", "searchablePath": f"分类/{index}/白鸽.txt"} for index in range(100)], ensure_ascii=False).encode("utf-8")
+        catalog = [
+            {"title": "白鸽", "searchablePath": "分类/白鸽.txt", "modifiedAt": "2026-10-01 09:00:00"},
+            {"title": "新书甲", "searchablePath": "新上传1/新书甲.txt", "modifiedAt": "2026-10-06 10:00:00"},
+            {"title": "新书乙", "searchablePath": "新上传1/新书乙.txt", "modifiedAt": "2026-10-06 11:00:00"},
+            {"title": "新书丙", "searchablePath": "新上传1/新书丙.txt", "modifiedAt": "2026-10-06 09:00:00"},
+        ]
+        catalog.extend({"title": f"目录测试书{index}", "searchablePath": f"分类/{index}/测试.txt"} for index in range(96))
+        cls.catalog_bytes = json.dumps(catalog, ensure_ascii=False).encode("utf-8")
         (cls.site / "assets" / "catalog.json").write_bytes(cls.catalog_bytes)
 
         cls.samples = {
@@ -132,6 +139,12 @@ class BookAccessIntegrationTests(unittest.TestCase):
             self.assertEqual(response.read(), b"catalog")
         with urllib.request.urlopen(self.base + "/pages/reader.html") as response:
             self.assertIn("/pages/home.html?card=required", response.geturl())
+
+    def test_public_update_notice_only_returns_the_two_latest_books(self):
+        with urllib.request.urlopen(self.base + "/api/updates") as response:
+            payload = json.loads(response.read())
+        self.assertEqual([item["title"] for item in payload["items"]], ["新书乙", "新书甲"])
+        self.assertEqual(len(payload["version"]), 16)
 
     def test_valid_reader_card_can_be_entered_again_but_expired_card_cannot(self):
         self.assertTrue(self.unlock(self.client(), "TEST-READER")["ok"])

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>小木屋 · 联网找书</title>
-  <link rel="stylesheet" href="../site-preferences.css">
+  <link rel="stylesheet" href="../site-preferences.css?v=20261006-1">
   <style>
     *{box-sizing:border-box}body{margin:0;min-height:100vh;color:#28241f;background:#d8d4cb url('../assets/search-bg.jpg') center/cover fixed;font-family:"Noto Serif SC","Songti SC",serif}.veil{min-height:100vh;padding:18px;background:#eeeae2b8}.wrap{width:min(900px,100%);margin:auto}.head{display:flex;align-items:center;justify-content:space-between;gap:14px}.head a{color:inherit}.head h1{margin:.4em 0}.intro{line-height:1.8;color:#4e4942}.search{display:grid;grid-template-columns:1fr auto;gap:8px;margin:22px 0}.search input,.search button,.result a{font:inherit;border:1px solid #5d574d;background:#f6f3ed;color:inherit;border-radius:8px;padding:11px 13px}.search button,.result a{cursor:pointer}.state{min-height:28px}.results{display:grid;gap:10px}.result{padding:15px;background:#f5f1e9e8;border:1px solid #7775;border-radius:12px}.result h2{margin:0 0 7px;font-size:1.08rem}.result p{margin:5px 0;line-height:1.7}.result .source{font-size:.78rem;opacity:.7}.result a{display:inline-block;margin-top:7px;text-decoration:none}.notice{margin-top:22px;padding:12px;border-left:3px solid #625b51;background:#f5f1e9b8;font-size:.8rem;line-height:1.7}@media(max-width:520px){.veil{padding:12px 8px}.head h1{font-size:1.55rem}.search{grid-template-columns:1fr}.search button{width:100%}.result{padding:12px}}
   </style>
@@ -24,5 +24,5 @@
   async function search(){var value=query.value.trim();if(!value){state.textContent='请输入书名或作者。';query.focus();return}if(controller)controller.abort();controller=new AbortController();results.replaceChildren();state.textContent='正在连接公开书源…';var timer=setTimeout(function(){controller.abort()},15000);try{var response=await fetch('/api/online/search?q='+encodeURIComponent(value),{cache:'no-store',signal:controller.signal});var data=await response.json();if(!response.ok)throw new Error(data.message||'搜索失败');render(data);history.replaceState(null,'','?q='+encodeURIComponent(value))}catch(error){if(error.name==='AbortError')state.textContent='联网搜索超时，请稍后重试；本地书库不受影响。';else state.textContent=error.message||'联网搜索暂时不可用，请稍后重试。'}finally{clearTimeout(timer)}}
   form.addEventListener('submit',function(event){event.preventDefault();search()});var initial=new URLSearchParams(location.search).get('q');if(initial){query.value=initial;search()}
 })();
-</script><script src="../site-preferences.js?v=online1"></script>
+</script><script src="../site-preferences.js?v=20261006-1"></script>
 </body></html>
