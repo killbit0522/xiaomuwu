@@ -336,6 +336,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             db.execute("INSERT INTO events(type, visitor, detail, created_at) VALUES(?,?,?,?)", (event_type[:30], visitor[:80], detail[:1000], datetime.now(timezone.utc).isoformat()))
 
     def admin_data(self):
+        disk = shutil.disk_usage(self.textbook_root)
         with sqlite3.connect(self.db_path) as db:
             db.row_factory = sqlite3.Row
             totals = {row["type"]: row["count"] for row in db.execute("SELECT type, COUNT(*) count FROM events GROUP BY type")}
@@ -344,7 +345,8 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             reviews = [dict(row) for row in db.execute("SELECT book, title, body, visitor, created_at FROM reviews ORDER BY id DESC LIMIT 100")]
             requests = [dict(row) for row in db.execute("SELECT title, author, edition, section, purpose, contact, note, visitor, created_at FROM book_requests ORDER BY id DESC LIMIT 200")]
             cards = [dict(row) for row in db.execute("SELECT code, card_type, download_limit, remaining, used, expires_at, active, created_at FROM access_cards ORDER BY id DESC LIMIT 500")]
-        return {"totals": totals, "visitors": visitors, "recent": recent, "reviews": reviews, "requests": requests, "cards": cards}
+        return {"totals": totals, "visitors": visitors, "recent": recent, "reviews": reviews, "requests": requests, "cards": cards,
+                "storage": {"free": disk.free, "used": disk.used, "total": disk.total}}
 
     def download_session(self):
         cookie = SimpleCookie(self.headers.get("Cookie", ""))
@@ -426,6 +428,10 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             body = self.rfile.read(length)
             upload_root = self.textbook_root / "管理员上传"
             with self.upload_lock:
+                duplicate = find_duplicate_book(self.textbook_root, filename)
+                if duplicate:
+                    self.send_json(200, {"ok": True, "skipped": True, "filename": filename,
+                                         "duplicateOf": duplicate.relative_to(self.textbook_root).as_posix()}); return
                 upload_root.mkdir(parents=True, exist_ok=True)
                 numbered = []
                 for child in upload_root.iterdir():
@@ -782,21 +788,35 @@ class LibraryHandler(SimpleHTTPRequestHandler):
         super().end_headers()
 
 
+BOOK_EXTENSIONS = {".txt", ".docx", ".zip", ".rar", ".7z", ".pdf", ".epub", ".mobi"}
+
+
+def normalized_book_title(path):
+    return re.sub(r"(?:\s*[（(]\s*\d+\s*[）)])+$", "", path.stem).strip()
+
+
+def find_duplicate_book(root, filename):
+    candidate = Path(filename)
+    identity = normalized_book_title(candidate).casefold()
+    for path in root.rglob("*"):
+        if path.is_file() and path.suffix.lower() in BOOK_EXTENSIONS:
+            if normalized_book_title(path).casefold() == identity:
+                return path
+    return None
+
+
 def rebuild_catalog(handler):
-    extensions = {".txt", ".docx", ".zip", ".rar", ".7z", ".pdf", ".epub", ".mobi"}
+    extensions = BOOK_EXTENSIONS
     with handler.catalog_build_lock:
         try:
             files = [p for p in handler.textbook_root.rglob("*") if p.is_file() and p.suffix.lower() in extensions and not {"novel-library", "node_modules", ".git"}.intersection(p.parts)]
             items = []
             seen_books = set()
-            def normalized_title(path):
-                return re.sub(r"(?:\s*[（(]\s*\d+\s*[）)])+$", "", path.stem).strip()
-
             for path in sorted(files, key=lambda item: (bool(re.search(r"[（(]\s*\d+\s*[）)]$", item.stem)), len(item.relative_to(handler.textbook_root).parts), str(item))):
                 relative = path.relative_to(handler.textbook_root).as_posix()
                 stat = path.stat()
-                title = normalized_title(path) or path.stem
-                duplicate_key = (title.casefold(), path.suffix.lower())
+                title = normalized_book_title(path) or path.stem
+                duplicate_key = title.casefold()
                 if duplicate_key in seen_books:
                     continue
                 seen_books.add(duplicate_key)
@@ -815,7 +835,7 @@ def rebuild_catalog(handler):
 
 
 def watch_textbook(handler):
-    extensions = {".txt", ".docx", ".zip", ".rar", ".7z", ".pdf", ".epub", ".mobi"}
+    extensions = BOOK_EXTENSIONS
     previous = None
     while True:
         try:

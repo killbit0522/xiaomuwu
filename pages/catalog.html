@@ -536,6 +536,7 @@ h1, h2, h3, h4 {
     padding-bottom: 1.1rem;
     border-bottom: 1px solid var(--zhaowen-line);
   }
+  .ct-filter-tools{display:flex;gap:.5rem;align-items:center;margin-top:1.15rem}.ct-filter-tools button{padding:.32rem .75rem;border:1px solid var(--zhaowen-ink-1);border-radius:var(--zhaowen-radius-sm);background:transparent;color:var(--zhaowen-ink-1);font:inherit;font-size:.78rem;cursor:pointer}.ct-filter-panel.is-collapsed{display:none}.ct-filter-panel.is-half{max-height:48dvh;overflow:auto;overscroll-behavior:contain;padding-right:.45rem}.ct-filter-panel.is-half .ct-filters{margin-top:.8rem}@media(max-width:700px){.ct-filter-tools{position:sticky;top:0;z-index:3;padding:.6rem 0;background:color-mix(in srgb,var(--zhaowen-paper) 93%,transparent)}.ct-filter-panel.is-half{max-height:43dvh}}
   .ct-chip {
     padding: 0.32rem 0.85rem;
     border: 1px solid var(--zhaowen-ink-1);
@@ -706,7 +707,7 @@ h1, h2, h3, h4 {
         </a>
         <a class="sh-nav-btn" href="./review.html">
           <i class="sh-nav-ico" data-lucide="pen-line" aria-hidden="true"></i>
-          <span class="sh-nav-label">读后感描写</span>
+          <span class="sh-nav-label">想看类型</span>
           <span class="sh-nav-en">Review</span>
         </a>
       </nav>
@@ -733,14 +734,14 @@ h1, h2, h3, h4 {
         <p class="ct-sub">按本机 textbook 文件夹自动整理成合集</p>
       </div>
 
-      <div id="catalog-filters" class="ct-filters" role="group" aria-label="合集筛选">
+      <div class="ct-filter-tools"><button id="catalog-panel-toggle" type="button" aria-expanded="true">收起分类</button><button id="catalog-panel-mode" type="button" aria-pressed="false">半屏分类</button></div><div id="catalog-filter-panel" class="ct-filter-panel"><div id="catalog-filters" class="ct-filters" role="group" aria-label="合集筛选">
         <button class="ct-chip is-active" type="button" data-filter="all" aria-pressed="true">全部</button>
         <button class="ct-chip" type="button" data-filter="jing" aria-pressed="false">经部</button>
         <button class="ct-chip" type="button" data-filter="shi" aria-pressed="false">史部</button>
         <button class="ct-chip" type="button" data-filter="zi" aria-pressed="false">子部</button>
         <button class="ct-chip" type="button" data-filter="ji" aria-pressed="false">集部</button>
         <button class="ct-chip" type="button" data-filter="meng" aria-pressed="false">蒙学</button>
-      </div>
+      </div></div>
 
       <section id="catalog-list" data-dom-id="catalog-list" aria-label="古籍目录">
         <article class="ct-row" data-cat="jing">
@@ -1024,7 +1025,14 @@ h1, h2, h3, h4 {
 (function () {
   var list = document.getElementById('catalog-list');
   var filters = document.getElementById('catalog-filters');
+  var filterPanel = document.getElementById('catalog-filter-panel');
+  var filterToggle = document.getElementById('catalog-panel-toggle');
+  var filterMode = document.getElementById('catalog-panel-mode');
   if (!list || !filters) { return; }
+  function setFilterPanel(collapsed, half){if(filterPanel){filterPanel.classList.toggle('is-collapsed',collapsed);filterPanel.classList.toggle('is-half',half)}if(filterToggle){filterToggle.textContent=collapsed?'展开分类':'收起分类';filterToggle.setAttribute('aria-expanded',collapsed?'false':'true')}if(filterMode){filterMode.textContent=half?'完整分类':'半屏分类';filterMode.setAttribute('aria-pressed',half?'true':'false')}try{localStorage.setItem('xiaomuwu-catalog-panel',JSON.stringify({collapsed:collapsed,half:half}))}catch(error){}}
+  try{var panelState=JSON.parse(localStorage.getItem('xiaomuwu-catalog-panel')||'{}');setFilterPanel(!!panelState.collapsed,!!panelState.half)}catch(error){setFilterPanel(false,false)}
+  if(filterToggle)filterToggle.onclick=function(){setFilterPanel(!filterPanel.classList.contains('is-collapsed'),filterPanel.classList.contains('is-half'))};
+  if(filterMode)filterMode.onclick=function(){setFilterPanel(filterPanel.classList.contains('is-collapsed'),!filterPanel.classList.contains('is-half'))};
   var books = [];
   var active = 'all';
   var page = 1;
@@ -1128,6 +1136,6 @@ h1, h2, h3, h4 {
   loadCatalog(0);
 })();
 </script>
-<script src="../site-preferences.js?v=20261006-1"></script>
+<script src="../site-preferences.js?v=20261009-1"></script>
 </body>
 </html>

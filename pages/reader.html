@@ -54,4 +54,4 @@ status.append(document.createElement('br'),retry,document.createTextNode(' '),fe
 if(code===401||code===403){var login=document.createElement('a');login.href='./home.html?card=required';login.textContent=' 返回首页验证';status.append(login)}
 document.dispatchEvent(new CustomEvent('reader-load-error',{detail:{message:message,code:code}}));
 }finally{clearTimeout(timeout)}
-}if(format==='pdf'){status.hidden=true;title.hidden=true;pdf.hidden=false;pdf.src=src;tocList.innerHTML='<p class="toc-empty">PDF 文件使用文档自身的目录和页码。</p>'}else loadBook(0)})()</script><script src="../reading-support.js?v=20261003-1"></script><script src="../site-preferences.js?v=reader5"></script></body></html>
+}if(format==='pdf'){status.hidden=true;title.hidden=true;pdf.hidden=false;pdf.src=src;tocList.innerHTML='<p class="toc-empty">PDF 文件使用文档自身的目录和页码。</p>'}else loadBook(0)})()</script><script src="../reading-support.js?v=20261003-1"></script><script src="../site-preferences.js?v=20261009-1"></script></body></html>

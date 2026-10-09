@@ -239,6 +239,21 @@ class BookAccessIntegrationTests(unittest.TestCase):
         self.assertIn("Max-Age=86400", cookie)
         self.assertIn("HttpOnly", cookie)
 
+    def test_admin_data_reports_storage_and_upload_skips_existing_titles(self):
+        headers = {"Cookie": "cabin_admin=test-admin-token"}
+        with urllib.request.urlopen(urllib.request.Request(self.base + "/api/admin/data", headers=headers)) as response:
+            storage = json.loads(response.read())["storage"]
+        self.assertGreater(storage["total"], 0)
+        self.assertGreaterEqual(storage["free"], 0)
+        for filename in ("重复书.txt", "重复书（1）.txt"):
+            request = urllib.request.Request(self.base + "/api/admin/upload", data=b"book", headers={**headers, "X-Filename": urllib.parse.quote(filename), "X-Relative-Path": urllib.parse.quote(filename)})
+            with urllib.request.urlopen(request) as response:
+                result = json.loads(response.read())
+            if filename.endswith("（1）.txt"):
+                self.assertTrue(result["skipped"])
+            else:
+                self.assertFalse(result.get("skipped", False))
+
     def test_admin_uploads_are_grouped_twenty_books_per_new_folder(self):
         for index in range(21):
             body = f"第{index + 1}本".encode("utf-8")

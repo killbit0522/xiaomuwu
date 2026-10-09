@@ -8,7 +8,7 @@ const save = source.slice(source.indexOf('function save('), source.indexOf('func
 const loader = source.slice(source.indexOf('async function loadBook('), source.indexOf("if(format==='pdf'){status.hidden"));
 test('all changed browser scripts parse', () => {
   new vm.Script(source);
-  for (const file of ['reading-support.js','recent-reading.js','site-preferences.js']) new vm.Script(fs.readFileSync(file,'utf8'));
+  for (const file of ['reading-support.js','recent-reading.js','site-preferences.js','shelf-store.js']) new vm.Script(fs.readFileSync(file,'utf8'));
   for (const file of ['pages/home.html','pages/bookshelf.html','pages/online-search.html','pages/admin.html']) {
     for (const match of fs.readFileSync(file,'utf8').matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)) new vm.Script(match[1]);
   }
@@ -42,6 +42,17 @@ test('catalog and search always request a fresh book index after uploads', () =>
   for (const page of ['pages/catalog.html','pages/search.html']) {
     assert.match(fs.readFileSync(page,'utf8'), /catalog\.json', \{ cache: 'no-store'/);
   }
+});
+test('catalog categories support collapse and half-screen browsing', () => {
+  const catalog=fs.readFileSync('pages/catalog.html','utf8');
+  assert.match(catalog,/catalog-panel-toggle/);
+  assert.match(catalog,/catalog-panel-mode/);
+  assert.match(catalog,/ct-filter-panel\.is-half/);
+});
+test('shelf data is mirrored locally so changing a card does not clear it', () => {
+  const shelf=fs.readFileSync('shelf-store.js','utf8');
+  assert.match(shelf,/xiaomuwu-shelf-backup/);
+  assert.match(shelf,/Storage\.prototype\.setItem/);
 });
 function saveContext() {
   const writes = new Map();

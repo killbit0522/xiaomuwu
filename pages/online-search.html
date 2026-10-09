@@ -24,5 +24,5 @@
   async function search(){var value=query.value.trim();if(!value){state.textContent='请输入书名或作者。';query.focus();return}if(controller)controller.abort();controller=new AbortController();results.replaceChildren();state.textContent='正在连接公开书源…';var timer=setTimeout(function(){controller.abort()},15000);try{var response=await fetch('/api/online/search?q='+encodeURIComponent(value),{cache:'no-store',signal:controller.signal});var data=await response.json();if(!response.ok)throw new Error(data.message||'搜索失败');render(data);history.replaceState(null,'','?q='+encodeURIComponent(value))}catch(error){if(error.name==='AbortError')state.textContent='联网搜索超时，请稍后重试；本地书库不受影响。';else state.textContent=error.message||'联网搜索暂时不可用，请稍后重试。'}finally{clearTimeout(timer)}}
   form.addEventListener('submit',function(event){event.preventDefault();search()});var initial=new URLSearchParams(location.search).get('q');if(initial){query.value=initial;search()}
 })();
-</script><script src="../site-preferences.js?v=20261006-1"></script>
+</script><script src="../site-preferences.js?v=20261009-1"></script>
 </body></html>

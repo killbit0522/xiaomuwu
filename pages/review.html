@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>读后感描写</title>
+    <title>想看类型</title>
     <style id="theme-vars">
 /* ==========================================================================
    Palette note
@@ -941,7 +941,7 @@ h1, h2, h3, h4 {
         </a>
         <a class="sh-nav-btn is-active" href="./review.html" aria-current="page">
           <i data-lucide="pen-line" class="sh-nav-ico" aria-hidden="true"></i>
-          <span class="sh-nav-label">读后感描写</span>
+          <span class="sh-nav-label">想看类型</span>
           <span class="sh-nav-en">Review</span>
         </a>
       </nav>
@@ -967,38 +967,38 @@ h1, h2, h3, h4 {
     <div class="rv-wrap">
       <header class="rv-head">
         <p class="rv-kicker"><span class="rv-kicker-seal">落笔</span></p>
-        <h1 class="rv-page-title">读后感描写</h1>
-        <p class="rv-lede">读罢一卷，落笔数行。</p>
+        <h1 class="rv-page-title">想看类型</h1>
+        <p class="rv-lede">告诉我们你想看的题材、方向或具体作品。</p>
       </header>
 
       <section id="review-editor" data-dom-id="review-editor" class="rv-card" aria-labelledby="review-editor-title">
-        <h2 id="review-editor-title" hidden>读后感撰写</h2>
+        <h2 id="review-editor-title" hidden>想看类型填写</h2>
 
         <div class="rv-card-head">
           <span class="rv-thumb">
             <img src="../assets/ancient-book.webp" alt="案头书影">
           </span>
           <span class="rv-card-head-text">
-            <span class="rv-card-head-kicker">案头书影</span>
-            <span id="rv-book-now" class="rv-card-head-title">请选择一本书</span>
+            <span class="rv-card-head-kicker">读者心愿</span>
+            <span id="rv-book-now" class="rv-card-head-title">填写你想看的类型</span>
           </span>
         </div>
 
         <form id="review-form" class="rv-form" novalidate>
           <div class="rv-field">
-            <label class="rv-label" for="rv-book">所读之书</label>
-            <input type="text" id="rv-book" class="rv-input" list="rv-book-list" autocomplete="off" placeholder="输入书名，或从同步书目中选择" required>
+            <label class="rv-label" for="rv-book">想看的类型</label>
+            <input type="text" id="rv-book" class="rv-input" autocomplete="off" placeholder="例如：会计入门、名著、古言、悬疑" required>
             <datalist id="rv-book-list"></datalist>
           </div>
 
           <div class="rv-field">
-            <label class="rv-label" for="rv-title">题目</label>
-            <input type="text" id="rv-title" class="rv-input" autocomplete="off" placeholder="为这段读后感取个题目">
+            <label class="rv-label" for="rv-title">具体方向（可选）</label>
+            <input type="text" id="rv-title" class="rv-input" autocomplete="off" placeholder="例如：想看哪些作者、主题或书名">
           </div>
 
           <div class="rv-field">
-            <label class="rv-label" for="rv-body">正文</label>
-            <textarea id="rv-body" class="rv-textarea" rows="12" placeholder="写下你的摘句与感想…"></textarea>
+            <label class="rv-label" for="rv-body">补充说明</label>
+            <textarea id="rv-body" class="rv-textarea" rows="12" placeholder="告诉我们想看的内容、阅读偏好或其他补充…"></textarea>
           </div>
 
           <p class="rv-meta"><span id="rv-count" class="rv-count">已写 0 字</span></p>
@@ -1010,7 +1010,7 @@ h1, h2, h3, h4 {
             <button type="submit" id="rv-submit" class="rv-btn rv-btn-primary">提交</button>
           </div>
 
-          <div id="rv-toast" class="rv-toast" hidden>已提交 · 感谢落笔</div>
+          <div id="rv-toast" class="rv-toast" hidden>已提交 · 我们已收到你的想看类型</div>
         </form>
       </section>
 
@@ -1057,11 +1057,10 @@ h1, h2, h3, h4 {
   }
 
   function setSelectedBook(name) {
-    if(bookInput){bookInput.value=name||''} if(bookNow){bookNow.textContent=name||'请选择一本书'}
+    if(bookInput){bookInput.value=name||''} if(bookNow){bookNow.textContent=name||'填写你想看的类型'}
   }
 
-  if(bookInput){bookInput.addEventListener('input',function(){if(bookNow){bookNow.textContent=bookInput.value.trim()||'请选择一本书'}})}
-  fetch('../assets/catalog.json',{cache:'default'}).then(function(r){return r.json()}).then(function(items){var seen={};items.forEach(function(book){if(!seen[book.title]){seen[book.title]=true;var option=document.createElement('option');option.value=book.title;bookList.appendChild(option)}})}).catch(function(){});
+  if(bookInput){bookInput.addEventListener('input',function(){if(bookNow){bookNow.textContent=bookInput.value.trim()||'填写你想看的类型'}})}
 
   if (bodyEl) {
     bodyEl.addEventListener('input', function () {
@@ -1074,7 +1073,7 @@ h1, h2, h3, h4 {
   form.addEventListener('submit', function (event) {
     event.preventDefault();
 
-    if (!selectedBook()) { errorEl.textContent='请先选择或填写所读之书。';errorEl.hidden=false;bookInput.focus();return; }
+    if (!selectedBook()) { errorEl.textContent='请先填写想看的类型。';errorEl.hidden=false;bookInput.focus();return; }
     if (countChars(bodyEl.value) < 10) {
       errorEl.textContent='至少写下十个字。';
       if (errorEl) { errorEl.hidden = false; }
@@ -1126,6 +1125,6 @@ h1, h2, h3, h4 {
   paintCount();
 })();
 </script>
-<script src="../site-preferences.js?v=20261006-1"></script>
+<script src="../site-preferences.js?v=20261009-1"></script>
 </body>
 </html>
