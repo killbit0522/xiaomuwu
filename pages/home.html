@@ -2203,15 +2203,14 @@ h1, h2, h3, h4 {
   }
 
   function dailySelection(items) {
-    var day = new Date().toISOString().slice(0, 10);
-    var seed = hash(day + ':' + visitorId());
-    var copy = items.slice();
-    for (var i = copy.length - 1; i > 0; i--) {
-      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-      var j = seed % (i + 1);
-      var temp = copy[i]; copy[i] = copy[j]; copy[j] = temp;
-    }
-    return copy.slice(0, 3);
+    var now = new Date();
+    var parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
+    var calendar = {}; parts.forEach(function (part) { calendar[part.type] = part.value; });
+    var dayNumber = Math.floor(Date.UTC(Number(calendar.year), Number(calendar.month) - 1, Number(calendar.day)) / 86400000);
+    var offset = (dayNumber + (hash(visitorId()) % items.length)) % items.length;
+    var picked = [];
+    for (var i = 0; i < Math.min(3, items.length); i++) picked.push(items[(offset + i) % items.length]);
+    return picked;
   }
 
   function makeCard(item) {
@@ -2241,6 +2240,6 @@ h1, h2, h3, h4 {
   if(count){count.textContent='今日 '+selected.length+' 本 · 每人不同'}
 })();
 </script>
-<script src="../site-preferences.js?v=20261009-1"></script>
+<script src="../site-preferences.js?v=20261010-1"></script>
 <script src="../recent-reading.js?v=20261001-1"></script></body>
 </html>

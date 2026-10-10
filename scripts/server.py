@@ -342,7 +342,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             totals = {row["type"]: row["count"] for row in db.execute("SELECT type, COUNT(*) count FROM events GROUP BY type")}
             visitors = db.execute("SELECT COUNT(DISTINCT visitor) FROM events WHERE visitor <> ''").fetchone()[0]
             recent = [dict(row) for row in db.execute("SELECT type, visitor, detail, created_at FROM events ORDER BY id DESC LIMIT 100")]
-            reviews = [dict(row) for row in db.execute("SELECT book, title, body, visitor, created_at FROM reviews ORDER BY id DESC LIMIT 100")]
+            reviews = [dict(row) for row in db.execute("SELECT id, book, title, body, visitor, created_at, admin_reply, replied_at FROM reviews ORDER BY id DESC LIMIT 100")]
             requests = [dict(row) for row in db.execute("SELECT title, author, edition, section, purpose, contact, note, visitor, created_at FROM book_requests ORDER BY id DESC LIMIT 200")]
             cards = [dict(row) for row in db.execute("SELECT code, card_type, download_limit, remaining, used, expires_at, active, created_at FROM access_cards ORDER BY id DESC LIMIT 500")]
         return {"totals": totals, "visitors": visitors, "recent": recent, "reviews": reviews, "requests": requests, "cards": cards,
@@ -454,6 +454,17 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 catalog_count = rebuild_catalog(type(self))
             grouped_path = (Path(target_dir.name) / relative).as_posix()
             self.send_json(200, {"ok": True, "filename": filename, "relativePath": grouped_path, "uploadGroup": target_dir.name, "catalogCount": catalog_count}); return
+        if api_path == "/api/admin/announcement-image":
+            if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
+            filename = Path(unquote(self.headers.get("X-Filename", ""))).name
+            length = int(self.headers.get("Content-Length", "0"))
+            if Path(filename).suffix.lower() not in {".jpg", ".jpeg", ".png", ".webp", ".gif"} or length < 1 or length > 5 * 1024 * 1024:
+                self.send_json(400, {"ok": False, "message": "请选择 5MB 以内的 JPG、PNG、WEBP 或 GIF 图片"}); return
+            safe_name = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S") + "-" + secrets.token_hex(4) + Path(filename).suffix.lower()
+            image_dir = self.site_root / "assets" / "announcements"
+            image_dir.mkdir(parents=True, exist_ok=True)
+            (image_dir / safe_name).write_bytes(self.rfile.read(length))
+            self.send_json(200, {"ok": True, "imageUrl": "/assets/announcements/" + safe_name}); return
         try:
             payload = self.read_json()
         except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
@@ -475,6 +486,29 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 db.execute("INSERT INTO reviews(book,title,body,visitor,created_at) VALUES(?,?,?,?,?)", (str(payload.get("book", ""))[:300], str(payload.get("title", ""))[:300], body[:10000], str(payload.get("visitor", ""))[:80], datetime.now(timezone.utc).isoformat()))
             self.save_event("review", str(payload.get("visitor", "")), str(payload.get("book", "")))
             self.send_json(200, {"ok": True}); return
+        if api_path == "/api/admin/reviews/reply":
+            if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
+            try:
+                review_id = int(payload.get("id", 0))
+            except (TypeError, ValueError):
+                review_id = 0
+            reply = str(payload.get("reply", "")).strip()
+            if review_id < 1 or not reply or len(reply) > 3000:
+                self.send_json(400, {"ok": False, "message": "回复内容需为 1 至 3000 个字"}); return
+            with sqlite3.connect(self.db_path) as db:
+                db.execute("UPDATE reviews SET admin_reply=?, replied_at=? WHERE id=?", (reply, datetime.now(timezone.utc).isoformat(), review_id))
+            self.send_json(200, {"ok": True}); return
+        if api_path == "/api/admin/announcement":
+            if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
+            title = str(payload.get("title", "")).strip()
+            body = str(payload.get("body", "")).strip()
+            image_url = str(payload.get("imageUrl", "")).strip()
+            if not title or not body or len(title) > 80 or len(body) > 3000 or (image_url and not image_url.startswith("/assets/announcements/")):
+                self.send_json(400, {"ok": False, "message": "请填写标题、内容，并使用本后台上传的图片"}); return
+            announcement = {"title": title, "body": body, "imageUrl": image_url, "updatedAt": datetime.now(timezone.utc).isoformat()}
+            with sqlite3.connect(self.db_path) as db:
+                db.execute("INSERT INTO settings(key,value) VALUES('member_announcement',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (json.dumps(announcement, ensure_ascii=False),))
+            self.send_json(200, {"ok": True, "announcement": announcement}); return
         if api_path == "/api/requests":
             title = str(payload.get("title", "")).strip()
             author = str(payload.get("author", "")).strip()
@@ -569,6 +603,32 @@ class LibraryHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         request_path = urlsplit(self.path).path
+        if request_path == "/api/recent":
+            if not self.access_info(): self.send_json(403, {"ok": False}); return
+            source = self.site_root / "assets" / "catalog.json"
+            try:
+                books = json.loads(source.read_text(encoding="utf-8"))
+                books = [book for book in books if isinstance(book, dict) and book.get("title")]
+                books.sort(key=lambda book: (str(book.get("modifiedAt", "")), str(book.get("searchablePath", ""))), reverse=True)
+                self.send_json(200, {"items": books[:50]})
+            except (OSError, ValueError, TypeError):
+                self.send_json(200, {"items": []})
+            return
+        if request_path == "/api/type-requests":
+            if not self.access_info(): self.send_json(403, {"ok": False}); return
+            with sqlite3.connect(self.db_path) as db:
+                db.row_factory = sqlite3.Row
+                items = [dict(row) for row in db.execute("SELECT id, book, title, body, created_at, admin_reply, replied_at FROM reviews ORDER BY id DESC LIMIT 80")]
+            self.send_json(200, {"items": items}); return
+        if request_path == "/api/announcement":
+            if not self.access_info(): self.send_json(403, {"ok": False}); return
+            with sqlite3.connect(self.db_path) as db:
+                row = db.execute("SELECT value FROM settings WHERE key='member_announcement'").fetchone()
+            try:
+                announcement = json.loads(row[0]) if row else None
+            except (ValueError, TypeError):
+                announcement = None
+            self.send_json(200, {"announcement": announcement}); return
         if request_path == "/api/updates":
             source = self.site_root / "assets" / "catalog.json"
             try:
@@ -626,6 +686,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
         protected_pages = {
             "/pages/search.html", "/pages/request.html",
             "/pages/review.html", "/pages/bookshelf.html", "/pages/reader.html",
+            "/pages/recent.html",
         }
         if request_path in protected_pages and not self.access_info():
             self.send_response(302)
@@ -772,6 +833,8 @@ class LibraryHandler(SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "same-origin")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
         request_path = urlsplit(self.path).path
         if request_path == "/assets/catalog.json":
             self.send_header("Cache-Control", "private, no-cache, max-age=0, must-revalidate")
@@ -823,7 +886,11 @@ def rebuild_catalog(handler):
                 category_path = Path(relative).parent
                 category = "uncategorized" if str(category_path) == "." else " / ".join(category_path.parts)
                 items.append({"title": title, "category": category, "format": path.suffix.lstrip(".").lower(), "size": stat.st_size, "modifiedAt": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"), "searchablePath": relative})
-            items.sort(key=lambda item: (item["title"], item["searchablePath"]))
+            def catalog_sort_key(item):
+                match = re.search(r"(?:^| / )新上传(\d+)(?: / |$)", item["category"])
+                # New-upload folders are intentionally shown first; the newest numbered folder leads.
+                return (0, -int(match.group(1)), item["title"], item["searchablePath"]) if match else (1, 0, item["title"], item["searchablePath"])
+            items.sort(key=catalog_sort_key)
             output = handler.site_root / "assets" / "catalog.json"
             output.parent.mkdir(parents=True, exist_ok=True)
             temporary = output.with_suffix(".json.tmp")
@@ -880,7 +947,7 @@ def main():
     LibraryHandler.online_cache_root.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(LibraryHandler.db_path) as db:
         db.execute("CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY, type TEXT, visitor TEXT, detail TEXT, created_at TEXT)")
-        db.execute("CREATE TABLE IF NOT EXISTS reviews(id INTEGER PRIMARY KEY, book TEXT, title TEXT, body TEXT, visitor TEXT, created_at TEXT)")
+        db.execute("CREATE TABLE IF NOT EXISTS reviews(id INTEGER PRIMARY KEY, book TEXT, title TEXT, body TEXT, visitor TEXT, created_at TEXT, admin_reply TEXT NOT NULL DEFAULT '', replied_at TEXT NOT NULL DEFAULT '')")
         db.execute("CREATE TABLE IF NOT EXISTS book_requests(id INTEGER PRIMARY KEY, title TEXT, author TEXT, edition TEXT, section TEXT, purpose TEXT, contact TEXT, note TEXT, visitor TEXT, created_at TEXT)")
         db.execute("CREATE TABLE IF NOT EXISTS access_cards(id INTEGER PRIMARY KEY, code TEXT UNIQUE, download_limit INTEGER NOT NULL, remaining INTEGER NOT NULL, used INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL)")
         db.execute("CREATE TABLE IF NOT EXISTS download_sessions(token TEXT PRIMARY KEY, card_id INTEGER NOT NULL, created_at TEXT NOT NULL, last_used_at TEXT, FOREIGN KEY(card_id) REFERENCES access_cards(id))")
@@ -888,6 +955,9 @@ def main():
         columns = {row[1] for row in db.execute("PRAGMA table_info(access_cards)")}
         if "card_type" not in columns: db.execute("ALTER TABLE access_cards ADD COLUMN card_type TEXT NOT NULL DEFAULT 'download'")
         if "expires_at" not in columns: db.execute("ALTER TABLE access_cards ADD COLUMN expires_at TEXT NOT NULL DEFAULT ''")
+        review_columns = {row[1] for row in db.execute("PRAGMA table_info(reviews)")}
+        if "admin_reply" not in review_columns: db.execute("ALTER TABLE reviews ADD COLUMN admin_reply TEXT NOT NULL DEFAULT ''")
+        if "replied_at" not in review_columns: db.execute("ALTER TABLE reviews ADD COLUMN replied_at TEXT NOT NULL DEFAULT ''")
         initial_admin_hash = hashlib.sha256(LibraryHandler.admin_key.encode("utf-8")).hexdigest()
         db.execute("INSERT OR IGNORE INTO settings(key,value) VALUES('admin_password_hash',?)", (initial_admin_hash,))
     threading.Thread(target=watch_textbook, args=(LibraryHandler,), daemon=True).start()

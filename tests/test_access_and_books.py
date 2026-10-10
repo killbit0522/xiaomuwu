@@ -61,7 +61,7 @@ class BookAccessIntegrationTests(unittest.TestCase):
             db.execute("CREATE TABLE access_cards(id INTEGER PRIMARY KEY, code TEXT UNIQUE, card_type TEXT, download_limit INTEGER, remaining INTEGER, used INTEGER, expires_at TEXT, active INTEGER, created_at TEXT)")
             db.execute("CREATE TABLE download_sessions(token TEXT PRIMARY KEY, card_id INTEGER, created_at TEXT, last_used_at TEXT)")
             db.execute("CREATE TABLE events(id INTEGER PRIMARY KEY, type TEXT, visitor TEXT, detail TEXT, created_at TEXT)")
-            db.execute("CREATE TABLE reviews(id INTEGER PRIMARY KEY, book TEXT, title TEXT, body TEXT, visitor TEXT, created_at TEXT)")
+            db.execute("CREATE TABLE reviews(id INTEGER PRIMARY KEY, book TEXT, title TEXT, body TEXT, visitor TEXT, created_at TEXT, admin_reply TEXT NOT NULL DEFAULT '', replied_at TEXT NOT NULL DEFAULT '')")
             db.execute("CREATE TABLE book_requests(id INTEGER PRIMARY KEY, title TEXT, author TEXT, edition TEXT, section TEXT, purpose TEXT, contact TEXT, note TEXT, visitor TEXT, created_at TEXT)")
             db.execute("CREATE TABLE settings(key TEXT PRIMARY KEY, value TEXT NOT NULL)")
             db.execute("INSERT INTO settings(key,value) VALUES('admin_password_hash',?)", (hashlib.sha256(b"test-admin-password").hexdigest(),))
@@ -98,6 +98,9 @@ class BookAccessIntegrationTests(unittest.TestCase):
     def setUp(self):
         (self.site / "assets" / "catalog.json").write_bytes(self.catalog_bytes)
         shutil.rmtree(self.books / "管理员上传", ignore_errors=True)
+        with sqlite3.connect(self.db) as db:
+            db.execute("DELETE FROM reviews")
+            db.execute("DELETE FROM settings WHERE key='member_announcement'")
 
     def unlock(self, client, code):
         payload = json.dumps({"code": code}).encode()
@@ -144,12 +147,21 @@ class BookAccessIntegrationTests(unittest.TestCase):
             self.assertEqual(response.read(), b"catalog")
         with urllib.request.urlopen(self.base + "/pages/reader.html") as response:
             self.assertIn("/pages/home.html?card=required", response.geturl())
+        with urllib.request.urlopen(self.base + "/pages/recent.html") as response:
+            self.assertIn("/pages/home.html?card=required", response.geturl())
 
     def test_public_update_notice_only_returns_the_two_latest_books(self):
         with urllib.request.urlopen(self.base + "/api/updates") as response:
             payload = json.loads(response.read())
         self.assertEqual([item["title"] for item in payload["items"]], ["新书乙", "新书甲"])
         self.assertEqual(len(payload["version"]), 16)
+
+    def test_recent_books_endpoint_returns_only_fifty_newest_items_for_reader(self):
+        reader = self.client(); self.unlock(reader, "TEST-READER")
+        with reader.open(self.base + "/api/recent") as response:
+            items = json.loads(response.read())["items"]
+        self.assertLessEqual(len(items), 50)
+        self.assertEqual(items[0]["title"], "新书乙")
 
     def test_valid_reader_card_can_be_entered_again_but_expired_card_cannot(self):
         self.assertTrue(self.unlock(self.client(), "TEST-READER")["ok"])
@@ -273,8 +285,48 @@ class BookAccessIntegrationTests(unittest.TestCase):
         self.assertEqual(sum(1 for path in first.rglob("*") if path.is_file()), 20)
         self.assertEqual(sum(1 for path in second.rglob("*") if path.is_file()), 1)
         with urllib.request.urlopen(self.base + "/assets/catalog.json") as response:
-            titles = {item["title"] for item in json.loads(response.read())}
+            catalog = json.loads(response.read())
+            titles = {item["title"] for item in catalog}
         self.assertIn("book-20", titles)
+        self.assertIn("新上传2", catalog[0]["category"])
+
+    def test_admin_can_reply_to_type_requests_and_readers_can_see_reply(self):
+        request = urllib.request.Request(
+            self.base + "/api/reviews",
+            data=json.dumps({"book": "想看类型", "title": "想看职场文", "body": "希望有轻松一点的职场类型小说。", "visitor": "reader-a"}).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(request):
+            pass
+        with sqlite3.connect(self.db) as db:
+            review_id = db.execute("SELECT id FROM reviews").fetchone()[0]
+        reply = urllib.request.Request(
+            self.base + "/api/admin/reviews/reply",
+            data=json.dumps({"id": review_id, "reply": "收到，我会安排寻找。"}).encode(),
+            headers={"Content-Type": "application/json", "Cookie": "cabin_admin=test-admin-token"},
+        )
+        with urllib.request.urlopen(reply) as response:
+            self.assertTrue(json.loads(response.read())["ok"])
+        reader = self.client(); self.unlock(reader, "TEST-READER")
+        with reader.open(self.base + "/api/type-requests") as response:
+            items = json.loads(response.read())["items"]
+        self.assertEqual(items[0]["admin_reply"], "收到，我会安排寻找。")
+
+    def test_member_announcement_is_visible_only_to_active_reader_cards(self):
+        publish = urllib.request.Request(
+            self.base + "/api/admin/announcement",
+            data=json.dumps({"title": "本周推荐", "body": "欢迎阅读新上传。", "imageUrl": ""}).encode(),
+            headers={"Content-Type": "application/json", "Cookie": "cabin_admin=test-admin-token"},
+        )
+        with urllib.request.urlopen(publish) as response:
+            self.assertTrue(json.loads(response.read())["ok"])
+        with self.assertRaises(urllib.error.HTTPError) as denied:
+            urllib.request.urlopen(self.base + "/api/announcement")
+        self.assertEqual(denied.exception.code, 403); denied.exception.close()
+        reader = self.client(); self.unlock(reader, "TEST-READER")
+        with reader.open(self.base + "/api/announcement") as response:
+            announcement = json.loads(response.read())["announcement"]
+        self.assertEqual(announcement["title"], "本周推荐")
 
 
 if __name__ == "__main__":

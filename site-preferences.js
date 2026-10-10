@@ -1,5 +1,6 @@
 (function () {
   var shelfScript=document.createElement('script');shelfScript.src='../shelf-store.js?v=20261009-1';document.head.appendChild(shelfScript);
+  var memberTools=document.createElement('script');memberTools.src='../member-tools.js?v=20261010-1';document.head.appendChild(memberTools);
   if (/\/pages\/(admin|reader)\.html$/.test(location.pathname)) {
     var enhancement = document.createElement('script');
     enhancement.src = '../reading-support.js?v=20261001';

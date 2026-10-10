@@ -523,7 +523,7 @@ h1, h2, h3, h4 {
   .ct-sub {
     margin-top: 0.6rem;
     font-family: var(--zhaowen-font-serif);
-    font-size: var(--zhaowen-text-sm);
+    font-size: calc(var(--zhaowen-text-sm) * .9);
     line-height: 1.85;
     letter-spacing: 0.06em;
     color: var(--zhaowen-ink-3);
@@ -587,7 +587,7 @@ h1, h2, h3, h4 {
     color: var(--zhaowen-ink-3);
   }
   .ct-main { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.15rem 0.6rem; }
-  .ct-book { font-family: var(--zhaowen-font-serif); font-size: 0.92rem; line-height: 1.85; letter-spacing: 0.04em; color: var(--zhaowen-ink-1); }
+  .ct-book { font-family: var(--zhaowen-font-serif); font-size: 0.98rem; line-height: 1.85; letter-spacing: 0.04em; color: #171512; font-weight: 600; }
   .ct-meta { font-family: var(--zhaowen-font-serif); font-size: 0.72rem; line-height: 1.8; letter-spacing: 0.04em; color: var(--zhaowen-ink-3); }
   .ct-cat {
     flex: none;
@@ -667,7 +667,7 @@ h1, h2, h3, h4 {
     .ct-no { display: none; }
     .ct-row-btn { gap: 0.7rem; padding: 0.75rem 0.7rem; }
     .ct-main { flex-wrap: wrap; gap: 0.1rem 0.5rem; }
-    .ct-book { font-size: 0.88rem; }
+    .ct-book { font-size: 0.94rem; }
     .ct-toggle { min-width: 2.8rem; }
     .ct-note { padding: 0 0.8rem 0.9rem 0.8rem; }
   }
@@ -1136,6 +1136,6 @@ h1, h2, h3, h4 {
   loadCatalog(0);
 })();
 </script>
-<script src="../site-preferences.js?v=20261009-1"></script>
+<script src="../site-preferences.js?v=20261010-1"></script>
 </body>
 </html>

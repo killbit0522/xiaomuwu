@@ -8,7 +8,7 @@ const save = source.slice(source.indexOf('function save('), source.indexOf('func
 const loader = source.slice(source.indexOf('async function loadBook('), source.indexOf("if(format==='pdf'){status.hidden"));
 test('all changed browser scripts parse', () => {
   new vm.Script(source);
-  for (const file of ['reading-support.js','recent-reading.js','site-preferences.js','shelf-store.js']) new vm.Script(fs.readFileSync(file,'utf8'));
+  for (const file of ['reading-support.js','recent-reading.js','site-preferences.js','shelf-store.js','member-tools.js','type-requests.js','admin-community.js']) new vm.Script(fs.readFileSync(file,'utf8'));
   for (const file of ['pages/home.html','pages/bookshelf.html','pages/online-search.html','pages/admin.html']) {
     for (const match of fs.readFileSync(file,'utf8').matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)) new vm.Script(match[1]);
   }
@@ -48,6 +48,16 @@ test('catalog categories support collapse and half-screen browsing', () => {
   assert.match(catalog,/catalog-panel-toggle/);
   assert.match(catalog,/catalog-panel-mode/);
   assert.match(catalog,/ct-filter-panel\.is-half/);
+});
+test('member guide, recent books, replies, and announcements are wired into the reader experience', () => {
+  const memberTools=fs.readFileSync('member-tools.js','utf8');
+  const adminTools=fs.readFileSync('admin-community.js','utf8');
+  assert.match(memberTools,/使用指南/);
+  assert.match(memberTools,/近期新增/);
+  assert.match(memberTools,/\/api\/announcement/);
+  assert.match(adminTools,/\/api\/admin\/reviews\/reply/);
+  assert.match(adminTools,/\/api\/admin\/announcement-image/);
+  assert.match(fs.readFileSync('pages/recent.html','utf8'),/最近入库的 50 本书/);
 });
 test('shelf data is mirrored locally so changing a card does not clear it', () => {
   const shelf=fs.readFileSync('shelf-store.js','utf8');
