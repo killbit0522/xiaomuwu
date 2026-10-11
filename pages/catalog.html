@@ -208,7 +208,7 @@ h1, h2, h3, h4 {
         background-color: currentColor;
       }
     </style>
-<link rel="stylesheet" href="../site-preferences.css?v=20261006-1">
+<link rel="stylesheet" href="../site-preferences.css?v=20261011-1">
 </head>
 <body class="min-h-screen antialiased">
 <style id="critical-layout">
@@ -627,7 +627,7 @@ h1, h2, h3, h4 {
     color: var(--zhaowen-ink-2);
   }
   .ct-row.is-open .ct-row-btn { background-color: color-mix(in srgb, var(--zhaowen-ink-1) 6%, transparent); }
-  .ct-row.is-open .ct-book { font-weight: 700; }
+  .ct-row.is-open .ct-book { font-weight: 600; }
   .ct-row.is-open .ct-note { display: block; }
 
   /* ============ responsive ============ */
@@ -1052,6 +1052,15 @@ h1, h2, h3, h4 {
     if (parts[0] === '管理员上传' && parts.length > 1) { parts.shift(); }
     return parts.slice(0, 4).join(' / ') || '未分类';
   }
+  function newUploadRank(value) {
+    var match = String(value || '').match(/(?:^| \/ )新上传(\d+)(?: \/ |$)/);
+    return match ? Number(match[1]) : 0;
+  }
+  function collectionSort(left, right) {
+    var leftRank = newUploadRank(left), rightRank = newUploadRank(right);
+    if (leftRank || rightRank) return rightRank - leftRank;
+    return String(left).localeCompare(String(right), 'zh-CN');
+  }
 
   function makeRow(book, index) {
     var row = document.createElement('article'); row.className = 'ct-row';
@@ -1108,7 +1117,7 @@ h1, h2, h3, h4 {
     var collections = {};
     books.forEach(function (book) { var parts=collectionOf(book).split(' / ');for(var depth=1;depth<=parts.length;depth++){var key=parts.slice(0,depth).join(' / ');collections[key]=(collections[key]||0)+1} });
     filters.replaceChildren();
-    [['all', '全部 ('+books.length+')']].concat(Object.keys(collections).sort().map(function (name) { var depth=name.split(' / ').length,label=(depth>1?'↳ ':'')+name.split(' / ').pop()+' ('+collections[name]+')';return [name,label]; })).forEach(function (entry) {
+    [['all', '全部 ('+books.length+')']].concat(Object.keys(collections).sort(collectionSort).map(function (name) { var depth=name.split(' / ').length,label=(depth>1?'↳ ':'')+name.split(' / ').pop()+' ('+collections[name]+')';return [name,label]; })).forEach(function (entry) {
       var chip = document.createElement('button'); chip.className = 'ct-chip' + (entry[0] === active ? ' is-active' : ''); chip.type = 'button'; chip.textContent = entry[1];
       if(entry[0]!=='all')chip.title=entry[0];
       chip.setAttribute('aria-pressed', entry[0] === active ? 'true' : 'false');
@@ -1126,7 +1135,7 @@ h1, h2, h3, h4 {
         if (!response.ok || !(response.headers.get('content-type') || '').includes('application/json')) throw new Error('catalog');
         return response.json();
       })
-      .then(function (data) { books = data; renderFilters(); render(); })
+      .then(function (data) { books = Array.isArray(data) ? data : []; books.sort(function(left,right){var leftRank=newUploadRank(left.category),rightRank=newUploadRank(right.category);if(leftRank||rightRank)return rightRank-leftRank;return String(left.title||'').localeCompare(String(right.title||''),'zh-CN')}); renderFilters(); render(); })
       .catch(function (error) {
         if (error.message === 'access') return;
         if (attempt < 2) { list.textContent='书目正在重新载入…';setTimeout(function(){loadCatalog(attempt+1)},500*(attempt+1));return; }
@@ -1136,6 +1145,6 @@ h1, h2, h3, h4 {
   loadCatalog(0);
 })();
 </script>
-<script src="../site-preferences.js?v=20261010-1"></script>
+<script src="../site-preferences.js?v=20261011-1"></script>
 </body>
 </html>

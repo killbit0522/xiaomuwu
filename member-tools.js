@@ -17,7 +17,8 @@
   }
 
   function showGuide() {
-    if (document.getElementById('member-guide')) return;
+    var existing = document.getElementById('member-guide');
+    if (existing) return existing;
     var modal = document.createElement('section');
     modal.id = 'member-guide'; modal.className = 'member-guide'; modal.hidden = true;
     modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true'); modal.setAttribute('aria-label', '使用指南');
@@ -34,10 +35,9 @@
 
   function installGuide() {
     var gate = document.querySelector('.gw-gate-inner');
-    if (!gate || document.getElementById('member-guide-open')) return;
-    var open = document.createElement('button'); open.id = 'member-guide-open'; open.className = 'member-guide-open'; open.type = 'button'; open.textContent = '使用指南';
-    var marker = document.getElementById('gw-gate-open') || gate.firstChild;
-    gate.insertBefore(open, marker);
+    if (!gate) return;
+    var open = document.getElementById('member-guide-open');
+    if (!open) { open = document.createElement('button'); open.id = 'member-guide-open'; open.className = 'member-guide-open'; open.type = 'button'; open.textContent = '使用指南'; var marker = document.getElementById('gw-gate-open') || gate.firstChild; gate.insertBefore(open, marker); }
     open.onclick = function () { var dialog = showGuide(); if (dialog) dialog.hidden = false; };
   }
 

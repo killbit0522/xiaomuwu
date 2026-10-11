@@ -8,7 +8,7 @@ const save = source.slice(source.indexOf('function save('), source.indexOf('func
 const loader = source.slice(source.indexOf('async function loadBook('), source.indexOf("if(format==='pdf'){status.hidden"));
 test('all changed browser scripts parse', () => {
   new vm.Script(source);
-  for (const file of ['reading-support.js','recent-reading.js','site-preferences.js','shelf-store.js','member-tools.js','type-requests.js','admin-community.js']) new vm.Script(fs.readFileSync(file,'utf8'));
+  for (const file of ['reading-support.js','recent-reading.js','site-preferences.js','shelf-store.js','member-tools.js','type-requests.js','admin-community.js','reader-stability.js']) new vm.Script(fs.readFileSync(file,'utf8'));
   for (const file of ['pages/home.html','pages/bookshelf.html','pages/online-search.html','pages/admin.html']) {
     for (const match of fs.readFileSync(file,'utf8').matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)) new vm.Script(match[1]);
   }
@@ -25,6 +25,12 @@ test('reader batches large-book DOM work and lets the loading notice paint first
   assert.match(source, /document\.createDocumentFragment\(\)/);
   assert.match(source, /status\.textContent='正文已收到，正在排版…'/);
   assert.match(source, /await new Promise\(function\(resolve\)\{requestAnimationFrame\(resolve\)\}\)/);
+});
+test('page turning has a visible-text fallback instead of leaving a blank page', () => {
+  const stability=fs.readFileSync('reader-stability.js','utf8');
+  assert.match(stability,/hasVisibleText/);
+  assert.match(stability,/candidates = \[original - step/);
+  assert.match(html,/reader-stability\.js\?v=20261011-1/);
 });
 test('reader offers stable in-book search from the settings panel', () => {
   assert.match(html, /id="search-text"/);
