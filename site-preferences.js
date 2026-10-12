@@ -8,7 +8,7 @@
   }
   if (/\/pages\/admin\.html$/.test(location.pathname)) {
     var communityScript = document.createElement('script');
-    communityScript.src = '../admin-community.js?v=20261012-1';
+    communityScript.src = '../admin-community.js?v=20261012-2';
     document.head.appendChild(communityScript);
   }
   var storageKey = 'xiaomuwu-theme';
