@@ -1,10 +1,14 @@
 (function () {
   'use strict';
   if (!/\/pages\/admin\.html$/.test(location.pathname)) return;
+  if (window.cabinCommunityVersion === '20261012') return;
+  window.cabinCommunityVersion = '20261012';
   var dashboard = document.getElementById('dashboard');
-  if (!dashboard || document.getElementById('community-tools')) return;
+  if (!dashboard) return;
+  var oldPanel = document.getElementById('community-tools');
+  if (oldPanel) oldPanel.remove();
   var panel = document.createElement('section'); panel.id = 'community-tools'; panel.className = 'panel';
-  panel.innerHTML = '<h2>会员公告</h2><p class="muted">公告会在有效阅读卡用户进入网站时展示；它是站内公告，不会向手机系统发送通知。</p><label>标题<input id="announcement-title" maxlength="80" placeholder="例如：本周推荐"></label><label>内容<textarea id="announcement-body" maxlength="3000" rows="4" placeholder="写给会员的消息"></textarea></label><label>配图（可选，5MB 以内）<input id="announcement-image" type="file" accept="image/jpeg,image/png,image/webp,image/gif"></label><p id="announcement-image-status" class="muted"></p><button id="announcement-send" type="button">发布给所有会员</button><p id="announcement-status" class="muted"></p><hr><h2>想看类型 · 回复</h2><p class="muted">读者会在“想看类型”里看到你的公开回复，请勿写入个人隐私。</p><div id="admin-type-requests"></div>';
+  panel.innerHTML = '<h2>木木有话说</h2><p class="muted">每次发布都会永久保存为一条消息；有效阅读会员可从导航的“木木有话说”随时查看。最新一条也会在会员进入时提示。</p><label>标题<input id="announcement-title" maxlength="80" placeholder="例如：本周推荐"></label><label>正文<textarea id="announcement-body" maxlength="3000" rows="4" placeholder="写给会员的消息"></textarea></label><label>配图（可选，5MB 以内）<input id="announcement-image" type="file" accept="image/jpeg,image/png,image/webp,image/gif"></label><p id="announcement-image-status" class="muted"></p><button id="announcement-send" type="button">发布给所有会员</button><p id="announcement-status" class="muted"></p><div id="admin-member-messages"></div><hr><h2>想看类型 · 回复</h2><p class="muted">读者会在“想看类型”里看到你的公开回复，请勿写入个人隐私。</p><div id="admin-type-requests"></div>';
   dashboard.insertBefore(panel, dashboard.querySelector('section') || null);
   var imageUrl = '';
   var imageInput = document.getElementById('announcement-image');
@@ -19,8 +23,16 @@
     var button = this, status = document.getElementById('announcement-status');
     var payload = { title: document.getElementById('announcement-title').value.trim(), body: document.getElementById('announcement-body').value.trim(), imageUrl: imageUrl };
     button.disabled = true; status.textContent = '正在发布…';
-    fetch('/api/admin/announcement', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(function (response) { if (!response.ok) throw Error(); return response.json(); }).then(function () { status.textContent = '已发布。会员下次进入网站时会看到。'; }).catch(function () { status.textContent = '发布失败，请确认标题和内容都已填写。'; }).finally(function () { button.disabled = false; });
+    fetch('/api/admin/announcement', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(function (response) { if (!response.ok) throw Error(); return response.json(); }).then(function () { status.textContent = '已发布并保存。会员可以在“木木有话说”里持续查看。'; document.getElementById('announcement-title').value=''; document.getElementById('announcement-body').value=''; imageInput.value=''; imageUrl=''; imageStatus.textContent=''; loadMessages(); }).catch(function () { status.textContent = '发布失败，请确认标题和内容都已填写。'; }).finally(function () { button.disabled = false; });
   };
+  function loadMessages() {
+    fetch('/api/admin/messages', { cache: 'no-store' }).then(function (response) { return response.ok ? response.json() : { items: [] }; }).then(function (data) {
+      var box = document.getElementById('admin-member-messages'); box.replaceChildren();
+      var heading = document.createElement('h3'); heading.textContent = '已发布的消息'; box.appendChild(heading);
+      (data.items || []).slice(0, 20).forEach(function (item) { var row=document.createElement('article');row.className='item';var title=document.createElement('strong');title.textContent=item.title||'未命名';var date=document.createElement('div');date.className='muted';date.textContent=item.updatedAt||'';var body=document.createElement('p');body.textContent=item.body||'';row.append(title,date,body);box.appendChild(row); });
+      if (!(data.items || []).length) { var empty=document.createElement('p');empty.className='muted';empty.textContent='暂未发布消息。';box.appendChild(empty); }
+    }).catch(function () {});
+  }
   function loadRequests() {
     fetch('/api/admin/data', { cache: 'no-store' }).then(function (response) { return response.ok ? response.json() : null; }).then(function (data) {
       if (!data) return; var box = document.getElementById('admin-type-requests'); box.replaceChildren();
@@ -34,5 +46,5 @@
       if (!(data.reviews || []).length) box.textContent = '暂时没有读者留言。';
     }).catch(function () {});
   }
-  loadRequests(); setInterval(loadRequests, 30000);
+  loadRequests(); loadMessages(); setInterval(function(){loadRequests();loadMessages()}, 30000);
 })();

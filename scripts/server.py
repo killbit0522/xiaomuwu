@@ -505,8 +505,25 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             image_url = str(payload.get("imageUrl", "")).strip()
             if not title or not body or len(title) > 80 or len(body) > 3000 or (image_url and not image_url.startswith("/assets/announcements/")):
                 self.send_json(400, {"ok": False, "message": "请填写标题、内容，并使用本后台上传的图片"}); return
-            announcement = {"title": title, "body": body, "imageUrl": image_url, "updatedAt": datetime.now(timezone.utc).isoformat()}
+            announcement = {"id": secrets.token_hex(8), "title": title, "body": body, "imageUrl": image_url, "updatedAt": datetime.now(timezone.utc).isoformat()}
             with sqlite3.connect(self.db_path) as db:
+                row = db.execute("SELECT value FROM settings WHERE key='member_messages'").fetchone()
+                try:
+                    messages = json.loads(row[0]) if row else []
+                except (ValueError, TypeError):
+                    messages = []
+                if not isinstance(messages, list): messages = []
+                # Preserve the former single announcement when this is the first saved message.
+                if not messages:
+                    legacy = db.execute("SELECT value FROM settings WHERE key='member_announcement'").fetchone()
+                    try:
+                        old = json.loads(legacy[0]) if legacy else None
+                    except (ValueError, TypeError):
+                        old = None
+                    if isinstance(old, dict) and old.get("title") and old.get("body"):
+                        messages.append(old)
+                messages.insert(0, announcement)
+                db.execute("INSERT INTO settings(key,value) VALUES('member_messages',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (json.dumps(messages[:500], ensure_ascii=False),))
                 db.execute("INSERT INTO settings(key,value) VALUES('member_announcement',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (json.dumps(announcement, ensure_ascii=False),))
             self.send_json(200, {"ok": True, "announcement": announcement}); return
         if api_path == "/api/requests":
@@ -629,6 +646,18 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             except (ValueError, TypeError):
                 announcement = None
             self.send_json(200, {"announcement": announcement}); return
+        if request_path in {"/api/messages", "/api/admin/messages"}:
+            if request_path.startswith("/api/admin/"):
+                if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
+            elif not self.access_info():
+                self.send_json(403, {"ok": False}); return
+            with sqlite3.connect(self.db_path) as db:
+                row = db.execute("SELECT value FROM settings WHERE key='member_messages'").fetchone()
+            try:
+                messages = json.loads(row[0]) if row else []
+            except (ValueError, TypeError):
+                messages = []
+            self.send_json(200, {"items": messages if isinstance(messages, list) else []}); return
         if request_path == "/api/updates":
             source = self.site_root / "assets" / "catalog.json"
             try:
@@ -686,7 +715,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
         protected_pages = {
             "/pages/search.html", "/pages/request.html",
             "/pages/review.html", "/pages/bookshelf.html", "/pages/reader.html",
-            "/pages/recent.html",
+            "/pages/recent.html", "/pages/messages.html",
         }
         if request_path in protected_pages and not self.access_info():
             self.send_response(302)

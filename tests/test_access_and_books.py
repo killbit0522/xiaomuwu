@@ -101,6 +101,7 @@ class BookAccessIntegrationTests(unittest.TestCase):
         with sqlite3.connect(self.db) as db:
             db.execute("DELETE FROM reviews")
             db.execute("DELETE FROM settings WHERE key='member_announcement'")
+            db.execute("DELETE FROM settings WHERE key='member_messages'")
 
     def unlock(self, client, code):
         payload = json.dumps({"code": code}).encode()
@@ -327,6 +328,17 @@ class BookAccessIntegrationTests(unittest.TestCase):
         with reader.open(self.base + "/api/announcement") as response:
             announcement = json.loads(response.read())["announcement"]
         self.assertEqual(announcement["title"], "本周推荐")
+
+    def test_member_messages_are_saved_in_order_for_readers(self):
+        headers = {"Content-Type": "application/json", "Cookie": "cabin_admin=test-admin-token"}
+        for title in ("第一条", "第二条"):
+            request = urllib.request.Request(self.base + "/api/admin/announcement", data=json.dumps({"title": title, "body": "会一直保留", "imageUrl": ""}).encode(), headers=headers)
+            with urllib.request.urlopen(request) as response:
+                self.assertTrue(json.loads(response.read())["ok"])
+        reader = self.client(); self.unlock(reader, "TEST-READER")
+        with reader.open(self.base + "/api/messages") as response:
+            items = json.loads(response.read())["items"]
+        self.assertEqual([item["title"] for item in items[:2]], ["第二条", "第一条"])
 
 
 if __name__ == "__main__":

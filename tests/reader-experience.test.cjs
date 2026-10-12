@@ -60,10 +60,12 @@ test('member guide, recent books, replies, and announcements are wired into the 
   const adminTools=fs.readFileSync('admin-community.js','utf8');
   assert.match(memberTools,/使用指南/);
   assert.match(memberTools,/近期新增/);
+  assert.match(memberTools,/木木有话说/);
   assert.match(memberTools,/\/api\/announcement/);
   assert.match(adminTools,/\/api\/admin\/reviews\/reply/);
   assert.match(adminTools,/\/api\/admin\/announcement-image/);
   assert.match(fs.readFileSync('pages/recent.html','utf8'),/最近入库的 50 本书/);
+  assert.match(fs.readFileSync('pages/messages.html','utf8'),/木木有话说/);
 });
 test('shelf data is mirrored locally so changing a card does not clear it', () => {
   const shelf=fs.readFileSync('shelf-store.js','utf8');
