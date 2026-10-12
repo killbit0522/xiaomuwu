@@ -343,7 +343,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             visitors = db.execute("SELECT COUNT(DISTINCT visitor) FROM events WHERE visitor <> ''").fetchone()[0]
             recent = [dict(row) for row in db.execute("SELECT type, visitor, detail, created_at FROM events ORDER BY id DESC LIMIT 100")]
             reviews = [dict(row) for row in db.execute("SELECT id, book, title, body, visitor, created_at, admin_reply, replied_at FROM reviews ORDER BY id DESC LIMIT 100")]
-            requests = [dict(row) for row in db.execute("SELECT title, author, edition, section, purpose, contact, note, visitor, created_at FROM book_requests ORDER BY id DESC LIMIT 200")]
+            requests = [dict(row) for row in db.execute("SELECT id, title, author, edition, section, purpose, contact, note, visitor, created_at FROM book_requests ORDER BY id DESC LIMIT 200")]
             cards = [dict(row) for row in db.execute("SELECT code, card_type, download_limit, remaining, used, expires_at, active, created_at FROM access_cards ORDER BY id DESC LIMIT 500")]
         return {"totals": totals, "visitors": visitors, "recent": recent, "reviews": reviews, "requests": requests, "cards": cards,
                 "storage": {"free": disk.free, "used": disk.used, "total": disk.total}}
@@ -496,8 +496,30 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             if review_id < 1 or not reply or len(reply) > 3000:
                 self.send_json(400, {"ok": False, "message": "回复内容需为 1 至 3000 个字"}); return
             with sqlite3.connect(self.db_path) as db:
-                db.execute("UPDATE reviews SET admin_reply=?, replied_at=? WHERE id=?", (reply, datetime.now(timezone.utc).isoformat(), review_id))
-            self.send_json(200, {"ok": True}); return
+                updated = db.execute("UPDATE reviews SET admin_reply=?, replied_at=? WHERE id=?", (reply, datetime.now(timezone.utc).isoformat(), review_id)).rowcount
+            if updated != 1:
+                self.send_json(404, {"ok": False, "message": "这条留言已不存在"}); return
+            self.send_json(200, {"ok": True, "reply": reply}); return
+        if api_path == "/api/admin/reviews/delete":
+            if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
+            ids = payload.get("ids", [])
+            if not isinstance(ids, list): self.send_json(400, {"ok": False, "message": "留言列表格式不正确"}); return
+            ids = list(dict.fromkeys(int(value) for value in ids if str(value).isdigit()))[:500]
+            if not ids: self.send_json(400, {"ok": False, "message": "请先选择留言"}); return
+            placeholders = ",".join("?" for _ in ids)
+            with sqlite3.connect(self.db_path) as db:
+                deleted = db.execute(f"DELETE FROM reviews WHERE id IN ({placeholders})", ids).rowcount
+            self.send_json(200, {"ok": True, "deleted": deleted}); return
+        if api_path == "/api/admin/requests/delete":
+            if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
+            ids = payload.get("ids", [])
+            if not isinstance(ids, list): self.send_json(400, {"ok": False, "message": "登记列表格式不正确"}); return
+            ids = list(dict.fromkeys(int(value) for value in ids if str(value).isdigit()))[:500]
+            if not ids: self.send_json(400, {"ok": False, "message": "请先选择登记"}); return
+            placeholders = ",".join("?" for _ in ids)
+            with sqlite3.connect(self.db_path) as db:
+                deleted = db.execute(f"DELETE FROM book_requests WHERE id IN ({placeholders})", ids).rowcount
+            self.send_json(200, {"ok": True, "deleted": deleted}); return
         if api_path == "/api/admin/announcement":
             if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
             title = str(payload.get("title", "")).strip()
@@ -526,6 +548,25 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 db.execute("INSERT INTO settings(key,value) VALUES('member_messages',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (json.dumps(messages[:500], ensure_ascii=False),))
                 db.execute("INSERT INTO settings(key,value) VALUES('member_announcement',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (json.dumps(announcement, ensure_ascii=False),))
             self.send_json(200, {"ok": True, "announcement": announcement}); return
+        if api_path == "/api/admin/messages/delete":
+            if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
+            ids = payload.get("ids", [])
+            if not isinstance(ids, list): self.send_json(400, {"ok": False, "message": "消息列表格式不正确"}); return
+            ids = {str(value).strip() for value in ids if str(value).strip()}
+            if not ids: self.send_json(400, {"ok": False, "message": "请先选择消息"}); return
+            with sqlite3.connect(self.db_path) as db:
+                row = db.execute("SELECT value FROM settings WHERE key='member_messages'").fetchone()
+                try:
+                    messages = json.loads(row[0]) if row else []
+                except (ValueError, TypeError):
+                    messages = []
+                messages = messages if isinstance(messages, list) else []
+                kept = [message for message in messages if not isinstance(message, dict) or str(message.get("id", "")) not in ids]
+                deleted = len(messages) - len(kept)
+                db.execute("INSERT INTO settings(key,value) VALUES('member_messages',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (json.dumps(kept, ensure_ascii=False),))
+                latest = kept[0] if kept else None
+                db.execute("INSERT INTO settings(key,value) VALUES('member_announcement',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (json.dumps(latest, ensure_ascii=False),))
+            self.send_json(200, {"ok": True, "deleted": deleted}); return
         if api_path == "/api/requests":
             title = str(payload.get("title", "")).strip()
             author = str(payload.get("author", "")).strip()
@@ -569,13 +610,9 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             codes = list(dict.fromkeys(str(code).strip().upper() for code in codes if str(code).strip()))[:500]
             if not codes:
                 self.send_json(400, {"ok": False, "message": "请先选择卡密"}); return
-            now = datetime.now(timezone.utc).isoformat()
             placeholders = ",".join("?" for _ in codes)
             with sqlite3.connect(self.db_path) as db:
-                rows = db.execute(
-                    f"SELECT id FROM access_cards WHERE code IN ({placeholders}) AND (active=0 OR (card_type='reader' AND expires_at<>'' AND expires_at<=?) OR (card_type<>'reader' AND remaining=0))",
-                    (*codes, now),
-                ).fetchall()
+                rows = db.execute(f"SELECT id FROM access_cards WHERE code IN ({placeholders})", codes).fetchall()
                 card_ids = [row[0] for row in rows]
                 if card_ids:
                     id_placeholders = ",".join("?" for _ in card_ids)

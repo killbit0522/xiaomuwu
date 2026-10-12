@@ -100,6 +100,7 @@ class BookAccessIntegrationTests(unittest.TestCase):
         shutil.rmtree(self.books / "管理员上传", ignore_errors=True)
         with sqlite3.connect(self.db) as db:
             db.execute("DELETE FROM reviews")
+            db.execute("DELETE FROM book_requests")
             db.execute("DELETE FROM settings WHERE key='member_announcement'")
             db.execute("DELETE FROM settings WHERE key='member_messages'")
 
@@ -339,6 +340,31 @@ class BookAccessIntegrationTests(unittest.TestCase):
         with reader.open(self.base + "/api/messages") as response:
             items = json.loads(response.read())["items"]
         self.assertEqual([item["title"] for item in items[:2]], ["第二条", "第一条"])
+
+    def test_admin_can_delete_selected_messages_requests_reviews_and_cards(self):
+        headers = {"Content-Type": "application/json", "Cookie": "cabin_admin=test-admin-token"}
+        for title in ("保留", "删除"):
+            request = urllib.request.Request(self.base + "/api/admin/announcement", data=json.dumps({"title": title, "body": "一条长期消息", "imageUrl": ""}).encode(), headers=headers)
+            with urllib.request.urlopen(request):
+                pass
+        with sqlite3.connect(self.db) as db:
+            message_id = json.loads(db.execute("SELECT value FROM settings WHERE key='member_messages'").fetchone()[0])[0]["id"]
+            db.execute("INSERT INTO book_requests(title,author,edition,section,purpose,contact,note,visitor,created_at) VALUES(?,?,?,?,?,?,?,?,?)", ("要删除的书", "作者", "", "", "", "", "", "visitor", datetime.now(timezone.utc).isoformat()))
+            request_id = db.execute("SELECT id FROM book_requests").fetchone()[0]
+            db.execute("INSERT INTO reviews(book,title,body,visitor,created_at) VALUES(?,?,?,?,?)", ("想看类型", "要删除的留言", "这是一条足够长的测试读者留言。", "visitor", datetime.now(timezone.utc).isoformat()))
+            review_id = db.execute("SELECT id FROM reviews").fetchone()[0]
+            db.execute("INSERT INTO access_cards(code,card_type,download_limit,remaining,used,expires_at,active,created_at) VALUES(?,?,?,?,?,?,?,?)", ("TEST-DELETE", "reader", 0, 0, 0, (datetime.now(timezone.utc) + timedelta(days=2)).isoformat(), 1, datetime.now(timezone.utc).isoformat()))
+        for endpoint, payload in (("/api/admin/messages/delete", {"ids": [message_id]}), ("/api/admin/requests/delete", {"ids": [request_id]}), ("/api/admin/reviews/delete", {"ids": [review_id]}), ("/api/admin/cards/delete", {"codes": ["TEST-DELETE"]})):
+            request = urllib.request.Request(self.base + endpoint, data=json.dumps(payload).encode(), headers=headers)
+            with urllib.request.urlopen(request) as response:
+                self.assertEqual(json.loads(response.read())["deleted"], 1)
+        reader = self.client(); self.unlock(reader, "TEST-READER")
+        with reader.open(self.base + "/api/messages") as response:
+            self.assertEqual(json.loads(response.read())["items"][0]["title"], "保留")
+        with sqlite3.connect(self.db) as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM book_requests").fetchone()[0], 0)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM reviews").fetchone()[0], 0)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM access_cards WHERE code='TEST-DELETE'").fetchone()[0], 0)
 
 
 if __name__ == "__main__":
