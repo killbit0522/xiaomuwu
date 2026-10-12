@@ -10,6 +10,20 @@
   var panel = document.createElement('section'); panel.id = 'community-tools'; panel.className = 'panel';
   panel.innerHTML = '<h2>木木有话说</h2><p class="muted">每次发布都会永久保存为一条消息；有效阅读会员可从导航的“木木有话说”随时查看。最新一条也会在会员进入时提示。</p><label>标题<input id="announcement-title" maxlength="80" placeholder="例如：本周推荐"></label><label>正文<textarea id="announcement-body" maxlength="3000" rows="4" placeholder="写给会员的消息"></textarea></label><label>配图（可选，5MB 以内）<input id="announcement-image" type="file" accept="image/jpeg,image/png,image/webp,image/gif"></label><p id="announcement-image-status" class="muted"></p><button id="announcement-send" type="button">发布给所有会员</button><p id="announcement-status" class="muted"></p><div class="card-tools"><button id="delete-selected-messages" class="delete-btn" type="button">删除勾选的消息</button><span id="message-action-status" class="muted"></span></div><div id="admin-member-messages"></div><hr><h2>想看类型 · 回复</h2><p class="muted">读者会在“想看类型”里看到你的公开回复，请勿写入个人隐私。点击“回复”后显示“已发出”，代表读者端已能读取。</p><div class="card-tools"><button id="delete-selected-reviews" class="delete-btn" type="button">删除勾选的留言</button><span id="review-action-status" class="muted"></span></div><div id="admin-type-requests"></div><hr><h2>缺书登记</h2><p class="muted">勾选已经处理或不再需要的登记后删除。</p><div class="card-tools"><button id="delete-selected-book-requests" class="delete-btn" type="button">删除勾选的登记</button><span id="request-action-status" class="muted"></span></div><div id="admin-book-requests"></div>';
   dashboard.insertBefore(panel, dashboard.querySelector('section') || null);
+  function savedCollapse(key) { try { return localStorage.getItem(key) === '1'; } catch (error) { return false; } }
+  function saveCollapse(key, collapsed) { try { localStorage.setItem(key, collapsed ? '1' : '0'); } catch (error) {} }
+  function addToggle(heading, target, key, panelMode) {
+    var button=document.createElement('button');button.type='button';button.className='panel-toggle';button.setAttribute('aria-label','收起或展开'+heading.firstChild.nodeValue);
+    function set(collapsed){if(panelMode)target.classList.toggle('is-collapsed',collapsed);else target.hidden=collapsed;button.textContent=collapsed?'展开':'收起';button.setAttribute('aria-expanded',collapsed?'false':'true');saveCollapse(key,collapsed)}
+    heading.appendChild(button);set(savedCollapse(key));button.onclick=function(){set(panelMode?!target.classList.contains('is-collapsed'):!target.hidden)};
+  }
+  function addSectionToggle(title, key) {
+    var headings=panel.querySelectorAll('h2'),heading=null;Array.prototype.forEach.call(headings,function(item){if(!heading&&item.firstChild&&item.firstChild.nodeValue===title)heading=item});if(!heading)return;
+    var content=document.createElement('div'),node=heading.nextSibling;while(node&&!(node.nodeType===1&&node.tagName==='H2')){var next=node.nextSibling;content.appendChild(node);node=next}heading.after(content);addToggle(heading,content,key,false);
+  }
+  addToggle(panel.querySelector('h2'),panel,'xiaomuwu-collapse-member-messages',true);
+  addSectionToggle('想看类型 · 回复','xiaomuwu-collapse-type-replies');
+  addSectionToggle('缺书登记','xiaomuwu-collapse-book-requests');
   var imageUrl = '';
   var imageInput = document.getElementById('announcement-image');
   var imageStatus = document.getElementById('announcement-image-status');
