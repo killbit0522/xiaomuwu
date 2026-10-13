@@ -159,6 +159,9 @@ def decode_readable_book(path):
 
 
 class LibraryHandler(SimpleHTTPRequestHandler):
+    # Do not disclose the underlying Python release in every HTTP response.
+    server_version = "Cabin"
+    sys_version = ""
     site_root = Path.cwd().resolve()
     textbook_root = Path.cwd().resolve()
     access_token = ""
@@ -901,6 +904,12 @@ class LibraryHandler(SimpleHTTPRequestHandler):
         self.send_header("Referrer-Policy", "same-origin")
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        self.send_header("Cross-Origin-Opener-Policy", "same-origin")
+        self.send_header("Cross-Origin-Resource-Policy", "same-origin")
+        self.send_header("X-Permitted-Cross-Domain-Policies", "none")
+        self.send_header("Content-Security-Policy", "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; frame-src 'self'")
+        if self.headers.get("X-Forwarded-Proto", "").lower() == "https":
+            self.send_header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
         request_path = urlsplit(self.path).path
         if request_path == "/assets/catalog.json":
             self.send_header("Cache-Control", "private, no-cache, max-age=0, must-revalidate")

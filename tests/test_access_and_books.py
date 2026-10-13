@@ -143,8 +143,16 @@ class BookAccessIntegrationTests(unittest.TestCase):
     def test_catalog_is_public_and_compressed_but_reader_stays_protected(self):
         request = urllib.request.Request(self.base + "/assets/catalog.json", headers={"Accept-Encoding": "gzip"})
         with urllib.request.urlopen(request) as response:
+            etag = response.headers.get("ETag")
             self.assertEqual(response.headers.get("Content-Encoding"), "gzip")
+            self.assertIn("no-cache", response.headers.get("Cache-Control", ""))
+            self.assertIn("Content-Security-Policy", response.headers)
+            self.assertNotIn("Python", response.headers.get("Server", ""))
             self.assertEqual(gzip.decompress(response.read()), self.catalog_bytes)
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            urllib.request.urlopen(urllib.request.Request(self.base + "/assets/catalog.json", headers={"If-None-Match": etag}))
+        self.assertEqual(caught.exception.code, 304)
+        caught.exception.close()
         with urllib.request.urlopen(self.base + "/pages/catalog.html") as response:
             self.assertEqual(response.read(), b"catalog")
         with urllib.request.urlopen(self.base + "/pages/reader.html") as response:

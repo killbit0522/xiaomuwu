@@ -46,7 +46,7 @@ test('new-book notice uses the update endpoint and limits the message to two boo
 });
 test('catalog and search always request a fresh book index after uploads', () => {
   for (const page of ['pages/catalog.html','pages/search.html']) {
-    assert.match(fs.readFileSync(page,'utf8'), /catalog\.json', \{ cache: 'no-store'/);
+    assert.match(fs.readFileSync(page,'utf8'), /catalog\.json', \{ cache: 'default'/);
   }
 });
 test('catalog categories support collapse and half-screen browsing', () => {
