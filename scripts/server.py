@@ -369,22 +369,41 @@ class LibraryHandler(SimpleHTTPRequestHandler):
         if row["card_type"] == "download" and row["remaining"] == 0: return None
         return dict(row)
 
-    def consume_download(self):
+    def reserve_download(self):
+        """Reserve one use before streaming, so concurrent downloads cannot overrun a card."""
         token = self.download_session()
         if not token:
-            return False
+            return None
         with sqlite3.connect(self.db_path) as db:
             db.row_factory = sqlite3.Row
+            db.execute("CREATE TABLE IF NOT EXISTS download_reservations(id INTEGER PRIMARY KEY, card_id INTEGER NOT NULL, token TEXT NOT NULL, created_at TEXT NOT NULL)")
             db.execute("BEGIN IMMEDIATE")
             row = db.execute("SELECT c.id, c.remaining, c.card_type FROM download_sessions s JOIN access_cards c ON c.id=s.card_id WHERE s.token=? AND c.active=1", (token,)).fetchone()
             if not row or row["card_type"] != "download" or row["remaining"] == 0:
-                return False
-            if row["remaining"] > 0:
-                db.execute("UPDATE access_cards SET remaining=remaining-1, used=used+1 WHERE id=? AND remaining>0", (row["id"],))
-            else:
-                db.execute("UPDATE access_cards SET used=used+1 WHERE id=?", (row["id"],))
+                return None
+            changed = db.execute("UPDATE access_cards SET remaining=remaining-1, used=used+1 WHERE id=? AND remaining>0", (row["id"],)).rowcount
+            if changed != 1:
+                return None
             db.execute("UPDATE download_sessions SET last_used_at=? WHERE token=?", (datetime.now(timezone.utc).isoformat(), token))
-        return True
+            cursor = db.execute("INSERT INTO download_reservations(card_id,token,created_at) VALUES(?,?,?)", (row["id"], token, datetime.now(timezone.utc).isoformat()))
+        return {"card_id": row["id"], "token": token, "reservation_id": cursor.lastrowid}
+
+    def refund_download(self, reservation):
+        """Return a reserved use when the server could not finish sending the file."""
+        if not reservation:
+            return
+        with sqlite3.connect(self.db_path) as db:
+            db.execute("BEGIN IMMEDIATE")
+            pending = db.execute("SELECT card_id FROM download_reservations WHERE id=?", (reservation["reservation_id"],)).fetchone()
+            if pending:
+                db.execute("UPDATE access_cards SET remaining=MIN(download_limit, remaining+1), used=MAX(0, used-1) WHERE id=?", (pending[0],))
+                db.execute("DELETE FROM download_reservations WHERE id=?", (reservation["reservation_id"],))
+
+    def complete_download(self, reservation):
+        if not reservation:
+            return
+        with sqlite3.connect(self.db_path) as db:
+            db.execute("DELETE FROM download_reservations WHERE id=?", (reservation["reservation_id"],))
 
     def create_cards(self, count, download_limit=0, card_type="download", months=0):
         now = datetime.now(timezone.utc).isoformat()
@@ -431,10 +450,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             body = self.rfile.read(length)
             upload_root = self.textbook_root / "管理员上传"
             with self.upload_lock:
-                duplicate = find_duplicate_book(self.textbook_root, filename)
-                if duplicate:
-                    self.send_json(200, {"ok": True, "skipped": True, "filename": filename,
-                                         "duplicateOf": duplicate.relative_to(self.textbook_root).as_posix()}); return
+                duplicates = find_duplicate_books(self.textbook_root, filename)
                 upload_root.mkdir(parents=True, exist_ok=True)
                 numbered = []
                 for child in upload_root.iterdir():
@@ -454,9 +470,19 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                     self.send_json(400, {"ok": False}); return
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(body)
+                replaced_paths = []
+                for duplicate in duplicates:
+                    if duplicate.resolve() == target:
+                        continue
+                    try:
+                        duplicate.unlink()
+                        replaced_paths.append(duplicate.relative_to(self.textbook_root).as_posix())
+                    except OSError:
+                        # Keep a readable copy if a stale or protected file cannot be removed.
+                        pass
                 catalog_count = rebuild_catalog(type(self))
             grouped_path = (Path(target_dir.name) / relative).as_posix()
-            self.send_json(200, {"ok": True, "filename": filename, "relativePath": grouped_path, "uploadGroup": target_dir.name, "catalogCount": catalog_count}); return
+            self.send_json(200, {"ok": True, "filename": filename, "relativePath": grouped_path, "uploadGroup": target_dir.name, "catalogCount": catalog_count, "replaced": len(replaced_paths), "replacedPaths": replaced_paths}); return
         if api_path == "/api/admin/announcement-image":
             if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
             filename = Path(unquote(self.headers.get("X-Filename", ""))).name
@@ -468,6 +494,22 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             image_dir.mkdir(parents=True, exist_ok=True)
             (image_dir / safe_name).write_bytes(self.rfile.read(length))
             self.send_json(200, {"ok": True, "imageUrl": "/assets/announcements/" + safe_name}); return
+        if api_path == "/api/admin/community-image":
+            if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
+            filename = Path(unquote(self.headers.get("X-Filename", ""))).name
+            length = int(self.headers.get("Content-Length", "0"))
+            if Path(filename).suffix.lower() not in {".jpg", ".jpeg", ".png", ".webp", ".gif"} or length < 1 or length > 3 * 1024 * 1024:
+                self.send_json(400, {"ok": False, "message": "请选择 3MB 以内的 JPG、PNG、WEBP 或 GIF 图片"}); return
+            image_body = self.rfile.read(length)
+            suffix = Path(filename).suffix.lower()
+            signatures = {".jpg": image_body.startswith(b"\xff\xd8\xff"), ".jpeg": image_body.startswith(b"\xff\xd8\xff"), ".png": image_body.startswith(b"\x89PNG\r\n\x1a\n"), ".gif": image_body.startswith((b"GIF87a", b"GIF89a")), ".webp": image_body.startswith(b"RIFF") and image_body[8:12] == b"WEBP"}
+            if len(image_body) != length or not signatures.get(suffix, False):
+                self.send_json(400, {"ok": False, "message": "图片内容与文件格式不匹配，请重新选择图片"}); return
+            safe_name = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S") + "-" + secrets.token_hex(4) + Path(filename).suffix.lower()
+            image_dir = self.community_image_root
+            image_dir.mkdir(parents=True, exist_ok=True)
+            (image_dir / safe_name).write_bytes(image_body)
+            self.send_json(200, {"ok": True, "imageUrl": "/api/community/image/" + safe_name}); return
         try:
             payload = self.read_json()
         except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
@@ -551,6 +593,61 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 db.execute("INSERT INTO settings(key,value) VALUES('member_messages',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (json.dumps(messages[:500], ensure_ascii=False),))
                 db.execute("INSERT INTO settings(key,value) VALUES('member_announcement',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (json.dumps(announcement, ensure_ascii=False),))
             self.send_json(200, {"ok": True, "announcement": announcement}); return
+        if api_path == "/api/admin/community/posts":
+            if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
+            title = str(payload.get("title", "")).strip()
+            body = str(payload.get("body", "")).strip()
+            image_url = str(payload.get("imageUrl", "")).strip()
+            if not title or not body or len(title) > 80 or len(body) > 3000 or (image_url and not re.fullmatch(r"/api/community/image/[0-9]{14}-[a-f0-9]{8}\.(?:jpe?g|png|webp|gif)", image_url)):
+                self.send_json(400, {"ok": False, "message": "请填写标题、感受，并使用本后台上传的图片"}); return
+            with sqlite3.connect(self.db_path) as db:
+                cursor = db.execute("INSERT INTO community_posts(title,body,image_url,created_at) VALUES(?,?,?,?)", (title, body, image_url, datetime.now(timezone.utc).isoformat()))
+            self.send_json(200, {"ok": True, "id": cursor.lastrowid}); return
+        if api_path == "/api/community/comments":
+            info = self.access_info()
+            if not info or info["card_type"] != "reader": self.send_json(403, {"ok": False, "message": "需要有效阅读卡"}); return
+            try:
+                post_id = int(payload.get("postId", 0))
+            except (TypeError, ValueError):
+                post_id = 0
+            body = str(payload.get("body", "")).strip()
+            if post_id < 1 or not body or len(body) > 500:
+                self.send_json(400, {"ok": False, "message": "评论需为 1 至 500 个字"}); return
+            token = self.download_session()
+            visitor = hashlib.sha256(token.encode("utf-8")).hexdigest()[:16] if token else "admin"
+            with sqlite3.connect(self.db_path) as db:
+                exists = db.execute("SELECT 1 FROM community_posts WHERE id=?", (post_id,)).fetchone()
+                if not exists: self.send_json(404, {"ok": False, "message": "这条动态已不存在"}); return
+                cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+                recent_comments = db.execute("SELECT COUNT(*) FROM community_comments WHERE visitor=? AND created_at>=?", (visitor, cutoff)).fetchone()[0]
+                if recent_comments >= 20: self.send_json(429, {"ok": False, "message": "留言太频繁，请稍后再试"}); return
+                cursor = db.execute("INSERT INTO community_comments(post_id,body,visitor,created_at) VALUES(?,?,?,?)", (post_id, body, visitor, datetime.now(timezone.utc).isoformat()))
+            self.send_json(200, {"ok": True, "id": cursor.lastrowid}); return
+        if api_path == "/api/admin/community/posts/delete":
+            if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
+            try: post_id = int(payload.get("id", 0))
+            except (TypeError, ValueError): post_id = 0
+            if post_id < 1: self.send_json(400, {"ok": False}); return
+            with sqlite3.connect(self.db_path) as db:
+                image_row = db.execute("SELECT image_url FROM community_posts WHERE id=?", (post_id,)).fetchone()
+                db.execute("DELETE FROM community_comments WHERE post_id=?", (post_id,))
+                deleted = db.execute("DELETE FROM community_posts WHERE id=?", (post_id,)).rowcount
+                image_url = image_row[0] if image_row else ""
+                still_used = db.execute("SELECT 1 FROM community_posts WHERE image_url=? LIMIT 1", (image_url,)).fetchone() if image_url else None
+            if deleted and image_url and not still_used:
+                filename = image_url.rsplit("/", 1)[-1]
+                if re.fullmatch(r"[0-9]{14}-[a-f0-9]{8}\.(?:jpe?g|png|webp|gif)", filename):
+                    try: (self.community_image_root / filename).unlink(missing_ok=True)
+                    except OSError: pass
+            self.send_json(200, {"ok": True, "deleted": deleted}); return
+        if api_path == "/api/admin/community/comments/delete":
+            if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
+            try: comment_id = int(payload.get("id", 0))
+            except (TypeError, ValueError): comment_id = 0
+            if comment_id < 1: self.send_json(400, {"ok": False}); return
+            with sqlite3.connect(self.db_path) as db:
+                deleted = db.execute("DELETE FROM community_comments WHERE id=?", (comment_id,)).rowcount
+            self.send_json(200, {"ok": True, "deleted": deleted}); return
         if api_path == "/api/admin/messages/delete":
             if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
             ids = payload.get("ids", [])
@@ -698,6 +795,24 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             except (ValueError, TypeError):
                 messages = []
             self.send_json(200, {"items": messages if isinstance(messages, list) else []}); return
+        if request_path in {"/api/community", "/api/admin/community"}:
+            if request_path.startswith("/api/admin/"):
+                if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
+            else:
+                info = self.access_info()
+                if not info or info["card_type"] != "reader": self.send_json(403, {"ok": False}); return
+            with sqlite3.connect(self.db_path) as db:
+                db.row_factory = sqlite3.Row
+                posts = [dict(row) for row in db.execute("SELECT id,title,body,image_url,created_at FROM community_posts ORDER BY id DESC LIMIT 40")]
+                post_ids = [post["id"] for post in posts]
+                comments_by_post = {post_id: [] for post_id in post_ids}
+                if post_ids:
+                    for post_id in post_ids:
+                        rows = db.execute("SELECT id,post_id,body,created_at FROM community_comments WHERE post_id=? ORDER BY id DESC LIMIT 50", (post_id,))
+                        comments_by_post[post_id] = list(reversed([dict(row) for row in rows]))
+            for post in posts:
+                post["comments"] = comments_by_post.get(post["id"], [])
+            self.send_json(200, {"items": posts}); return
         if request_path == "/api/updates":
             source = self.site_root / "assets" / "catalog.json"
             try:
@@ -749,15 +864,38 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             self.send_json(200, self.admin_data()); return
         if request_path == "/health":
             self.send_json(200, {"ok": True}); return
+        if request_path.startswith("/api/community/image/"):
+            info = self.access_info()
+            if not info or info["card_type"] != "reader": self.send_error(403, "Reader card required"); return
+            filename = request_path.rsplit("/", 1)[-1]
+            if not re.fullmatch(r"[0-9]{14}-[a-f0-9]{8}\.(?:jpe?g|png|webp|gif)", filename):
+                self.send_error(404); return
+            source = self.community_image_root / filename
+            if not source.is_file(): self.send_error(404); return
+            try:
+                content_type = mimetypes.guess_type(source.name)[0] or "application/octet-stream"
+                size = source.stat().st_size
+                self.send_response(200)
+                self.send_header("Content-Type", content_type)
+                self.send_header("Content-Length", str(size))
+                self.send_header("Cache-Control", "private, max-age=300")
+                self.end_headers()
+                with source.open("rb") as stream:
+                    shutil.copyfileobj(stream, self.wfile, length=1024 * 128)
+                self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                return
+            return
         if request_path == "/api/access":
             info = self.access_info()
             self.send_json(200, {"ok": bool(info), "cardType": info["card_type"] if info else "", "remaining": info["remaining"] if info else 0, "expiresAt": info["expires_at"] if info else ""}); return
         protected_pages = {
             "/pages/search.html", "/pages/request.html",
             "/pages/review.html", "/pages/bookshelf.html", "/pages/reader.html",
-            "/pages/recent.html", "/pages/messages.html",
+            "/pages/recent.html", "/pages/messages.html", "/pages/community.html",
         }
-        if request_path in protected_pages and not self.access_info():
+        page_access = self.access_info() if request_path in protected_pages else None
+        if request_path in protected_pages and (not page_access or (request_path == "/pages/community.html" and page_access["card_type"] != "reader")):
             self.send_response(302)
             self.send_header("Location", "/pages/home.html?card=required")
             self.end_headers()
@@ -828,22 +966,47 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             else:
                 body = None
                 content_type = mimetypes.guess_type(source.name)[0] or "application/octet-stream"
-            if not self.consume_download():
+            try:
+                if body is None:
+                    stream = source.open("rb")
+                    content_length = os.fstat(stream.fileno()).st_size
+                else:
+                    stream = None
+                    content_length = len(body)
+            except OSError:
+                self.send_error(503, "Book file temporarily unavailable")
+                return
+            reservation = self.reserve_download()
+            if not reservation:
+                if stream is not None:
+                    stream.close()
                 self.send_error(403, "Download limit exhausted")
                 return
-            self.send_response(200)
-            self.send_header("Content-Type", content_type)
-            self.send_header("Content-Disposition", "attachment; filename=book%s; filename*=UTF-8''%s" % (source.suffix, quote(source.name)))
-            self.send_header("Content-Length", str(len(body) if body is not None else source.stat().st_size))
-            self.end_headers()
             try:
+                self.send_response(200)
+                self.send_header("Content-Type", content_type)
+                self.send_header("Content-Disposition", "attachment; filename=book%s; filename*=UTF-8''%s" % (source.suffix, quote(source.name)))
+                self.send_header("Content-Length", str(content_length))
+                self.end_headers()
                 if body is not None:
                     self.wfile.write(body)
                 else:
-                    with source.open("rb") as stream:
-                        shutil.copyfileobj(stream, self.wfile, length=1024 * 256)
-            except (BrokenPipeError, ConnectionResetError):
-                pass
+                    sent = 0
+                    while True:
+                        chunk = stream.read(1024 * 256)
+                        if not chunk:
+                            break
+                        self.wfile.write(chunk)
+                        sent += len(chunk)
+                    if sent != content_length:
+                        raise OSError("incomplete file read")
+                self.wfile.flush()
+                self.complete_download(reservation)
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                self.refund_download(reservation)
+            finally:
+                if stream is not None:
+                    stream.close()
             return
         if request_path.startswith("/read/"):
             info = self.access_info()
@@ -916,6 +1079,9 @@ class LibraryHandler(SimpleHTTPRequestHandler):
         elif request_path.startswith("/read/"):
             # Reader responses set their own private cache policy and ETag.
             pass
+        elif request_path.startswith("/api/community/image/"):
+            # Community images are private to active reader sessions.
+            pass
         elif request_path == "/api/online/read":
             # Online reader responses set their own private cache policy and ETag.
             pass
@@ -933,14 +1099,33 @@ def normalized_book_title(path):
     return re.sub(r"(?:\s*[（(]\s*\d+\s*[）)])+$", "", path.stem).strip()
 
 
-def find_duplicate_book(root, filename):
-    candidate = Path(filename)
-    identity = normalized_book_title(candidate).casefold()
+def duplicate_title_key(value):
+    """Normalize filenames for replacement matching while ignoring routine labels."""
+    title = normalized_book_title(Path(value)).casefold()
+    title = re.sub(r"(?:作者|author)\s*[:：].*$", "", title, flags=re.IGNORECASE)
+    title = re.sub(r"[\[【][^\]】]{0,32}[\]】]", "", title)
+    return re.sub(r"[^\w\u4e00-\u9fff]", "", title)
+
+
+def titles_overlap_enough(left, right):
+    if not left or not right:
+        return False
+    if left == right:
+        return True
+    short, long = (left, right) if len(left) <= len(right) else (right, left)
+    if len(short) < 5:
+        return False
+    return any(short[index:index + 5] in long for index in range(len(short) - 4))
+
+
+def find_duplicate_books(root, filename):
+    identity = duplicate_title_key(filename)
+    matches = []
     for path in root.rglob("*"):
         if path.is_file() and path.suffix.lower() in BOOK_EXTENSIONS:
-            if normalized_book_title(path).casefold() == identity:
-                return path
-    return None
+            if titles_overlap_enough(identity, duplicate_title_key(path)):
+                matches.append(path)
+    return matches
 
 
 def rebuild_catalog(handler):
@@ -1020,12 +1205,18 @@ def main():
     LibraryHandler.read_cache_root.mkdir(parents=True, exist_ok=True)
     LibraryHandler.online_cache_root = data_dir / "online-cache"
     LibraryHandler.online_cache_root.mkdir(parents=True, exist_ok=True)
+    LibraryHandler.community_image_root = data_dir / "community-images"
+    LibraryHandler.community_image_root.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(LibraryHandler.db_path) as db:
         db.execute("CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY, type TEXT, visitor TEXT, detail TEXT, created_at TEXT)")
         db.execute("CREATE TABLE IF NOT EXISTS reviews(id INTEGER PRIMARY KEY, book TEXT, title TEXT, body TEXT, visitor TEXT, created_at TEXT, admin_reply TEXT NOT NULL DEFAULT '', replied_at TEXT NOT NULL DEFAULT '')")
         db.execute("CREATE TABLE IF NOT EXISTS book_requests(id INTEGER PRIMARY KEY, title TEXT, author TEXT, edition TEXT, section TEXT, purpose TEXT, contact TEXT, note TEXT, visitor TEXT, created_at TEXT)")
+        db.execute("CREATE TABLE IF NOT EXISTS community_posts(id INTEGER PRIMARY KEY, title TEXT NOT NULL, body TEXT NOT NULL, image_url TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL)")
+        db.execute("CREATE TABLE IF NOT EXISTS community_comments(id INTEGER PRIMARY KEY, post_id INTEGER NOT NULL, body TEXT NOT NULL, visitor TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, FOREIGN KEY(post_id) REFERENCES community_posts(id))")
+        db.execute("CREATE INDEX IF NOT EXISTS community_comments_post_id ON community_comments(post_id, id)")
         db.execute("CREATE TABLE IF NOT EXISTS access_cards(id INTEGER PRIMARY KEY, code TEXT UNIQUE, download_limit INTEGER NOT NULL, remaining INTEGER NOT NULL, used INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL)")
         db.execute("CREATE TABLE IF NOT EXISTS download_sessions(token TEXT PRIMARY KEY, card_id INTEGER NOT NULL, created_at TEXT NOT NULL, last_used_at TEXT, FOREIGN KEY(card_id) REFERENCES access_cards(id))")
+        db.execute("CREATE TABLE IF NOT EXISTS download_reservations(id INTEGER PRIMARY KEY, card_id INTEGER NOT NULL, token TEXT NOT NULL, created_at TEXT NOT NULL, FOREIGN KEY(card_id) REFERENCES access_cards(id))")
         db.execute("CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL)")
         columns = {row[1] for row in db.execute("PRAGMA table_info(access_cards)")}
         if "card_type" not in columns: db.execute("ALTER TABLE access_cards ADD COLUMN card_type TEXT NOT NULL DEFAULT 'download'")
@@ -1033,6 +1224,12 @@ def main():
         review_columns = {row[1] for row in db.execute("PRAGMA table_info(reviews)")}
         if "admin_reply" not in review_columns: db.execute("ALTER TABLE reviews ADD COLUMN admin_reply TEXT NOT NULL DEFAULT ''")
         if "replied_at" not in review_columns: db.execute("ALTER TABLE reviews ADD COLUMN replied_at TEXT NOT NULL DEFAULT ''")
+        pending_downloads = [row[0] for row in db.execute("SELECT id FROM download_reservations")]
+        for reservation_id in pending_downloads:
+            pending = db.execute("SELECT card_id FROM download_reservations WHERE id=?", (reservation_id,)).fetchone()
+            if pending:
+                db.execute("UPDATE access_cards SET remaining=MIN(download_limit, remaining+1), used=MAX(0, used-1) WHERE id=?", (pending[0],))
+                db.execute("DELETE FROM download_reservations WHERE id=?", (reservation_id,))
         initial_admin_hash = hashlib.sha256(LibraryHandler.admin_key.encode("utf-8")).hexdigest()
         db.execute("INSERT OR IGNORE INTO settings(key,value) VALUES('admin_password_hash',?)", (initial_admin_hash,))
     threading.Thread(target=watch_textbook, args=(LibraryHandler,), daemon=True).start()

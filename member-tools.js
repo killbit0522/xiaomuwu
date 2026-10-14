@@ -63,6 +63,7 @@
     var nav = document.querySelector('.gw-nav,.sh-nav');
     navLink(nav, './recent.html', '近期新增', '新', 'Recent');
     navLink(nav, './messages.html', '木木有话说', '话', 'Messages');
+    navLink(nav, './community.html', '木木小广场', '聊', 'Community');
     fetch('/api/announcement', { cache: 'no-store' }).then(function (response) { return response.ok ? response.json() : null; }).then(announcement).catch(function () {});
   }).catch(function () {});
 })();
