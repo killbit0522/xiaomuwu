@@ -261,7 +261,7 @@ class BookAccessIntegrationTests(unittest.TestCase):
         self.assertIn("Max-Age=86400", cookie)
         self.assertIn("HttpOnly", cookie)
 
-    def test_admin_data_reports_storage_and_upload_skips_existing_titles(self):
+    def test_admin_data_reports_storage_and_upload_replaces_existing_titles(self):
         headers = {"Cookie": "cabin_admin=test-admin-token"}
         with urllib.request.urlopen(urllib.request.Request(self.base + "/api/admin/data", headers=headers)) as response:
             storage = json.loads(response.read())["storage"]
@@ -272,9 +272,9 @@ class BookAccessIntegrationTests(unittest.TestCase):
             with urllib.request.urlopen(request) as response:
                 result = json.loads(response.read())
             if filename.endswith("（1）.txt"):
-                self.assertTrue(result["skipped"])
+                self.assertEqual(result["replaced"], 1)
             else:
-                self.assertFalse(result.get("skipped", False))
+                self.assertEqual(result["replaced"], 0)
 
     def test_admin_uploads_are_grouped_twenty_books_per_new_folder(self):
         for index in range(21):

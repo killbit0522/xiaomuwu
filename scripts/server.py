@@ -1112,6 +1112,11 @@ def titles_overlap_enough(left, right):
         return False
     if left == right:
         return True
+    # The five-character rule is for book titles written with Chinese characters.
+    # Applying it to short ASCII file sequences (for example book-00/book-01)
+    # would make separately numbered uploads replace one another.
+    if not (re.search(r"[\u4e00-\u9fff]", left) or re.search(r"[\u4e00-\u9fff]", right)):
+        return False
     short, long = (left, right) if len(left) <= len(right) else (right, left)
     if len(short) < 5:
         return False
