@@ -13,6 +13,7 @@ import re
 import shutil
 import zipfile
 import mimetypes
+from contextlib import contextmanager
 from html.parser import HTMLParser
 from xml.etree import ElementTree
 from datetime import timedelta
@@ -28,6 +29,20 @@ try:
 except ImportError:
     import library_audit
     import online_library
+
+
+@contextmanager
+def open_database(path):
+    """Commit or roll back each short request transaction and always close it."""
+    db = sqlite3.connect(path, timeout=15)
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
 
 
 def decode_book_text(raw):
@@ -174,6 +189,44 @@ class LibraryHandler(SimpleHTTPRequestHandler):
     catalog_cache_lock = threading.Lock()
     catalog_build_lock = threading.Lock()
     upload_lock = threading.Lock()
+    auth_attempt_lock = threading.Lock()
+    auth_attempts = {}
+    auth_last_cleanup = 0.0
+
+    def client_identity(self):
+        forwarded = self.headers.get("X-Real-IP", "").strip()
+        if not forwarded:
+            forwarded = self.headers.get("X-Forwarded-For", "").split(",", 1)[0].strip()
+        return forwarded[:80] or str(self.client_address[0])[:80]
+
+    def auth_rate_limited(self, scope, limit, window=600):
+        key = (scope, self.client_identity())
+        now = time.monotonic()
+        owner = type(self)
+        with self.auth_attempt_lock:
+            if now - owner.auth_last_cleanup >= 60:
+                for existing_key, attempts in list(owner.auth_attempts.items()):
+                    recent_attempts = [stamp for stamp in attempts if now - stamp < window]
+                    if recent_attempts:
+                        owner.auth_attempts[existing_key] = recent_attempts
+                    else:
+                        owner.auth_attempts.pop(existing_key, None)
+                owner.auth_last_cleanup = now
+            recent = [stamp for stamp in owner.auth_attempts.get(key, ()) if now - stamp < window]
+            if recent:
+                owner.auth_attempts[key] = recent
+            else:
+                owner.auth_attempts.pop(key, None)
+            return len(recent) >= limit
+
+    def record_auth_failure(self, scope):
+        key = (scope, self.client_identity())
+        with self.auth_attempt_lock:
+            type(self).auth_attempts.setdefault(key, []).append(time.monotonic())
+
+    def clear_auth_failures(self, scope):
+        with self.auth_attempt_lock:
+            type(self).auth_attempts.pop((scope, self.client_identity()), None)
 
     def cached_gzip_file(self, source, prefix="asset"):
         """Build large gzip responses once instead of recompressing per visitor."""
@@ -335,12 +388,12 @@ class LibraryHandler(SimpleHTTPRequestHandler):
         return bool(item and secrets.compare_digest(item.value, self.admin_token))
 
     def save_event(self, event_type, visitor, detail):
-        with sqlite3.connect(self.db_path) as db:
+        with open_database(self.db_path) as db:
             db.execute("INSERT INTO events(type, visitor, detail, created_at) VALUES(?,?,?,?)", (event_type[:30], visitor[:80], detail[:1000], datetime.now(timezone.utc).isoformat()))
 
     def admin_data(self):
         disk = shutil.disk_usage(self.textbook_root)
-        with sqlite3.connect(self.db_path) as db:
+        with open_database(self.db_path) as db:
             db.row_factory = sqlite3.Row
             totals = {row["type"]: row["count"] for row in db.execute("SELECT type, COUNT(*) count FROM events GROUP BY type")}
             visitors = db.execute("SELECT COUNT(DISTINCT visitor) FROM events WHERE visitor <> ''").fetchone()[0]
@@ -361,7 +414,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             return {"id": 0, "card_type": "reader", "remaining": -1, "expires_at": "", "active": 1}
         token = self.download_session()
         if not token: return None
-        with sqlite3.connect(self.db_path) as db:
+        with open_database(self.db_path) as db:
             db.row_factory = sqlite3.Row
             row = db.execute("SELECT c.id,c.card_type,c.remaining,c.expires_at,c.active FROM download_sessions s JOIN access_cards c ON c.id=s.card_id WHERE s.token=?", (token,)).fetchone()
         if not row or not row["active"]: return None
@@ -374,7 +427,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
         token = self.download_session()
         if not token:
             return None
-        with sqlite3.connect(self.db_path) as db:
+        with open_database(self.db_path) as db:
             db.row_factory = sqlite3.Row
             db.execute("CREATE TABLE IF NOT EXISTS download_reservations(id INTEGER PRIMARY KEY, card_id INTEGER NOT NULL, token TEXT NOT NULL, created_at TEXT NOT NULL)")
             db.execute("BEGIN IMMEDIATE")
@@ -392,7 +445,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
         """Return a reserved use when the server could not finish sending the file."""
         if not reservation:
             return
-        with sqlite3.connect(self.db_path) as db:
+        with open_database(self.db_path) as db:
             db.execute("BEGIN IMMEDIATE")
             pending = db.execute("SELECT card_id FROM download_reservations WHERE id=?", (reservation["reservation_id"],)).fetchone()
             if pending:
@@ -402,14 +455,14 @@ class LibraryHandler(SimpleHTTPRequestHandler):
     def complete_download(self, reservation):
         if not reservation:
             return
-        with sqlite3.connect(self.db_path) as db:
+        with open_database(self.db_path) as db:
             db.execute("DELETE FROM download_reservations WHERE id=?", (reservation["reservation_id"],))
 
     def create_cards(self, count, download_limit=0, card_type="download", months=0):
         now = datetime.now(timezone.utc).isoformat()
         expires_at = (datetime.now(timezone.utc) + timedelta(days=30 * months)).isoformat() if card_type == "reader" else ""
         cards = []
-        with sqlite3.connect(self.db_path) as db:
+        with open_database(self.db_path) as db:
             for _ in range(count):
                 while True:
                     code = "MUMU-" + secrets.token_hex(3).upper() + "-" + secrets.token_hex(2).upper()
@@ -423,7 +476,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
 
     def verify_admin_password(self, password):
         digest = hashlib.sha256(password.encode("utf-8")).hexdigest()
-        with sqlite3.connect(self.db_path) as db:
+        with open_database(self.db_path) as db:
             row = db.execute("SELECT value FROM settings WHERE key='admin_password_hash'").fetchone()
         return bool(row and secrets.compare_digest(row[0], digest))
 
@@ -434,6 +487,9 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 self.send_json(403, {'ok': False}); return
             library_audit.start(type(self), decode_readable_book)
             self.send_json(202, {'ok': True}); return
+        if api_path == "/api/admin/rebuild-catalog":
+            if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
+            self.send_json(200, {"ok": True, "catalogCount": rebuild_catalog(type(self))}); return
         if api_path == "/api/admin/upload":
             if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
             filename = Path(unquote(self.headers.get("X-Filename", ""))).name
@@ -448,6 +504,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             if relative.is_absolute() or not relative.parts or any(part in ("", ".", "..") for part in relative.parts) or len(relative.parts) > 30:
                 self.send_json(400, {"ok": False}); return
             body = self.rfile.read(length)
+            defer_catalog = self.headers.get("X-Defer-Catalog", "") == "1"
             upload_root = self.textbook_root / "管理员上传"
             with self.upload_lock:
                 duplicates = find_duplicate_books(self.textbook_root, filename)
@@ -480,9 +537,9 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                     except OSError:
                         # Keep a readable copy if a stale or protected file cannot be removed.
                         pass
-                catalog_count = rebuild_catalog(type(self))
+                catalog_count = None if defer_catalog else rebuild_catalog(type(self))
             grouped_path = (Path(target_dir.name) / relative).as_posix()
-            self.send_json(200, {"ok": True, "filename": filename, "relativePath": grouped_path, "uploadGroup": target_dir.name, "catalogCount": catalog_count, "replaced": len(replaced_paths), "replacedPaths": replaced_paths}); return
+            self.send_json(200, {"ok": True, "filename": filename, "relativePath": grouped_path, "uploadGroup": target_dir.name, "catalogCount": catalog_count, "catalogDeferred": defer_catalog, "replaced": len(replaced_paths), "replacedPaths": replaced_paths}); return
         if api_path == "/api/admin/announcement-image":
             if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
             filename = Path(unquote(self.headers.get("X-Filename", ""))).name
@@ -527,7 +584,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             body = str(payload.get("body", "")).strip()
             if len(body) < 10:
                 self.send_json(400, {"ok": False}); return
-            with sqlite3.connect(self.db_path) as db:
+            with open_database(self.db_path) as db:
                 db.execute("INSERT INTO reviews(book,title,body,visitor,created_at) VALUES(?,?,?,?,?)", (str(payload.get("book", ""))[:300], str(payload.get("title", ""))[:300], body[:10000], str(payload.get("visitor", ""))[:80], datetime.now(timezone.utc).isoformat()))
             self.save_event("review", str(payload.get("visitor", "")), str(payload.get("book", "")))
             self.send_json(200, {"ok": True}); return
@@ -540,7 +597,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             reply = str(payload.get("reply", "")).strip()
             if review_id < 1 or not reply or len(reply) > 3000:
                 self.send_json(400, {"ok": False, "message": "回复内容需为 1 至 3000 个字"}); return
-            with sqlite3.connect(self.db_path) as db:
+            with open_database(self.db_path) as db:
                 updated = db.execute("UPDATE reviews SET admin_reply=?, replied_at=? WHERE id=?", (reply, datetime.now(timezone.utc).isoformat(), review_id)).rowcount
             if updated != 1:
                 self.send_json(404, {"ok": False, "message": "这条留言已不存在"}); return
@@ -552,7 +609,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             ids = list(dict.fromkeys(int(value) for value in ids if str(value).isdigit()))[:500]
             if not ids: self.send_json(400, {"ok": False, "message": "请先选择留言"}); return
             placeholders = ",".join("?" for _ in ids)
-            with sqlite3.connect(self.db_path) as db:
+            with open_database(self.db_path) as db:
                 deleted = db.execute(f"DELETE FROM reviews WHERE id IN ({placeholders})", ids).rowcount
             self.send_json(200, {"ok": True, "deleted": deleted}); return
         if api_path == "/api/admin/requests/delete":
@@ -562,7 +619,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             ids = list(dict.fromkeys(int(value) for value in ids if str(value).isdigit()))[:500]
             if not ids: self.send_json(400, {"ok": False, "message": "请先选择登记"}); return
             placeholders = ",".join("?" for _ in ids)
-            with sqlite3.connect(self.db_path) as db:
+            with open_database(self.db_path) as db:
                 deleted = db.execute(f"DELETE FROM book_requests WHERE id IN ({placeholders})", ids).rowcount
             self.send_json(200, {"ok": True, "deleted": deleted}); return
         if api_path == "/api/admin/announcement":
@@ -573,7 +630,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             if not title or not body or len(title) > 80 or len(body) > 3000 or (image_url and not image_url.startswith("/assets/announcements/")):
                 self.send_json(400, {"ok": False, "message": "请填写标题、内容，并使用本后台上传的图片"}); return
             announcement = {"id": secrets.token_hex(8), "title": title, "body": body, "imageUrl": image_url, "updatedAt": datetime.now(timezone.utc).isoformat()}
-            with sqlite3.connect(self.db_path) as db:
+            with open_database(self.db_path) as db:
                 row = db.execute("SELECT value FROM settings WHERE key='member_messages'").fetchone()
                 try:
                     messages = json.loads(row[0]) if row else []
@@ -600,7 +657,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             image_url = str(payload.get("imageUrl", "")).strip()
             if not title or not body or len(title) > 80 or len(body) > 3000 or (image_url and not re.fullmatch(r"/api/community/image/[0-9]{14}-[a-f0-9]{8}\.(?:jpe?g|png|webp|gif)", image_url)):
                 self.send_json(400, {"ok": False, "message": "请填写标题、感受，并使用本后台上传的图片"}); return
-            with sqlite3.connect(self.db_path) as db:
+            with open_database(self.db_path) as db:
                 cursor = db.execute("INSERT INTO community_posts(title,body,image_url,created_at) VALUES(?,?,?,?)", (title, body, image_url, datetime.now(timezone.utc).isoformat()))
             self.send_json(200, {"ok": True, "id": cursor.lastrowid}); return
         if api_path == "/api/community/comments":
@@ -615,7 +672,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 self.send_json(400, {"ok": False, "message": "评论需为 1 至 500 个字"}); return
             token = self.download_session()
             visitor = hashlib.sha256(token.encode("utf-8")).hexdigest()[:16] if token else "admin"
-            with sqlite3.connect(self.db_path) as db:
+            with open_database(self.db_path) as db:
                 exists = db.execute("SELECT 1 FROM community_posts WHERE id=?", (post_id,)).fetchone()
                 if not exists: self.send_json(404, {"ok": False, "message": "这条动态已不存在"}); return
                 cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
@@ -628,7 +685,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             try: post_id = int(payload.get("id", 0))
             except (TypeError, ValueError): post_id = 0
             if post_id < 1: self.send_json(400, {"ok": False}); return
-            with sqlite3.connect(self.db_path) as db:
+            with open_database(self.db_path) as db:
                 image_row = db.execute("SELECT image_url FROM community_posts WHERE id=?", (post_id,)).fetchone()
                 db.execute("DELETE FROM community_comments WHERE post_id=?", (post_id,))
                 deleted = db.execute("DELETE FROM community_posts WHERE id=?", (post_id,)).rowcount
@@ -645,7 +702,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             try: comment_id = int(payload.get("id", 0))
             except (TypeError, ValueError): comment_id = 0
             if comment_id < 1: self.send_json(400, {"ok": False}); return
-            with sqlite3.connect(self.db_path) as db:
+            with open_database(self.db_path) as db:
                 deleted = db.execute("DELETE FROM community_comments WHERE id=?", (comment_id,)).rowcount
             self.send_json(200, {"ok": True, "deleted": deleted}); return
         if api_path == "/api/admin/messages/delete":
@@ -654,7 +711,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             if not isinstance(ids, list): self.send_json(400, {"ok": False, "message": "消息列表格式不正确"}); return
             ids = {str(value).strip() for value in ids if str(value).strip()}
             if not ids: self.send_json(400, {"ok": False, "message": "请先选择消息"}); return
-            with sqlite3.connect(self.db_path) as db:
+            with open_database(self.db_path) as db:
                 row = db.execute("SELECT value FROM settings WHERE key='member_messages'").fetchone()
                 try:
                     messages = json.loads(row[0]) if row else []
@@ -673,13 +730,17 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             if not title or not author:
                 self.send_json(400, {"ok": False}); return
             visitor = str(payload.get("visitor", ""))[:80]
-            with sqlite3.connect(self.db_path) as db:
+            with open_database(self.db_path) as db:
                 db.execute("INSERT INTO book_requests(title,author,edition,section,purpose,contact,note,visitor,created_at) VALUES(?,?,?,?,?,?,?,?,?)", (title[:300], author[:300], "", "", "", "", "", visitor, datetime.now(timezone.utc).isoformat()))
             self.save_event("request", visitor, title)
             self.send_json(200, {"ok": True}); return
         if api_path == "/api/admin/login":
+            if self.auth_rate_limited("admin", 8):
+                self.send_json(429, {"ok": False, "message": "尝试次数过多，请 10 分钟后再试", "retryAfter": 600}); return
             if not self.verify_admin_password(str(payload.get("code", ""))):
+                self.record_auth_failure("admin")
                 self.send_json(401, {"ok": False}); return
+            self.clear_auth_failures("admin")
             expires = datetime.now(timezone.utc) + timedelta(hours=24)
             cookie = f"cabin_admin={self.admin_token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400; Expires={format_datetime(expires, usegmt=True)}"
             self.send_json(200, {"ok": True}, cookie); return
@@ -689,7 +750,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             if len(new_password) < 8 or len(new_password) > 128:
                 self.send_json(400, {"ok": False, "message": "密码需要 8 至 128 位"}); return
             digest = hashlib.sha256(new_password.encode("utf-8")).hexdigest()
-            with sqlite3.connect(self.db_path) as db:
+            with open_database(self.db_path) as db:
                 db.execute("INSERT INTO settings(key,value) VALUES('admin_password_hash',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (digest,))
             self.send_json(200, {"ok": True}); return
         if api_path == "/api/admin/cards":
@@ -711,7 +772,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             if not codes:
                 self.send_json(400, {"ok": False, "message": "请先选择卡密"}); return
             placeholders = ",".join("?" for _ in codes)
-            with sqlite3.connect(self.db_path) as db:
+            with open_database(self.db_path) as db:
                 rows = db.execute(f"SELECT id FROM access_cards WHERE code IN ({placeholders})", codes).fetchall()
                 card_ids = [row[0] for row in rows]
                 if card_ids:
@@ -728,7 +789,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             if not codes:
                 self.send_json(400, {"ok": False, "message": "请先选择卡密"}); return
             placeholders = ",".join("?" for _ in codes)
-            with sqlite3.connect(self.db_path) as db:
+            with open_database(self.db_path) as db:
                 card_ids = [row[0] for row in db.execute(f"SELECT id FROM access_cards WHERE code IN ({placeholders}) AND active=1", codes)]
                 if card_ids:
                     id_placeholders = ",".join("?" for _ in card_ids)
@@ -737,13 +798,17 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             self.send_json(200, {"ok": True, "disabled": len(card_ids)}); return
         if api_path != "/api/unlock":
             self.send_error(404); return
+        if self.auth_rate_limited("card", 20):
+            self.send_json(429, {"ok": False, "message": "尝试次数过多，请 10 分钟后再试", "retryAfter": 600}); return
         code = str(payload.get("code", "")).strip()
-        with sqlite3.connect(self.db_path) as db:
+        with open_database(self.db_path) as db:
             db.row_factory = sqlite3.Row
             card = db.execute("SELECT id, card_type, remaining, expires_at FROM access_cards WHERE code=? AND active=1", (code.upper(),)).fetchone()
             expired = bool(card and card["card_type"] == "reader" and card["expires_at"] and card["expires_at"] < datetime.now(timezone.utc).isoformat())
             if not card or expired or (card["card_type"] == "download" and card["remaining"] == 0):
+                self.record_auth_failure("card")
                 self.send_json(401, {"ok": False}); return
+            self.clear_auth_failures("card")
             token = secrets.token_urlsafe(32)
             db.execute("INSERT INTO download_sessions(token,card_id,created_at,last_used_at) VALUES(?,?,?,?)", (token, card["id"], datetime.now(timezone.utc).isoformat(), ""))
         if card["card_type"] == "reader" and card["expires_at"]:
@@ -770,13 +835,13 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             return
         if request_path == "/api/type-requests":
             if not self.access_info(): self.send_json(403, {"ok": False}); return
-            with sqlite3.connect(self.db_path) as db:
+            with open_database(self.db_path) as db:
                 db.row_factory = sqlite3.Row
                 items = [dict(row) for row in db.execute("SELECT id, book, title, body, created_at, admin_reply, replied_at FROM reviews ORDER BY id DESC LIMIT 80")]
             self.send_json(200, {"items": items}); return
         if request_path == "/api/announcement":
             if not self.access_info(): self.send_json(403, {"ok": False}); return
-            with sqlite3.connect(self.db_path) as db:
+            with open_database(self.db_path) as db:
                 row = db.execute("SELECT value FROM settings WHERE key='member_announcement'").fetchone()
             try:
                 announcement = json.loads(row[0]) if row else None
@@ -788,7 +853,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
             elif not self.access_info():
                 self.send_json(403, {"ok": False}); return
-            with sqlite3.connect(self.db_path) as db:
+            with open_database(self.db_path) as db:
                 row = db.execute("SELECT value FROM settings WHERE key='member_messages'").fetchone()
             try:
                 messages = json.loads(row[0]) if row else []
@@ -801,7 +866,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             else:
                 info = self.access_info()
                 if not info or info["card_type"] != "reader": self.send_json(403, {"ok": False}); return
-            with sqlite3.connect(self.db_path) as db:
+            with open_database(self.db_path) as db:
                 db.row_factory = sqlite3.Row
                 posts = [dict(row) for row in db.execute("SELECT id,title,body,image_url,created_at FROM community_posts ORDER BY id DESC LIMIT 40")]
                 post_ids = [post["id"] for post in posts]
@@ -851,7 +916,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
         if request_path == '/api/admin/reading-errors':
             if not self.has_admin_access():
                 self.send_json(403, {'ok': False}); return
-            with sqlite3.connect(self.db_path) as db:
+            with open_database(self.db_path) as db:
                 db.row_factory = sqlite3.Row
                 rows = [dict(row) for row in db.execute("SELECT type,detail,created_at FROM events WHERE type IN ('reading_error','reading_feedback') ORDER BY id DESC LIMIT 100")]
             self.send_json(200, {'items': rows}); return
@@ -1212,7 +1277,7 @@ def main():
     LibraryHandler.online_cache_root.mkdir(parents=True, exist_ok=True)
     LibraryHandler.community_image_root = data_dir / "community-images"
     LibraryHandler.community_image_root.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(LibraryHandler.db_path) as db:
+    with open_database(LibraryHandler.db_path) as db:
         db.execute("CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY, type TEXT, visitor TEXT, detail TEXT, created_at TEXT)")
         db.execute("CREATE TABLE IF NOT EXISTS reviews(id INTEGER PRIMARY KEY, book TEXT, title TEXT, body TEXT, visitor TEXT, created_at TEXT, admin_reply TEXT NOT NULL DEFAULT '', replied_at TEXT NOT NULL DEFAULT '')")
         db.execute("CREATE TABLE IF NOT EXISTS book_requests(id INTEGER PRIMARY KEY, title TEXT, author TEXT, edition TEXT, section TEXT, purpose TEXT, contact TEXT, note TEXT, visitor TEXT, created_at TEXT)")
@@ -1235,6 +1300,9 @@ def main():
             if pending:
                 db.execute("UPDATE access_cards SET remaining=MIN(download_limit, remaining+1), used=MAX(0, used-1) WHERE id=?", (pending[0],))
                 db.execute("DELETE FROM download_reservations WHERE id=?", (reservation_id,))
+        now = datetime.now(timezone.utc)
+        stale_session = (now - timedelta(days=45)).isoformat()
+        db.execute("DELETE FROM download_sessions WHERE created_at < ? OR card_id NOT IN (SELECT id FROM access_cards WHERE active=1 AND (card_type <> 'reader' OR expires_at='' OR expires_at >= ?))", (stale_session, now.isoformat()))
         initial_admin_hash = hashlib.sha256(LibraryHandler.admin_key.encode("utf-8")).hexdigest()
         db.execute("INSERT OR IGNORE INTO settings(key,value) VALUES('admin_password_hash',?)", (initial_admin_hash,))
     threading.Thread(target=watch_textbook, args=(LibraryHandler,), daemon=True).start()

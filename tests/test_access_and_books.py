@@ -96,6 +96,8 @@ class BookAccessIntegrationTests(unittest.TestCase):
         return urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
 
     def setUp(self):
+        LibraryHandler.auth_attempts.clear()
+        LibraryHandler.auth_last_cleanup = 0.0
         (self.site / "assets" / "catalog.json").write_bytes(self.catalog_bytes)
         shutil.rmtree(self.books / "管理员上传", ignore_errors=True)
         with sqlite3.connect(self.db) as db:
@@ -299,6 +301,61 @@ class BookAccessIntegrationTests(unittest.TestCase):
             titles = {item["title"] for item in catalog}
         self.assertIn("book-20", titles)
         self.assertIn("新上传2", catalog[0]["category"])
+
+    def test_admin_batch_upload_can_defer_catalog_until_one_final_rebuild(self):
+        headers = {
+            "Cookie": "cabin_admin=test-admin-token",
+            "X-Filename": urllib.parse.quote("批量新书.txt"),
+            "X-Relative-Path": urllib.parse.quote("批量新书.txt"),
+            "X-Defer-Catalog": "1",
+        }
+        request = urllib.request.Request(self.base + "/api/admin/upload", data="新书正文".encode(), headers=headers)
+        with urllib.request.urlopen(request) as response:
+            result = json.loads(response.read())
+        self.assertTrue(result["catalogDeferred"])
+        self.assertIsNone(result["catalogCount"])
+        rebuild = urllib.request.Request(self.base + "/api/admin/rebuild-catalog", data=b"", headers={"Cookie": "cabin_admin=test-admin-token"})
+        with urllib.request.urlopen(rebuild) as response:
+            self.assertGreater(json.loads(response.read())["catalogCount"], 0)
+
+    def test_admin_login_is_temporarily_limited_after_repeated_failures(self):
+        for _ in range(8):
+            request = urllib.request.Request(
+                self.base + "/api/admin/login",
+                data=json.dumps({"code": "wrong-password"}).encode(),
+                headers={"Content-Type": "application/json"},
+            )
+            with self.assertRaises(urllib.error.HTTPError) as denied:
+                urllib.request.urlopen(request)
+            self.assertEqual(denied.exception.code, 401); denied.exception.close()
+        request = urllib.request.Request(
+            self.base + "/api/admin/login",
+            data=json.dumps({"code": "wrong-password"}).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        with self.assertRaises(urllib.error.HTTPError) as limited:
+            urllib.request.urlopen(request)
+        self.assertEqual(limited.exception.code, 429); limited.exception.close()
+
+    def test_card_entry_is_temporarily_limited_after_repeated_failures(self):
+        headers = {"Content-Type": "application/json", "X-Real-IP": "203.0.113.27"}
+        for _ in range(20):
+            request = urllib.request.Request(
+                self.base + "/api/unlock",
+                data=json.dumps({"code": "NOT-A-CARD"}).encode(),
+                headers=headers,
+            )
+            with self.assertRaises(urllib.error.HTTPError) as denied:
+                urllib.request.urlopen(request)
+            self.assertEqual(denied.exception.code, 401); denied.exception.close()
+        request = urllib.request.Request(
+            self.base + "/api/unlock",
+            data=json.dumps({"code": "NOT-A-CARD"}).encode(),
+            headers=headers,
+        )
+        with self.assertRaises(urllib.error.HTTPError) as limited:
+            urllib.request.urlopen(request)
+        self.assertEqual(limited.exception.code, 429); limited.exception.close()
 
     def test_admin_can_reply_to_type_requests_and_readers_can_see_reply(self):
         request = urllib.request.Request(
