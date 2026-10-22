@@ -57,6 +57,34 @@ class OnlineLibraryTests(unittest.TestCase):
         self.assertLess(text.index("第一回"), text.index("第二回"))
         self.assertEqual(calls, ["parse", "query"])
 
+    def test_search_combines_wikisource_and_public_domain_gutenberg(self):
+        def wiki(_):
+            return {"query": {"search": [{"title": "红楼梦", "snippet": "中文古典小说"}]}}
+        def gutenberg(params):
+            self.assertEqual(params["copyright"], "false")
+            return {"results": [{"id": 123, "title": "三字经", "authors": [{"name": "王应麟"}], "summaries": ["公版作品"]}]}
+        result = online_library.search("古典", self.cache, wiki, gutenberg)
+        self.assertEqual([item["source"] for item in result["items"]], [online_library.SOURCE_NAME, online_library.GUTENBERG_SOURCE])
+        self.assertEqual(result["items"][1]["id"], "gutenberg:123")
+
+    def test_gutenberg_read_uses_safe_plain_text_and_cache(self):
+        def metadata(_):
+            return {"results": [{"id": 123, "title": "三字经", "formats": {"text/plain; charset=utf-8": "https://www.gutenberg.org/files/123/123-0.txt"}}]}
+        page = online_library.read("gutenberg:123", self.cache, gutenberg_requester=metadata, content_requester=lambda _: "人之初，性本善。\n" * 20)
+        self.assertEqual(page["source"], online_library.GUTENBERG_SOURCE)
+        self.assertIn("人之初", page["path"].read_text(encoding="utf-8"))
+        cached = online_library.read("gutenberg:123", self.cache, gutenberg_requester=lambda _: self.fail("fresh cache was not used"))
+        self.assertTrue(cached["cached"])
+
+    def test_search_keeps_results_when_one_source_is_down(self):
+        def wiki_down(_):
+            raise online_library.OnlineLibraryError(503, "wiki down")
+        def gutenberg(_):
+            return {"results": [{"id": 321, "title": "论语", "authors": [], "summaries": []}]}
+        result = online_library.search("论语", self.cache, wiki_down, gutenberg)
+        self.assertTrue(result["partial"])
+        self.assertEqual(result["items"][0]["id"], "gutenberg:321")
+
 
 if __name__ == "__main__":
     unittest.main()
