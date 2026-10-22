@@ -5,7 +5,9 @@
   if (isAdmin) return;
 
   function navLink(nav, href, label, icon, english) {
-    if (!nav || nav.querySelector('a[href="' + href + '"]')) return;
+    if (!nav) return null;
+    var present = nav.querySelector('a[href="' + href + '"]');
+    if (present) return present;
     var homeStyle = nav.classList.contains('gw-nav');
     var link = document.createElement('a');
     link.href = href;
@@ -14,6 +16,22 @@
     link.children[1].textContent = label;
     link.children[2].textContent = english;
     nav.appendChild(link);
+    return link;
+  }
+
+  function unreadMarker(link, endpoint, itemsKey, dateKey, storageKey, destination) {
+    var badge = null;
+    if (link) { badge = document.createElement('span'); badge.className = 'nav-unread-badge'; badge.hidden = true; badge.setAttribute('aria-label', '未读消息'); link.appendChild(badge); }
+    fetch(endpoint, { cache: 'no-store' }).then(function (response) { return response.ok ? response.json() : null; }).then(function (data) {
+      var items = data && Array.isArray(data[itemsKey]) ? data[itemsKey] : [];
+      var newest = items.reduce(function (value, item) { var next = String(item[dateKey] || ''); return next > value ? next : value; }, '');
+      var seen = ''; try { seen = localStorage.getItem(storageKey) || ''; } catch (_) {}
+      var onDestination = location.pathname.endsWith(destination);
+      if (onDestination) { try { if (newest) localStorage.setItem(storageKey, newest); } catch (_) {} return; }
+      var count = items.filter(function (item) { return String(item[dateKey] || '') > seen; }).length;
+      if (count && badge) { badge.textContent = count > 99 ? '99+' : String(count); badge.hidden = false; link.title = count + ' 条未读'; }
+      if (link) link.addEventListener('click', function () { try { if (newest) localStorage.setItem(storageKey, newest); } catch (_) {} });
+    }).catch(function () {});
   }
 
   function showGuide() {
@@ -62,8 +80,10 @@
     if (!access.ok || access.cardType !== 'reader') return;
     var nav = document.querySelector('.gw-nav,.sh-nav');
     navLink(nav, './recent.html', '近期新增', '新', 'Recent');
-    navLink(nav, './messages.html', '木木有话说', '话', 'Messages');
-    navLink(nav, './community.html', '木木小广场', '聊', 'Community');
+    var messagesLink = navLink(nav, './messages.html', '木木有话说', '话', 'Messages');
+    var communityLink = navLink(nav, './community.html', '木木小广场', '聊', 'Community');
+    unreadMarker(messagesLink, '/api/messages', 'items', 'updatedAt', 'xiaomuwu-messages-read-at', '/pages/messages.html');
+    unreadMarker(communityLink, '/api/community', 'items', 'created_at', 'xiaomuwu-community-read-at', '/pages/community.html');
     fetch('/api/announcement', { cache: 'no-store' }).then(function (response) { return response.ok ? response.json() : null; }).then(announcement).catch(function () {});
   }).catch(function () {});
 })();

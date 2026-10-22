@@ -78,6 +78,16 @@ test('member guide, recent books, replies, and announcements are wired into the 
   assert.match(fs.readFileSync('pages/recent.html','utf8'),/最近入库的 50 本书/);
   assert.match(fs.readFileSync('pages/messages.html','utf8'),/木木有话说/);
 });
+test('navigation includes comics, ten-second auto close, click-to-close, and unread counters', () => {
+  const preferences=fs.readFileSync('site-preferences.js','utf8');
+  const memberTools=fs.readFileSync('member-tools.js','utf8');
+  assert.match(preferences,/https:\/\/manwa\.hezidh\.com\//);
+  assert.match(preferences,/timer=setTimeout\(hideSide,10000\)/);
+  assert.match(preferences,/if\(side\.classList\.contains\('is-auto-hidden'\)\)showSide\(\);else hideSide\(\)/);
+  assert.match(memberTools,/nav-unread-badge/);
+  assert.match(memberTools,/xiaomuwu-messages-read-at/);
+  assert.match(memberTools,/xiaomuwu-community-read-at/);
+});
 test('shelf data is mirrored locally so changing a card does not clear it', () => {
   const shelf=fs.readFileSync('shelf-store.js','utf8');
   assert.match(shelf,/xiaomuwu-shelf-backup/);
