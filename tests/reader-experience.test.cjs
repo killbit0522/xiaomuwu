@@ -88,6 +88,13 @@ test('navigation includes comics, ten-second auto close, click-to-close, and unr
   assert.match(memberTools,/xiaomuwu-messages-read-at/);
   assert.match(memberTools,/xiaomuwu-community-read-at/);
 });
+test('online search results can be saved directly and still open in the in-site reader', () => {
+  const online=fs.readFileSync('pages/online-search.html','utf8');
+  assert.match(online,/link\.textContent='站内阅读'/);
+  assert.match(online,/save\.textContent=saved\?'已在书架':'加入书架'/);
+  assert.match(online,/onlineId:item\.id/);
+  assert.match(online,/localStorage\.setItem\('xiaomuwu-shelf'/);
+});
 test('shelf data is mirrored locally so changing a card does not clear it', () => {
   const shelf=fs.readFileSync('shelf-store.js','utf8');
   assert.match(shelf,/xiaomuwu-shelf-backup/);
