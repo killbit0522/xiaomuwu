@@ -87,6 +87,8 @@ test('navigation excludes the unstable comics site and keeps auto-close and unre
   assert.match(memberTools,/nav-unread-badge/);
   assert.match(memberTools,/xiaomuwu-messages-read-at/);
   assert.match(memberTools,/xiaomuwu-community-read-at/);
+  assert.match(preferences,/Number\(data\.expiresInSeconds\)>0&&Number\(data\.expiresInSeconds\)<=86400/);
+  assert.match(preferences,/您的卡密还有一天到期，如需续期找木木哦/);
 });
 test('online search results can be saved directly and still open in the in-site reader', () => {
   const online=fs.readFileSync('pages/online-search.html','utf8');

@@ -953,7 +953,13 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             return
         if request_path == "/api/access":
             info = self.access_info()
-            self.send_json(200, {"ok": bool(info), "cardType": info["card_type"] if info else "", "remaining": info["remaining"] if info else 0, "expiresAt": info["expires_at"] if info else ""}); return
+            expires_in_seconds = None
+            if info and info["card_type"] == "reader" and info["expires_at"]:
+                try:
+                    expires_in_seconds = max(0, int((datetime.fromisoformat(info["expires_at"]) - datetime.now(timezone.utc)).total_seconds()))
+                except (TypeError, ValueError):
+                    expires_in_seconds = None
+            self.send_json(200, {"ok": bool(info), "cardType": info["card_type"] if info else "", "remaining": info["remaining"] if info else 0, "expiresAt": info["expires_at"] if info else "", "expiresInSeconds": expires_in_seconds}); return
         protected_pages = {
             "/pages/search.html", "/pages/request.html",
             "/pages/review.html", "/pages/bookshelf.html", "/pages/reader.html",

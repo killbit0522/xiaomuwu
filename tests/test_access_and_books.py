@@ -68,6 +68,7 @@ class BookAccessIntegrationTests(unittest.TestCase):
             db.execute("INSERT INTO settings(key,value) VALUES('admin_password_hash',?)", (hashlib.sha256(b"test-admin-password").hexdigest(),))
             now = datetime.now(timezone.utc)
             db.execute("INSERT INTO access_cards(code,card_type,download_limit,remaining,used,expires_at,active,created_at) VALUES(?,?,?,?,?,?,?,?)", ("TEST-READER", "reader", 0, 0, 0, (now + timedelta(days=2)).isoformat(), 1, now.isoformat()))
+            db.execute("INSERT INTO access_cards(code,card_type,download_limit,remaining,used,expires_at,active,created_at) VALUES(?,?,?,?,?,?,?,?)", ("TEST-EXPIRING", "reader", 0, 0, 0, (now + timedelta(hours=12)).isoformat(), 1, now.isoformat()))
             db.execute("INSERT INTO access_cards(code,card_type,download_limit,remaining,used,expires_at,active,created_at) VALUES(?,?,?,?,?,?,?,?)", ("TEST-EXPIRED", "reader", 0, 0, 0, (now - timedelta(seconds=1)).isoformat(), 1, now.isoformat()))
             db.execute("INSERT INTO access_cards(code,card_type,download_limit,remaining,used,expires_at,active,created_at) VALUES(?,?,?,?,?,?,?,?)", ("TEST-DOWNLOAD", "download", 2, 2, 0, "", 1, now.isoformat()))
             db.execute("INSERT INTO access_cards(code,card_type,download_limit,remaining,used,expires_at,active,created_at) VALUES(?,?,?,?,?,?,?,?)", ("TEST-DISABLE", "reader", 0, 0, 0, (now + timedelta(days=2)).isoformat(), 1, now.isoformat()))
@@ -211,6 +212,20 @@ class BookAccessIntegrationTests(unittest.TestCase):
         self.assertEqual(access["cardType"], "reader")
         with urllib.request.urlopen(urllib.request.Request(self.base + "/read/utf8.txt", headers=headers)) as response:
             self.assertEqual(response.read().decode("utf-8"), self.samples["utf8.txt"])
+
+    def test_access_reports_server_calculated_expiry_for_current_card(self):
+        regular = self.client()
+        self.unlock(regular, "TEST-READER")
+        with regular.open(self.base + "/api/access") as response:
+            regular_access = json.loads(response.read())
+        self.assertGreater(regular_access["expiresInSeconds"], 86400)
+
+        expiring = self.client()
+        self.unlock(expiring, "TEST-EXPIRING")
+        with expiring.open(self.base + "/api/access") as response:
+            expiring_access = json.loads(response.read())
+        self.assertGreater(expiring_access["expiresInSeconds"], 0)
+        self.assertLessEqual(expiring_access["expiresInSeconds"], 86400)
 
     def test_online_search_is_public_but_online_reading_requires_reader_card(self):
         result = {"query": "红楼梦", "items": [{"id": "红楼梦", "title": "红楼梦"}], "source": "中文维基文库"}
