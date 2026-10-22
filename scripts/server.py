@@ -526,17 +526,17 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 except ValueError:
                     self.send_json(400, {"ok": False}); return
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(body)
+                temporary_upload = target.with_name("." + target.name + ".upload-" + secrets.token_hex(4))
+                temporary_upload.write_bytes(body)
                 replaced_paths = []
                 for duplicate in duplicates:
-                    if duplicate.resolve() == target:
-                        continue
-                    try:
-                        duplicate.unlink()
+                    backup = archive_replaced_book(type(self), duplicate)
+                    if backup is not None:
                         replaced_paths.append(duplicate.relative_to(self.textbook_root).as_posix())
-                    except OSError:
-                        # Keep a readable copy if a stale or protected file cannot be removed.
-                        pass
+                    elif duplicate.resolve() == target:
+                        temporary_upload.unlink(missing_ok=True)
+                        self.send_json(500, {"ok": False, "message": "旧文件暂时无法安全备份，请稍后重试"}); return
+                temporary_upload.replace(target)
                 catalog_count = None if defer_catalog else rebuild_catalog(type(self))
             grouped_path = (Path(target_dir.name) / relative).as_posix()
             self.send_json(200, {"ok": True, "filename": filename, "relativePath": grouped_path, "uploadGroup": target_dir.name, "catalogCount": catalog_count, "catalogDeferred": defer_catalog, "replaced": len(replaced_paths), "replacedPaths": replaced_paths}); return
@@ -1161,31 +1161,34 @@ BOOK_EXTENSIONS = {".txt", ".docx", ".zip", ".rar", ".7z", ".pdf", ".epub", ".mo
 
 
 def normalized_book_title(path):
-    return re.sub(r"(?:\s*[（(]\s*\d+\s*[）)])+$", "", path.stem).strip()
+    title = path.stem.strip()
+    # Windows/browser downloads routinely append (1), （2）, empty brackets or
+    # “副本”.  Remove only these trailing copy markers; meaningful brackets in
+    # the actual title (for example 1V1) must stay intact.
+    copy_suffix = r"(?:\s*(?:[（(]\s*\d*\s*[）)]|[-_ ]?(?:副本|复制|copy)(?:\s*\d+)?))+$"
+    previous = None
+    while title != previous:
+        previous = title
+        title = re.sub(copy_suffix, "", title, flags=re.IGNORECASE).strip()
+    return title
 
 
 def duplicate_title_key(value):
-    """Normalize filenames for replacement matching while ignoring routine labels."""
+    """Return a conservative identity key for true copies of one book.
+
+    Do not use partial/five-character overlap here: it deletes distinct books
+    from series and books whose titles share a common opening phrase.
+    """
     title = normalized_book_title(Path(value)).casefold()
     title = re.sub(r"(?:作者|author)\s*[:：].*$", "", title, flags=re.IGNORECASE)
-    title = re.sub(r"[\[【][^\]】]{0,32}[\]】]", "", title)
+    status = r"(?:完结|已完结|完本|全文(?:完)?|精校版?|校对版?|补档|更新至[^\]】]{1,16}|更\s*\d+)"
+    title = re.sub(r"^(?:\s*[\[【]\s*" + status + r"\s*[\]】]\s*)+", "", title)
+    title = re.sub(r"[丨|].{0,80}(?:作品集|作者合集|爱发电).*$", "", title)
     return re.sub(r"[^\w\u4e00-\u9fff]", "", title)
 
 
 def titles_overlap_enough(left, right):
-    if not left or not right:
-        return False
-    if left == right:
-        return True
-    # The five-character rule is for book titles written with Chinese characters.
-    # Applying it to short ASCII file sequences (for example book-00/book-01)
-    # would make separately numbered uploads replace one another.
-    if not (re.search(r"[\u4e00-\u9fff]", left) or re.search(r"[\u4e00-\u9fff]", right)):
-        return False
-    short, long = (left, right) if len(left) <= len(right) else (right, left)
-    if len(short) < 5:
-        return False
-    return any(short[index:index + 5] in long for index in range(len(short) - 4))
+    return bool(left and right and left == right)
 
 
 def find_duplicate_books(root, filename):
@@ -1198,21 +1201,41 @@ def find_duplicate_books(root, filename):
     return matches
 
 
+def archive_replaced_book(handler, path):
+    """Move a superseded copy out of the live library without destroying it."""
+    try:
+        relative = path.resolve().relative_to(handler.textbook_root.resolve())
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+        destination = handler.replaced_root / stamp / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(path), str(destination))
+        return destination
+    except (OSError, ValueError):
+        return None
+
+
 def rebuild_catalog(handler):
     extensions = BOOK_EXTENSIONS
     with handler.catalog_build_lock:
         try:
             files = [p for p in handler.textbook_root.rglob("*") if p.is_file() and p.suffix.lower() in extensions and not {"novel-library", "node_modules", ".git"}.intersection(p.parts)]
-            items = []
-            seen_books = set()
-            for path in sorted(files, key=lambda item: (bool(re.search(r"[（(]\s*\d+\s*[）)]$", item.stem)), len(item.relative_to(handler.textbook_root).parts), str(item))):
-                relative = path.relative_to(handler.textbook_root).as_posix()
-                stat = path.stat()
-                title = normalized_book_title(path) or path.stem
-                duplicate_key = title.casefold()
-                if duplicate_key in seen_books:
+            newest_by_title = {}
+            for path in files:
+                try:
+                    stat = path.stat()
+                    relative = path.relative_to(handler.textbook_root)
+                except (OSError, ValueError):
                     continue
-                seen_books.add(duplicate_key)
+                key = duplicate_title_key(path.name) or normalized_book_title(path).casefold()
+                copy_marked = bool(re.search(r"(?:[（(]\s*\d*\s*[）)]|副本|复制|copy)\s*$", path.stem, re.IGNORECASE))
+                rank = (stat.st_mtime_ns, not copy_marked, -len(relative.parts), relative.as_posix())
+                current = newest_by_title.get(key)
+                if current is None or rank > current[0]:
+                    newest_by_title[key] = (rank, path, stat)
+            items = []
+            for _, path, stat in newest_by_title.values():
+                relative = path.relative_to(handler.textbook_root).as_posix()
+                title = normalized_book_title(path) or path.stem
                 category_path = Path(relative).parent
                 category = "uncategorized" if str(category_path) == "." else " / ".join(category_path.parts)
                 items.append({"title": title, "category": category, "format": path.suffix.lstrip(".").lower(), "size": stat.st_size, "modifiedAt": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"), "searchablePath": relative})
@@ -1277,6 +1300,8 @@ def main():
     LibraryHandler.online_cache_root.mkdir(parents=True, exist_ok=True)
     LibraryHandler.community_image_root = data_dir / "community-images"
     LibraryHandler.community_image_root.mkdir(parents=True, exist_ok=True)
+    LibraryHandler.replaced_root = data_dir / "replaced-books"
+    LibraryHandler.replaced_root.mkdir(parents=True, exist_ok=True)
     with open_database(LibraryHandler.db_path) as db:
         db.execute("CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY, type TEXT, visitor TEXT, detail TEXT, created_at TEXT)")
         db.execute("CREATE TABLE IF NOT EXISTS reviews(id INTEGER PRIMARY KEY, book TEXT, title TEXT, body TEXT, visitor TEXT, created_at TEXT, admin_reply TEXT NOT NULL DEFAULT '', replied_at TEXT NOT NULL DEFAULT '')")

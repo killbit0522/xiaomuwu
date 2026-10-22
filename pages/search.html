@@ -1057,7 +1057,7 @@ h1, h2, h3, h4 {
             </div>
           </div>
 
-          <div class="sm-filters">
+          <div class="sm-filters" hidden aria-hidden="true">
             <div class="sm-field">
               <label class="sm-label" for="search-section">目录</label>
               <select id="search-section" name="section" class="sm-select">
@@ -1086,7 +1086,7 @@ h1, h2, h3, h4 {
             <button type="button" id="search-reset" class="sm-btn sm-btn-ghost">重置</button>
           </div>
 
-          <p class="sm-hint">支持模糊匹配 · 留空可浏览全部书目</p>
+          <p class="sm-hint">输入书名即可搜索整个本地书库 · 留空可浏览全部书目</p>
           <p id="search-error" class="sm-error" role="alert" hidden>书目载入失败，请稍后刷新。</p>
         </form>
       </section>
@@ -1151,7 +1151,6 @@ h1, h2, h3, h4 {
   var filtered = [];
   var page = 1;
   var pageSize = 20;
-  var lastCatalogSignature = '';
   var accessKey = 'cabin-download-unlocked';
   var keyDialog = document.getElementById('download-key-dialog');
   var keyForm = document.getElementById('download-key-form');
@@ -1268,14 +1267,22 @@ h1, h2, h3, h4 {
     previous.addEventListener('click', function () { page -= 1; render(); });
     var label = document.createElement('span');
     label.className = 'sm-summary';
-    label.textContent = page + ' / ' + pages;
+    label.textContent = '第 ' + page + ' / ' + pages + ' 页';
+    var jump = document.createElement('input');
+    jump.type = 'number';
+    jump.min = '1';
+    jump.max = String(pages);
+    jump.value = String(page);
+    jump.setAttribute('aria-label', '跳转页码');
+    jump.style.cssText = 'width:4.6rem;padding:.45rem .55rem;border:1px solid var(--zhaowen-line);background:transparent;color:inherit';
+    jump.addEventListener('change', function(){var wanted=Math.max(1,Math.min(pages,Number(jump.value)||1));page=wanted;render();});
     var next = document.createElement('button');
     next.type = 'button';
     next.className = 'sm-btn sm-btn-ghost';
     next.textContent = '下一页';
     next.disabled = page === pages;
     next.addEventListener('click', function () { page += 1; render(); });
-    pagerEl.append(previous, label, next);
+    pagerEl.append(previous, label, jump, next);
   }
 
   function render() {
@@ -1284,7 +1291,7 @@ h1, h2, h3, h4 {
     filtered.slice(start, start + pageSize).forEach(function (book) { cardsEl.appendChild(renderCard(book)); });
     titleEl.textContent = keyword.value.trim() ? '检索结果 · ' + keyword.value.trim() : '全部书目';
     statusEl.textContent = '找到 ' + filtered.length + ' 本 · 共收录 ' + books.length + ' 个文件';
-    summaryEl.textContent = '目录：' + section.value + ' · 格式：' + format.value;
+    summaryEl.textContent = keyword.value.trim() ? '已搜索全部目录和全部格式 · 每页显示 ' + pageSize + ' 本' : '全部书目 · 每页显示 ' + pageSize + ' 本';
     summaryEl.hidden = false;
     listEl.hidden = filtered.length === 0;
     emptyEl.hidden = filtered.length !== 0;
@@ -1299,16 +1306,21 @@ h1, h2, h3, h4 {
   }
 
   function applyFilters() {
-    var query = normalizeSearch(keyword.value.trim());
-    function matchesQuery(book) { return !query || book._searchNormalized.indexOf(query) >= 0; }
+    var rawQuery = keyword.value.trim();
+    var terms = rawQuery.split(/\s+/).map(normalizeSearch).filter(Boolean);
+    function matchesQuery(book) { return !terms.length || terms.every(function(term){return book._searchNormalized.indexOf(term) >= 0;}); }
     filtered = books.filter(function (book) {
       var category = book._category, inSection = section.value === '全部' || category === section.value || category.indexOf(section.value + ' /') === 0;
       var inFormat = format.value === '不限' || formatGroup(book.format) === format.value;
-      return inSection && inFormat && matchesQuery(book);
+      // A typed title search always covers the complete local library.  The
+      // directory/format controls are useful only while browsing without text.
+      return matchesQuery(book) && (terms.length || (inSection && inFormat));
     });
-    if (query && filtered.length === 0) {
-      filtered = books.filter(matchesQuery);
-      if (filtered.length) { section.value = '全部'; format.value = '不限'; }
+    if (terms.length) {
+      filtered.sort(function(a,b){
+        function score(book){var whole=normalizeSearch(rawQuery);if(book._titleNormalized===whole)return 0;if(book._titleNormalized.indexOf(whole)===0)return 1;if(book._titleNormalized.indexOf(whole)>=0)return 2;return 3;}
+        return score(a)-score(b) || String(a.title).localeCompare(String(b.title), 'zh-CN') || String(a.searchablePath).localeCompare(String(b.searchablePath), 'zh-CN');
+      });
     }
     page = 1;
     render();
@@ -1336,17 +1348,14 @@ h1, h2, h3, h4 {
 
   function loadCatalog(quiet, attempt) {
     attempt = attempt || 0;
-    fetch('../assets/catalog.json', { cache: 'default', credentials: 'same-origin' })
+    fetch('../assets/catalog.json', { cache: 'no-cache', credentials: 'same-origin' })
       .then(function (response) {
         if (response.redirected && response.url.indexOf('/pages/home.html') >= 0) { location.href = '/pages/home.html?card=required'; throw new Error('access'); }
         if (!response.ok || !(response.headers.get('content-type') || '').includes('application/json')) { throw new Error('catalog'); }
         return response.json();
       })
       .then(function (data) {
-        var signature = data.length + ':' + (data[0] ? data[0].searchablePath + ':' + data[0].modifiedAt : 'empty') + ':' + (data[data.length - 1] ? data[data.length - 1].searchablePath + ':' + data[data.length - 1].modifiedAt : 'empty');
-        if (signature === lastCatalogSignature) { return; }
-        lastCatalogSignature = signature;
-        books = data.map(function(book){book._category=searchCategory(book);book._searchNormalized=normalizeSearch((book.title||'')+' '+(book.searchablePath||''));return book});
+        books = data.map(function(book){book._category=searchCategory(book);book._titleNormalized=normalizeSearch(book.title||'');book._pathNormalized=normalizeSearch(book.searchablePath||'');book._searchNormalized=book._titleNormalized+book._pathNormalized;return book});
         rebuildSections();
         errorEl.hidden = true;
         applyFilters();

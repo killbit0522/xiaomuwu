@@ -2,6 +2,7 @@ import http.cookiejar
 import hashlib
 import gzip
 import json
+import os
 import shutil
 import sqlite3
 import tempfile
@@ -79,6 +80,8 @@ class BookAccessIntegrationTests(unittest.TestCase):
         LibraryHandler.read_cache_root.mkdir()
         LibraryHandler.online_cache_root = cls.data / "online-cache"
         LibraryHandler.online_cache_root.mkdir()
+        LibraryHandler.replaced_root = cls.data / "replaced-books"
+        LibraryHandler.replaced_root.mkdir()
         cls.httpd = ThreadingHTTPServer(("127.0.0.1", 0), LibraryHandler)
         cls.base = f"http://127.0.0.1:{cls.httpd.server_port}"
         cls.thread = threading.Thread(target=cls.httpd.serve_forever, daemon=True)
@@ -277,6 +280,40 @@ class BookAccessIntegrationTests(unittest.TestCase):
                 self.assertEqual(result["replaced"], 1)
             else:
                 self.assertEqual(result["replaced"], 0)
+        self.assertEqual((self.books / "管理员上传" / "新上传1" / "重复书（1）.txt").read_bytes(), b"book")
+        self.assertTrue(any(path.name == "重复书.txt" for path in LibraryHandler.replaced_root.rglob("*")))
+
+    def test_upload_does_not_replace_a_different_book_with_five_shared_characters(self):
+        headers = {"Cookie": "cabin_admin=test-admin-token"}
+        names = ("霸总爱上小秘书.txt", "霸总爱上小秘书的姐姐.txt")
+        for name in names:
+            request = urllib.request.Request(
+                self.base + "/api/admin/upload",
+                data=name.encode("utf-8"),
+                headers={**headers, "X-Filename": urllib.parse.quote(name), "X-Relative-Path": urllib.parse.quote(name)},
+            )
+            with urllib.request.urlopen(request) as response:
+                self.assertEqual(json.loads(response.read())["replaced"], 0)
+        with urllib.request.urlopen(self.base + "/assets/catalog.json") as response:
+            titles = {item["title"] for item in json.loads(response.read())}
+        self.assertTrue(set(name[:-4] for name in names).issubset(titles))
+
+    def test_catalog_keeps_the_newest_copy_when_legacy_duplicates_remain(self):
+        old_copy = self.books / "管理员上传" / "旧目录" / "同一本书.txt"
+        new_copy = self.books / "管理员上传" / "新目录" / "同一本书（2）.txt"
+        old_copy.parent.mkdir(parents=True)
+        new_copy.parent.mkdir(parents=True)
+        old_copy.write_text("旧正文", encoding="utf-8")
+        new_copy.write_text("新正文", encoding="utf-8")
+        os.utime(old_copy, (100, 100))
+        os.utime(new_copy, (200, 200))
+        request = urllib.request.Request(self.base + "/api/admin/rebuild-catalog", data=b"", headers={"Cookie": "cabin_admin=test-admin-token"})
+        with urllib.request.urlopen(request) as response:
+            self.assertTrue(json.loads(response.read())["ok"])
+        with urllib.request.urlopen(self.base + "/assets/catalog.json") as response:
+            matches = [item for item in json.loads(response.read()) if item["title"] == "同一本书"]
+        self.assertEqual(len(matches), 1)
+        self.assertTrue(matches[0]["searchablePath"].endswith("同一本书（2）.txt"))
 
     def test_admin_uploads_are_grouped_twenty_books_per_new_folder(self):
         for index in range(21):

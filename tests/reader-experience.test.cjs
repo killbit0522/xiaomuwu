@@ -44,10 +44,16 @@ test('new-book notice uses the update endpoint and limits the message to two boo
   assert.match(preferences,/data\.items\.slice\(0,2\)/);
   assert.match(preferences,/xiaomuwu-last-update-notice/);
 });
-test('catalog and search always request a fresh book index after uploads', () => {
+test('catalog and search always revalidate the book index after uploads', () => {
   for (const page of ['pages/catalog.html','pages/search.html']) {
-    assert.match(fs.readFileSync(page,'utf8'), /catalog\.json', \{ cache: 'default'/);
+    assert.match(fs.readFileSync(page,'utf8'), /catalog\.json', \{ cache: 'no-cache'/);
   }
+});
+test('typed search covers every directory and supports direct page jumps', () => {
+  const search=fs.readFileSync('pages/search.html','utf8');
+  assert.match(search,/return matchesQuery\(book\) && \(terms\.length \|\| \(inSection && inFormat\)\)/);
+  assert.match(search,/aria-label', '跳转页码'/);
+  assert.match(search,/sm-filters" hidden/);
 });
 test('catalog categories support collapse and half-screen browsing', () => {
   const catalog=fs.readFileSync('pages/catalog.html','utf8');
