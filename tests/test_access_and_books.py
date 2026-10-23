@@ -99,6 +99,13 @@ class BookAccessIntegrationTests(unittest.TestCase):
         jar = http.cookiejar.CookieJar()
         return urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
 
+    def no_redirect_client(self, client):
+        class StopRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, req, fp, code, msg, headers, newurl):
+                return None
+        cookiejar = next(handler.cookiejar for handler in client.handlers if isinstance(handler, urllib.request.HTTPCookieProcessor))
+        return urllib.request.build_opener(StopRedirect(), urllib.request.HTTPCookieProcessor(cookiejar))
+
     def setUp(self):
         LibraryHandler.auth_attempts.clear()
         LibraryHandler.auth_last_cleanup = 0.0
@@ -226,6 +233,30 @@ class BookAccessIntegrationTests(unittest.TestCase):
             expiring_access = json.loads(response.read())
         self.assertGreater(expiring_access["expiresInSeconds"], 0)
         self.assertLessEqual(expiring_access["expiresInSeconds"], 86400)
+
+    def test_external_ao3_and_comics_redirects_require_an_active_card(self):
+        destinations = {
+            "/go/ao3": "https://aoya.moe/works/search?page=1&view_adult=true&work_search%5Bquery%5D=%E7%A6%85%E9%99%A2%E7%9B%B4%E5%93%89",
+            "/go/comics": "https://appgu.cc/rank/",
+        }
+        guest = self.no_redirect_client(self.client())
+        for route in destinations:
+            with self.subTest(route=route), self.assertRaises(urllib.error.HTTPError) as denied:
+                guest.open(self.base + route)
+            self.assertEqual(denied.exception.code, 302)
+            self.assertEqual(denied.exception.headers.get("Location"), "/pages/home.html?card=required")
+            denied.exception.close()
+
+        member = self.client()
+        self.unlock(member, "TEST-READER")
+        gated = self.no_redirect_client(member)
+        for route, destination in destinations.items():
+            with self.subTest(route=route), self.assertRaises(urllib.error.HTTPError) as allowed:
+                gated.open(self.base + route)
+            self.assertEqual(allowed.exception.code, 302)
+            self.assertEqual(allowed.exception.headers.get("Location"), destination)
+            self.assertEqual(allowed.exception.headers.get("Cache-Control"), "no-store")
+            allowed.exception.close()
 
     def test_online_search_is_public_but_online_reading_requires_reader_card(self):
         result = {"query": "红楼梦", "items": [{"id": "红楼梦", "title": "红楼梦"}], "source": "中文维基文库"}

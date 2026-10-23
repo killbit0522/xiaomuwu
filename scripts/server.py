@@ -1093,6 +1093,23 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 except (BrokenPipeError, ConnectionResetError):
                     pass
             return
+        external_member_destinations = {
+            "/go/ao3": "https://aoya.moe/works/search?page=1&view_adult=true&work_search%5Bquery%5D=%E7%A6%85%E9%99%A2%E7%9B%B4%E5%93%89",
+            "/go/comics": "https://appgu.cc/rank/",
+        }
+        if request_path in external_member_destinations:
+            if not self.access_info():
+                self.send_response(302)
+                self.send_header("Location", "/pages/home.html?card=required")
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                return
+            self.send_response(302)
+            self.send_header("Location", external_member_destinations[request_path])
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.end_headers()
+            return
         if request_path == "/go/read":
             if not self.access_info():
                 self.send_response(302)

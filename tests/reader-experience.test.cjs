@@ -89,6 +89,8 @@ test('navigation excludes the unstable comics site and keeps auto-close and unre
   assert.doesNotMatch(preferences,/manwa\.hezidh\.com/);
   assert.match(preferences,/function addMemberExternalLinks\(\)/);
   assert.match(preferences,/if\(data\.ok\)addMemberExternalLinks\(\)/);
+  assert.match(preferences,/ao3\.href='\/go\/ao3'/);
+  assert.match(preferences,/link\.href='\/go\/comics'/);
   assert.ok(preferences.indexOf("primaryNav.insertBefore(ao3,accountLinks)") < preferences.indexOf("primaryNav.insertBefore(comics,accountLinks)"), 'AO3 should sit immediately before the comics section');
   assert.match(preferencesCss,/\.gw-sidebar,\.sh-side\{[^}]*background-color:color-mix/);
   assert.match(preferencesCss,/\.gw-sidebar-bg,\.sh-side-bg\{[^}]*opacity:\.28!important/);
