@@ -487,6 +487,12 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 self.send_json(403, {'ok': False}); return
             library_audit.start(type(self), decode_readable_book)
             self.send_json(202, {'ok': True}); return
+        if api_path == '/api/admin/audit/repair':
+            if not self.has_admin_access():
+                self.send_json(403, {'ok': False}); return
+            result = library_audit.repair(type(self), rebuild_catalog)
+            library_audit.start(type(self), decode_readable_book)
+            self.send_json(200, result); return
         if api_path == "/api/admin/rebuild-catalog":
             if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
             self.send_json(200, {"ok": True, "catalogCount": rebuild_catalog(type(self))}); return

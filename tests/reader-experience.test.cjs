@@ -18,6 +18,10 @@ test('tap zones and chapter controls are present in the reader', () => {
   assert.match(html, /id="chapter-next"[^>]*>下一章/);
   assert.match(source, /document\.addEventListener\('pointerup',finishTap,true\)/);
   assert.match(source, /if\(y>=\.66\)\{stepRead\(1\);return\}/);
+  assert.match(source, /now-downAt>420/);
+  assert.match(source, /now-lastScrollAt<140/);
+  assert.match(source, /scrollFrame=requestAnimationFrame/);
+  assert.doesNotMatch(source, /scrollBy\(\{top:direction\*Math\.max\(280,innerHeight\*\.76\),behavior:'smooth'\}\)/);
   assert.match(source, /if\(x>\.22&&x<\.78&&y>\.20&&y<\.80\)\{controlsPanel\.classList\.toggle\('open'\);return\}/);
   assert.match(source, /function stepChapter\(direction\)/);
 });

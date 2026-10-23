@@ -26,5 +26,26 @@ class AuditTests(unittest.TestCase):
             result = library_audit.report(handler)
             self.assertFalse(result['running'])
             self.assertEqual(result['checked'],3)
+            self.assertEqual(result['errors'], 2)
+            self.assertEqual(result['warnings'], 0)
             self.assertEqual({issue['path'] for issue in result['issues']},{'empty.txt','missing.txt'})
+            self.assertTrue(all(issue['suggestion'] for issue in result['issues']))
             self.assertEqual((root/'good.txt').read_text(encoding='utf-8'),'可读正文')
+
+    def test_safe_repair_only_removes_temporary_cache_and_rebuilds_catalog(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cache = root / '.read-cache'
+            cache.mkdir()
+            temporary = cache / 'unfinished.tmp'
+            completed = cache / 'completed.txt'
+            book = root / 'book.txt'
+            temporary.write_text('partial', encoding='utf-8')
+            completed.write_text('cached', encoding='utf-8')
+            book.write_text('original book', encoding='utf-8')
+            handler = SimpleNamespace(read_cache_root=cache)
+            result = library_audit.repair(handler, lambda _: 1)
+            self.assertTrue(result['ok'])
+            self.assertFalse(temporary.exists())
+            self.assertTrue(completed.exists())
+            self.assertEqual(book.read_text(encoding='utf-8'), 'original book')
