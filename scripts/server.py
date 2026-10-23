@@ -1139,7 +1139,9 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 except (OSError, ValueError) as error:
                     self.send_error(422, str(error))
                     return
-                content_type = "text/plain; charset=utf-8"
+                # Keep the .txt extension and UTF-8 bytes, but tell mobile browsers
+                # this is a file attachment so they do not render it as a reader page.
+                content_type = "application/octet-stream"
             else:
                 body = None
                 content_type = mimetypes.guess_type(source.name)[0] or "application/octet-stream"

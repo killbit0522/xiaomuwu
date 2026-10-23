@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const html = fs.readFileSync('pages/reader.html', 'utf8');
 const source = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 const save = source.slice(source.indexOf('function save('), source.indexOf('function keepSettings'));
-const loader = source.slice(source.indexOf('async function loadBook('), source.indexOf("if(format==='pdf'){status.hidden"));
+const loader = source.slice(source.indexOf('async function loadBook('), source.indexOf("}fetch('/api/access'") + 1);
 test('all changed browser scripts parse', () => {
   new vm.Script(source);
   for (const file of ['reading-support.js','recent-reading.js','site-preferences.js','shelf-store.js','member-tools.js','type-requests.js','admin-community.js','reader-stability.js']) new vm.Script(fs.readFileSync(file,'utf8'));
@@ -41,6 +41,11 @@ test('reader offers stable in-book search from the settings panel', () => {
   assert.match(html, /id="search-next"/);
   assert.match(source, /function findText\(\)/);
   assert.match(source, /function jumpText\(i,offset\)/);
+});
+test('reader explains wrong card type before requesting protected text', () => {
+  assert.match(source, /fetch\('\/api\/access',\{cache:'no-store'\}\)/);
+  assert.match(source, /access\.cardType!=='reader'/);
+  assert.match(source, /当前登录的是下载卡，只能下载本地书/);
 });
 test('new-book notice uses the update endpoint and limits the message to two books', () => {
   const preferences=fs.readFileSync('site-preferences.js','utf8');
@@ -109,6 +114,13 @@ test('online search results can be saved directly and still open in the in-site 
   assert.match(online,/onlineId:item\.id/);
   assert.match(online,/p:onlinePath\(item\)/);
   assert.match(online,/localStorage\.setItem\('xiaomuwu-shelf'/);
+  assert.match(online,/render\(local\.items\|\|\[\],\[\],\{searching:true\}\)/);
+  assert.match(online,/error\.name==='AbortError'\)throw error/);
+});
+test('home gate identifies the active card type and remaining downloads', () => {
+  const home=fs.readFileSync('pages/home.html','utf8');
+  assert.match(home,/下载卡 · 剩余 /);
+  assert.match(home,/阅读卡 · 已验证/);
 });
 test('shelf data is mirrored locally so changing a card does not clear it', () => {
   const shelf=fs.readFileSync('shelf-store.js','utf8');

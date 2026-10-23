@@ -199,6 +199,9 @@ class BookAccessIntegrationTests(unittest.TestCase):
         self.unlock(client, "TEST-DOWNLOAD")
         with client.open(self.base + "/books/gb18030.txt") as first:
             body = first.read()
+            self.assertEqual(first.headers.get_content_type(), "application/octet-stream")
+            self.assertIn("attachment", first.headers.get("Content-Disposition", ""))
+            self.assertIn(".txt", first.headers.get("Content-Disposition", ""))
         self.assertTrue(body.startswith(b"\xef\xbb\xbf"))
         self.assertEqual(body[3:].decode("utf-8"), self.samples["gb18030.txt"])
         with client.open(self.base + "/books/sample.pdf") as second:
@@ -210,6 +213,26 @@ class BookAccessIntegrationTests(unittest.TestCase):
         with sqlite3.connect(self.db) as db:
             remaining, used = db.execute("SELECT remaining,used FROM access_cards WHERE code='TEST-DOWNLOAD'").fetchone()
         self.assertEqual((remaining, used), (0, 2))
+
+    def test_reader_and_download_cards_cannot_be_mistaken_for_each_other(self):
+        reader = self.client()
+        self.unlock(reader, "TEST-READER")
+        with self.assertRaises(urllib.error.HTTPError) as denied_download:
+            reader.open(self.base + "/books/utf8.txt")
+        self.assertEqual(denied_download.exception.code, 403)
+        denied_download.exception.close()
+
+        with sqlite3.connect(self.db) as db:
+            db.execute(
+                "INSERT OR REPLACE INTO access_cards(code,card_type,download_limit,remaining,used,expires_at,active,created_at) VALUES(?,?,?,?,?,?,?,?)",
+                ("TEST-CROSS-DOWNLOAD", "download", 1, 1, 0, "", 1, datetime.now(timezone.utc).isoformat()),
+            )
+        downloader = self.client()
+        self.unlock(downloader, "TEST-CROSS-DOWNLOAD")
+        with self.assertRaises(urllib.error.HTTPError) as denied_reader:
+            downloader.open(self.base + "/read/utf8.txt")
+        self.assertEqual(denied_reader.exception.code, 403)
+        denied_reader.exception.close()
 
     def test_admin_can_enter_and_read_without_reader_card(self):
         headers = {"Cookie": "cabin_admin=test-admin-token"}

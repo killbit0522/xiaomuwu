@@ -1983,6 +1983,7 @@ h1, h2, h3, h4 {
   var TARGET_URL = './search.html';
   var isOpen = false;
   var isEntered = false;
+  var activeCard = null;
   var lastFocus = null;
   var closeTimer = null;
   var shakeTimer = null;
@@ -2013,9 +2014,17 @@ h1, h2, h3, h4 {
     }
   }
 
-  function applyEnteredUI(entered) {
-    if (openLabel) { openLabel.textContent = entered ? '已入内' : DEFAULT_LABEL; }
+  function applyEnteredUI(entered, access) {
+    if (access) { activeCard = access; }
+    var label = activeCard && activeCard.cardType === 'download'
+      ? '下载卡 · 剩余 ' + activeCard.remaining + ' 次'
+      : activeCard && activeCard.cardType === 'reader' ? '阅读卡 · 已验证' : '已入内';
+    if (openLabel) { openLabel.textContent = entered ? label : DEFAULT_LABEL; }
     openBtn.classList.toggle('is-entered', entered);
+    var successTitle = document.getElementById('gw-modal-success-title');
+    var successNote = successPane.querySelector('.gw-modal-success-note');
+    if (successTitle && entered) { successTitle.textContent = activeCard && activeCard.cardType === 'download' ? '下载卡已验证' : '阅读卡已验证'; }
+    if (successNote && entered) { successNote.textContent = activeCard && activeCard.cardType === 'download' ? '可下载本地书；剩余 ' + activeCard.remaining + ' 次。此卡不能进入在线阅读器。' : '可在线阅读并加入书架；此卡不能下载本地文件。'; }
   }
 
   /* ---------------- 状态复位 ---------------- */
@@ -2139,9 +2148,9 @@ h1, h2, h3, h4 {
 
     fetch('/api/unlock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: code }) })
       .then(function (response) { if (!response.ok) { throw new Error('invalid'); } return response.json(); })
-      .then(function () {
-        isEntered = true; writeEnteredFlag(); clearError(); showSuccessPane();
-        if (doneBtn) { doneBtn.focus(); } applyEnteredUI(true);
+      .then(function (data) {
+        activeCard = data; isEntered = true; writeEnteredFlag(); clearError(); showSuccessPane();
+        if (doneBtn) { doneBtn.focus(); } applyEnteredUI(true, data);
       })
       .catch(function () {
         showError(); panel.classList.remove('is-shake'); void panel.offsetWidth; panel.classList.add('is-shake');
@@ -2161,7 +2170,7 @@ h1, h2, h3, h4 {
   if(cardRequired){
     clearEnteredFlag(); isEntered=false; applyEnteredUI(false); window.setTimeout(openModal,80);
   }else{
-    fetch('/api/access').then(function(r){return r.json()}).then(function(a){isEntered=!!a.ok;if(isEntered)writeEnteredFlag();else clearEnteredFlag();applyEnteredUI(isEntered)}).catch(function(){});
+    fetch('/api/access',{cache:'no-store'}).then(function(r){return r.json()}).then(function(a){isEntered=!!a.ok;if(isEntered)writeEnteredFlag();else clearEnteredFlag();applyEnteredUI(isEntered,a.ok?a:null)}).catch(function(){});
   }
 
   /* ---------------- 键盘：Esc 关闭 + Tab 收束 ---------------- */
