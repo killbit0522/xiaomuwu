@@ -1,0 +1,8 @@
+(function(){
+ var dashboard=document.getElementById('dashboard');if(!dashboard)return;
+ var panel=document.createElement('section');panel.className='panel';
+ var details=document.createElement('details'),heading=document.createElement('summary');heading.textContent='替换记录与恢复';details.appendChild(heading);
+ var refresh=document.createElement('button');refresh.type='button';refresh.textContent='读取最近200条替换记录';
+ var list=document.createElement('div');list.className='health-list';details.append(refresh,list);panel.appendChild(details);dashboard.appendChild(panel);
+ refresh.onclick=async function(){refresh.disabled=true;list.textContent='读取中…';try{var response=await fetch('/api/admin/replacements');if(!response.ok)throw Error();var items=(await response.json()).items;list.replaceChildren();if(!items.length)list.textContent='暂无替换记录';items.forEach(function(item){var row=document.createElement('article');row.className='item';var title=document.createElement('p');title.textContent=item.original+' · '+item.time;var restore=document.createElement('button');restore.type='button';restore.textContent='恢复这个版本';restore.onclick=async function(){if(!confirm('恢复 '+item.title+'？当前同路径文件会先备份，恢复后目录将更新。'))return;restore.disabled=true;try{var result=await fetch('/api/admin/replacements/restore',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:item.id})});if(!result.ok)throw Error();restore.textContent='已恢复'}catch(e){restore.textContent='恢复失败，点击重试';restore.disabled=false}};row.append(title,restore);list.appendChild(row)})}catch(e){list.textContent='读取失败，请重新登录后台后重试。'}finally{refresh.disabled=false}};
+})();

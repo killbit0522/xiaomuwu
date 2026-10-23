@@ -34,7 +34,8 @@ document.getElementById('disable-selected-cards').onclick=function(){var button=
 document.getElementById('delete-selected-cards').onclick=function(){var button=this,message=document.getElementById('card-action-message'),codes=selectedCodes(false);if(!codes.length){message.textContent='请先勾选已过期、已用完或已停用的卡密。';return}if(!confirm('只会删除其中已经失效的卡密，确定继续吗？'))return;button.disabled=true;fetch('/api/admin/cards/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({codes:codes})}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(data){message.textContent='已删除 '+data.deleted+' 张失效卡密；仍有效的卡未删除。';load()}).catch(function(){message.textContent='删除失败，请刷新页面后重试。'}).finally(function(){button.disabled=false})};
 document.getElementById('download-card-form').onsubmit=function(e){e.preventDefault();createCards({cardType:'download',count:Number(document.getElementById('download-card-count').value),downloadLimit:Number(document.getElementById('card-limit').value)},'download','下载卡')};
 document.getElementById('reader-card-form').onsubmit=function(e){e.preventDefault();createCards({cardType:'reader',count:Number(document.getElementById('reader-card-count').value),months:Number(document.getElementById('reader-card-months').value)},'reader','阅读卡')};
-var uploadBusy=false;
+var uploadBusy=false,failedUploads=[];
+var retryUploads=document.createElement('button');retryUploads.type='button';retryUploads.textContent='仅重传失败文件';retryUploads.hidden=true;document.getElementById('upload-message').after(retryUploads);retryUploads.onclick=function(){uploadSelected(failedUploads.slice())};
 async function uploadSelected(files){
  var message=document.getElementById('upload-message'),list=Array.from(files||[]);
  if(uploadBusy){return}if(!list.length){message.textContent='请先选择文件或文件夹。';return}
@@ -51,16 +52,21 @@ async function uploadSelected(files){
   }
  }
  try{
+  var preview=await fetch('/api/admin/upload-preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({names:list.map(function(file){return file.name})})});
+  if(!preview.ok)throw new Error('重复预览失败');
+  var matches=(await preview.json()).items.filter(function(item){return item.matches.length});
+  if(matches.length&&!confirm('以下同名书将替换旧版（旧版可在替换记录恢复）：\n'+matches.map(function(item){return item.name+' → '+item.matches.join('、')}).join('\n')+'\n是否继续上传？')){message.textContent='已取消上传。';return}
+  failedUploads=[];retryUploads.hidden=true;
   for(var file of list){
    if(!/\.(txt|docx|zip|rar|7z|pdf|epub|mobi)$/i.test(file.name)||!file.size||file.size>104857600){skipped++;continue}
    message.textContent='正在上传 '+(completed+failed.length+1)+' / '+list.length+'：'+file.name;
-   try{var data=await send(file);completed++;replaced+=Number(data.replaced)||0}catch(error){failed.push((file.webkitRelativePath||file.name)+'（'+error.message+'）')}
+   try{var data=await send(file);completed++;replaced+=Number(data.replaced)||0}catch(error){failedUploads.push(file);failed.push((file.webkitRelativePath||file.name)+'（'+error.message+'）')}
   }
   var result=await fetch('/api/admin/rebuild-catalog',{method:'POST'});
   message.textContent='成功 '+completed+' 本，替换 '+replaced+' 本，跳过空文件/不支持格式/超过100MB '+skipped+' 个。'+(result.ok?'目录已更新。':'目录更新失败，请点击安全修复。')+(failed.length?'上传失败：'+failed.join('；'):'');
   load();
  }catch(error){message.textContent='已上传 '+completed+' 本；目录刷新暂时失败，请点击安全修复。'}
- finally{uploadBusy=false;buttons.forEach(function(b){b.disabled=false})}
+ finally{uploadBusy=false;retryUploads.hidden=!failedUploads.length;buttons.forEach(function(b){b.disabled=false})}
 }
 document.getElementById('upload-form').onsubmit=function(e){e.preventDefault();uploadSelected(document.getElementById('upload-file').files)};
 document.getElementById('folder-upload-form').onsubmit=function(e){e.preventDefault();uploadSelected(document.getElementById('upload-folder').files)};

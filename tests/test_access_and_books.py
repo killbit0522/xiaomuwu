@@ -330,6 +330,32 @@ class BookAccessIntegrationTests(unittest.TestCase):
             urllib.request.urlopen(urllib.request.Request(self.base + '/api/admin/upload', data=body, headers=headers))
         self.assertEqual(error.exception.code, 400)
 
+    def test_replacement_restore_is_admin_only_and_preserves_current_version(self):
+        headers={'Cookie': 'cabin_admin=test-admin-token', 'Content-Type': 'application/json'}
+        original=self.books / 'restore-test.txt'
+        original.write_text('current', encoding='utf-8')
+        backup=LibraryHandler.replaced_root / '20261023T000000Z' / 'restore-test.txt'
+        backup.parent.mkdir(parents=True, exist_ok=True)
+        backup.write_text('old', encoding='utf-8')
+        url=self.base+'/api/admin/replacements/restore'
+        body=json.dumps({'id':'20261023T000000Z/restore-test.txt'}).encode()
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(urllib.request.Request(url,data=body))
+        self.assertEqual(error.exception.code,403)
+        with urllib.request.urlopen(urllib.request.Request(url,data=body,headers=headers)) as response:
+            self.assertTrue(json.loads(response.read())['ok'])
+        self.assertEqual(original.read_text(), 'old')
+        self.assertTrue(any(p.read_text()=='current' for p in LibraryHandler.replaced_root.rglob('restore-test.txt')))
+        bad=json.dumps({'id':'../restore-test.txt'}).encode()
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(urllib.request.Request(url,data=bad,headers=headers))
+        self.assertEqual(error.exception.code,400)
+        preview=json.dumps({'names':['restore-test.txt','not-existing.txt']}).encode()
+        with urllib.request.urlopen(urllib.request.Request(self.base+'/api/admin/upload-preview',data=preview,headers=headers)) as response:
+            items=json.loads(response.read())['items']
+        self.assertTrue(items[0]['matches'])
+        self.assertFalse(items[1]['matches'])
+
     def test_identical_content_under_different_name_is_replaced(self):
         body = '完全相同正文用于检查改名副本'.encode('utf-8')
         for index, name in enumerate(['内容副本甲.txt', '内容副本乙.txt']):

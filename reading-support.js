@@ -8,6 +8,9 @@
   if (location.pathname.endsWith('/admin.html')) return;
   var content = document.getElementById('content'), paper = document.getElementById('paper');
   if (!content || !paper) return;
+  var userInteracted=false;
+  document.addEventListener('pointerdown',function(){userInteracted=true;},{passive:true});
+  document.addEventListener('keydown',function(){userInteracted=true;},{passive:true});
   var query = new URLSearchParams(location.search), path = query.get('p') || '', title = query.get('title') || path;
   var key = 'xiaomuwu-anchor:' + path, ready = false, restoring = false, saved, pending, last;
   try { saved = JSON.parse(localStorage.getItem(key) || 'null'); } catch (_) {}
@@ -49,10 +52,10 @@
   var observer = new MutationObserver(function () {
     if (!ready && !content.hidden && content.querySelector('.chapter-text')) {
       observer.disconnect();
-      setTimeout(function(){ready=true;restore(saved);capture();},500);
+      setTimeout(function(){ready=true;if(!userInteracted)restore(saved);capture();},500);
     }
   }); observer.observe(content,{childList:true,attributes:true});
-  if (!content.hidden && content.querySelector('.chapter-text')) {observer.disconnect();setTimeout(function(){ready=true;restore(saved);capture();},500);}
+  if (!content.hidden && content.querySelector('.chapter-text')) {observer.disconnect();setTimeout(function(){ready=true;if(!userInteracted)restore(saved);capture();},500);}
   window.addEventListener('scroll',schedule,{passive:true}); paper.addEventListener('scroll',schedule,{passive:true});
   window.addEventListener('pagehide',capture); document.addEventListener('visibilitychange',function(){if(document.hidden)capture();});
   var resizeTimer, viewportWidth=innerWidth, resizeAnchor;
@@ -65,7 +68,7 @@
   });
   var controls=document.getElementById('controls');
   var resume=text('button','继续上次阅读'), report=text('button','反馈本书问题'); resume.type=report.type='button';
-  resume.onclick=function(){restore(saved||last);};
+  resume.onclick=function(){restore(last||saved);};
   var sent=false;
   function reportIssue(type, detail) {
     return fetch('/api/events',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:type,visitor:'reader',detail:JSON.stringify({title:title,path:path,message:detail})}),keepalive:true}).then(function(r){if(!r.ok)throw new Error('发送失败');});

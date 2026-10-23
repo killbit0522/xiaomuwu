@@ -7,6 +7,7 @@
     document.head.appendChild(enhancement);
   }
   if (/\/pages\/admin\.html$/.test(location.pathname)) {
+    var replacementScript=document.createElement('script');replacementScript.src='../admin-replacements.js?v=20261023';document.head.appendChild(replacementScript);
     var communityScript = document.createElement('script');
     communityScript.src = '../admin-community.js?v=20261012-3';
     document.head.appendChild(communityScript);

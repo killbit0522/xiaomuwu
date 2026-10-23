@@ -482,6 +482,43 @@ class LibraryHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         api_path = urlsplit(self.path).path
+        if api_path in {'/api/admin/upload-preview', '/api/admin/replacements/restore'}:
+            if not self.has_admin_access():
+                self.send_json(403, {'ok': False}); return
+            try:
+                length = int(self.headers.get('Content-Length', '0'))
+                if not 0 < length <= 1048576:
+                    raise ValueError('请求过大')
+                payload = json.loads(self.rfile.read(length))
+                if api_path.endswith('upload-preview'):
+                    names = payload.get('names', [])
+                    if not isinstance(names, list) or len(names) > 2000:
+                        raise ValueError('每批最多预览2000本')
+                    index = {}
+                    for path in self.textbook_root.rglob('*'):
+                        if path.is_file() and path.suffix.lower() in BOOK_EXTENSIONS:
+                            index.setdefault(duplicate_title_key(path), []).append(path.relative_to(self.textbook_root).as_posix())
+                    self.send_json(200, {'items': [{'name': name, 'matches': index.get(duplicate_title_key(name), [])} for name in names if isinstance(name, str)]}); return
+                relative = Path(payload.get('id', ''))
+                source = (self.replaced_root / relative).resolve()
+                if len(relative.parts) < 2 or relative.is_absolute() or not source.is_relative_to(self.replaced_root.resolve()) or not source.is_file():
+                    raise ValueError('备份不存在')
+                target = (self.textbook_root / Path(*relative.parts[1:])).resolve()
+                if not target.is_relative_to(self.textbook_root.resolve()):
+                    raise ValueError('路径无效')
+                with self.upload_lock:
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    temporary = target.with_name('.restore-' + secrets.token_hex(8))
+                    shutil.copy2(source, temporary)
+                    if target.exists() and archive_replaced_book(type(self), target) is None:
+                        temporary.unlink(missing_ok=True)
+                        raise ValueError('当前版本无法备份，请稍后重试')
+                    temporary.replace(target)
+                    os.utime(target, None)
+                    rebuild_catalog(type(self))
+                self.send_json(200, {'ok': True}); return
+            except (ValueError, OSError, TypeError) as error:
+                self.send_json(400, {'ok': False, 'message': str(error)}); return
         if api_path == '/api/admin/audit':
             if not self.has_admin_access():
                 self.send_json(403, {'ok': False}); return
@@ -945,6 +982,15 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             if not self.has_admin_access():
                 self.send_json(403, {'ok': False}); return
             self.send_json(200, library_audit.report(type(self))); return
+        if request_path == '/api/admin/replacements':
+            if not self.has_admin_access():
+                self.send_json(403, {'ok': False}); return
+            items = []
+            for path in self.replaced_root.rglob('*'):
+                if path.is_file() and path.suffix.lower() in BOOK_EXTENSIONS:
+                    relative = path.relative_to(self.replaced_root)
+                    items.append({'id': relative.as_posix(), 'title': path.name, 'original': Path(*relative.parts[1:]).as_posix(), 'time': relative.parts[0]})
+            self.send_json(200, {'items': sorted(items, key=lambda item: item['time'], reverse=True)[:200]}); return
         if request_path == "/api/admin/data":
             if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
             self.send_json(200, self.admin_data()); return
