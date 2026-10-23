@@ -85,6 +85,54 @@ class OnlineLibraryTests(unittest.TestCase):
         self.assertTrue(result["partial"])
         self.assertEqual(result["items"][0]["id"], "gutenberg:321")
 
+    def test_open_library_only_exposes_public_scans(self):
+        def wiki(_):
+            return {"query": {"search": []}}
+        def openlibrary(params):
+            self.assertIn("public_scan_b", params["fields"])
+            return {"docs": [
+                {"key": "/works/OL1W", "title": "公开古籍", "author_name": ["某作者"], "first_publish_year": 1901, "public_scan_b": True, "ia": ["public-book-1"]},
+                {"key": "/works/OL2W", "title": "受限作品", "public_scan_b": False, "ia": ["restricted-book"]},
+            ]}
+        result = online_library.search("古籍", self.cache, wiki, openlibrary_requester=openlibrary)
+        self.assertEqual(len(result["items"]), 1)
+        self.assertEqual(result["items"][0]["id"], "archive:public-book-1")
+        self.assertIn("某作者", result["items"][0]["snippet"])
+
+    def test_archive_read_prefers_ocr_text_and_uses_cache(self):
+        def metadata(identifier):
+            self.assertEqual(identifier, "public-book-1")
+            return {"metadata": {"title": "公开古籍"}, "files": [
+                {"name": "public-book-1_meta.txt", "size": "20"},
+                {"name": "public-book-1_djvu.txt", "size": "1200"},
+            ]}
+        requested = []
+        page = online_library.read(
+            "archive:public-book-1",
+            self.cache,
+            archive_metadata_requester=metadata,
+            archive_content_requester=lambda url: requested.append(url) or ("正文内容。" * 30),
+        )
+        self.assertEqual(page["source"], online_library.ARCHIVE_SOURCE)
+        self.assertTrue(requested[0].endswith("public-book-1_djvu.txt"))
+        cached = online_library.read("archive:public-book-1", self.cache, archive_metadata_requester=lambda _: self.fail("fresh cache was not used"))
+        self.assertTrue(cached["cached"])
+
+    def test_archive_ids_and_download_hosts_are_validated(self):
+        with self.assertRaises(online_library.OnlineLibraryError) as invalid:
+            online_library.read("archive:../../secret", self.cache)
+        self.assertEqual(invalid.exception.status, 400)
+        self.assertFalse(online_library._allowed_archive_url("https://example.com/book.txt"))
+
+    def test_source_registry_rejects_duplicate_keys_and_dispatches_reader(self):
+        from scripts.book_sources import BookSourceAdapter, BookSourceRegistry
+        adapter = BookSourceAdapter("sample", "样例", lambda _: [], lambda native_id: native_id)
+        registry = BookSourceRegistry([adapter])
+        self.assertIs(registry.reader_for("sample:book-1"), adapter)
+        self.assertEqual(adapter.native_id("sample:book-1"), "book-1")
+        with self.assertRaises(ValueError):
+            registry.register(BookSourceAdapter("sample", "重复", lambda _: []))
+
 
 if __name__ == "__main__":
     unittest.main()

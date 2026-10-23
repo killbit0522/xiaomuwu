@@ -1,4 +1,4 @@
-"""A small, isolated reader for openly licensed Wikisource texts."""
+"""A small, isolated multi-source reader for openly readable texts."""
 import hashlib
 import html
 import json
@@ -9,13 +9,21 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import quote, urlencode, urlsplit
 from urllib.request import Request, urlopen
+
+try:
+    from .book_sources import BookSourceAdapter, BookSourceRegistry
+except ImportError:
+    from book_sources import BookSourceAdapter, BookSourceRegistry
 
 API_URL = "https://zh.wikisource.org/w/api.php"
 SOURCE_NAME = "中文维基文库"
 GUTENDEX_URL = "https://gutendex.com/books"
 GUTENBERG_SOURCE = "Project Gutenberg（公版书）"
+OPEN_LIBRARY_URL = "https://openlibrary.org/search.json"
+ARCHIVE_METADATA_URL = "https://archive.org/metadata/"
+ARCHIVE_SOURCE = "Open Library / Internet Archive（公开阅读）"
 USER_AGENT = "XiaomuwuReader/1.0 (https://xiaomuwuread.top/)"
 MAX_RESPONSE = 6 * 1024 * 1024
 lock = threading.Lock()
@@ -99,6 +107,24 @@ def _request_gutendex(params):
         raise OnlineLibraryError(502, "Project Gutenberg 数据解析失败") from error
 
 
+def _request_open_library(params):
+    url = OPEN_LIBRARY_URL + "?" + urlencode(params)
+    request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
+    try:
+        with slots, urlopen(request, timeout=7) as response:
+            raw = response.read(MAX_RESPONSE + 1)
+    except HTTPError as error:
+        raise OnlineLibraryError(503, "Open Library 书源暂时不可用") from error
+    except (URLError, TimeoutError, OSError) as error:
+        raise OnlineLibraryError(503, "连接 Open Library 超时") from error
+    if len(raw) > MAX_RESPONSE:
+        raise OnlineLibraryError(413, "Open Library 返回内容过大")
+    try:
+        return json.loads(raw.decode("utf-8"))
+    except (UnicodeError, ValueError) as error:
+        raise OnlineLibraryError(502, "Open Library 数据解析失败") from error
+
+
 def _gutenberg_items(query, requester):
     payload = requester({"search": query, "languages": "zh", "copyright": "false", "mime_type": "text/plain"})
     items = []
@@ -123,6 +149,38 @@ def _wikisource_items(query, requester):
             continue
         parser = _ReadableHTML(); parser.feed(str(row.get("snippet", "")))
         items.append({"id": title, "title": title, "snippet": parser.text()[:240], "source": SOURCE_NAME, "sourceUrl": "https://zh.wikisource.org/wiki/" + title.replace(" ", "_")})
+    return items
+
+
+def _open_library_items(query, requester):
+    payload = requester({
+        "q": query,
+        "limit": "20",
+        "fields": "key,title,author_name,first_publish_year,public_scan_b,ia,language",
+    })
+    items = []
+    for row in payload.get("docs", [])[:20]:
+        if not isinstance(row, dict) or row.get("public_scan_b") is not True:
+            continue
+        archive_ids = row.get("ia") or []
+        archive_id = next((str(value).strip() for value in archive_ids if re.fullmatch(r"[A-Za-z0-9._-]{1,100}", str(value).strip())), "")
+        title = str(row.get("title", "")).strip()
+        if not archive_id or not title:
+            continue
+        authors = "、".join(str(value).strip() for value in (row.get("author_name") or [])[:3] if str(value).strip())
+        year = str(row.get("first_publish_year") or "").strip()
+        snippet = " · ".join(value for value in (authors, year and "初版 " + year, "可公开阅读全文") if value)
+        work_key = str(row.get("key") or "").strip()
+        source_url = "https://openlibrary.org" + work_key if work_key.startswith("/works/") else "https://archive.org/details/" + archive_id
+        items.append({
+            "id": "archive:" + archive_id,
+            "title": title[:200],
+            "snippet": snippet[:240],
+            "source": ARCHIVE_SOURCE,
+            "sourceUrl": source_url,
+        })
+        if len(items) >= 10:
+            break
     return items
 
 
@@ -194,7 +252,7 @@ def _subpage_texts(titles, requester):
     return "\n\n".join(parts)
 
 
-def search(query, cache_root, requester=None, gutenberg_requester=None):
+def search(query, cache_root, requester=None, gutenberg_requester=None, openlibrary_requester=None):
     query = re.sub(r"\s+", " ", str(query or "")).strip()[:80]
     if len(query) < 1:
         raise OnlineLibraryError(400, "请输入书名或作者")
@@ -204,22 +262,29 @@ def search(query, cache_root, requester=None, gutenberg_requester=None):
         return dict(cached, cached=True)
     wiki_requester = requester or _request_json
     include_gutenberg = requester is None or gutenberg_requester is not None
+    include_openlibrary = requester is None or openlibrary_requester is not None
     items, source_errors = [], []
-    providers = [("中文维基文库", lambda: _wikisource_items(query, wiki_requester))]
+    registry = BookSourceRegistry([
+        BookSourceAdapter("wikisource", SOURCE_NAME, lambda value: _wikisource_items(value, wiki_requester)),
+    ])
     if include_gutenberg:
-        providers.append(("Project Gutenberg", lambda: _gutenberg_items(query, gutenberg_requester or _request_gutendex)))
+        registry.register(BookSourceAdapter("gutenberg", GUTENBERG_SOURCE, lambda value: _gutenberg_items(value, gutenberg_requester or _request_gutendex)))
+    if include_openlibrary:
+        registry.register(BookSourceAdapter("archive", ARCHIVE_SOURCE, lambda value: _open_library_items(value, openlibrary_requester or _request_open_library)))
+    providers = registry.adapters()
     provider_items = {}
     with ThreadPoolExecutor(max_workers=len(providers), thread_name_prefix="online-book-source") as executor:
-        pending = {executor.submit(loader): name for name, loader in providers}
+        pending = {executor.submit(adapter.searcher, query): adapter for adapter in providers}
         for future in as_completed(pending):
+            adapter = pending[future]
             try:
-                provider_items[pending[future]] = future.result()
+                provider_items[adapter.key] = future.result()
             except OnlineLibraryError as error:
-                source_errors.append(pending[future] + "：" + str(error))
+                source_errors.append(adapter.name + "：" + str(error))
             except Exception:
-                source_errors.append(pending[future] + "：暂时不可用")
-    for name, _ in providers:
-        items.extend(provider_items.get(name, []))
+                source_errors.append(adapter.name + "：暂时不可用")
+    for adapter in providers:
+        items.extend(provider_items.get(adapter.key, []))
     if not items and source_errors:
         try:
             stale = json.loads(cache.read_text(encoding="utf-8"))
@@ -232,7 +297,15 @@ def search(query, cache_root, requester=None, gutenberg_requester=None):
         key = (item["source"], item["id"])
         if key not in seen:
             seen.add(key); unique.append(item)
-    result = {"query": query, "items": unique[:24], "source": "多书源", "sources": [SOURCE_NAME, GUTENBERG_SOURCE], "cached": False, "partial": bool(source_errors)}
+    result = {
+        "query": query,
+        "items": unique[:30],
+        "source": "多书源",
+        "sources": [adapter.name for adapter in providers],
+        "sourceErrors": source_errors,
+        "cached": False,
+        "partial": bool(source_errors),
+    }
     with lock:
         _write_atomic(cache, json.dumps(result, ensure_ascii=False, separators=(",", ":")))
     return result
@@ -360,8 +433,113 @@ def _read_gutenberg(book_id, cache_root, metadata_requester=None, content_reques
         raise
 
 
-def read(identifier, cache_root, requester=None, gutenberg_requester=None, content_requester=None):
+def _allowed_archive_url(value):
+    parsed = urlsplit(str(value or ""))
+    return parsed.scheme == "https" and (parsed.hostname or "").lower() == "archive.org"
+
+
+def _request_archive_metadata(archive_id):
+    request = Request(ARCHIVE_METADATA_URL + archive_id, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
+    try:
+        with slots, urlopen(request, timeout=10) as response:
+            raw = response.read(MAX_RESPONSE + 1)
+    except HTTPError as error:
+        raise OnlineLibraryError(503, "Internet Archive 书源暂时不可用") from error
+    except (URLError, TimeoutError, OSError) as error:
+        raise OnlineLibraryError(503, "连接 Internet Archive 超时") from error
+    if len(raw) > MAX_RESPONSE:
+        raise OnlineLibraryError(413, "Internet Archive 元数据过大")
+    try:
+        return json.loads(raw.decode("utf-8"))
+    except (UnicodeError, ValueError) as error:
+        raise OnlineLibraryError(502, "Internet Archive 元数据解析失败") from error
+
+
+def _download_archive_text(url):
+    if not _allowed_archive_url(url):
+        raise OnlineLibraryError(502, "公开书正文地址不安全")
+    request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "text/plain"})
+    try:
+        with slots, urlopen(request, timeout=20) as response:
+            raw = response.read(MAX_RESPONSE + 1)
+    except HTTPError as error:
+        raise OnlineLibraryError(503, "公开书正文暂时不可用") from error
+    except (URLError, TimeoutError, OSError) as error:
+        raise OnlineLibraryError(503, "公开书正文连接超时") from error
+    if len(raw) > MAX_RESPONSE:
+        raise OnlineLibraryError(413, "公开书正文过大")
+    for encoding in ("utf-8-sig", "utf-8", "gb18030", "big5"):
+        try:
+            return raw.decode(encoding)
+        except UnicodeError:
+            continue
+    raise OnlineLibraryError(502, "公开书正文编码无法识别")
+
+
+def _read_archive(archive_id, cache_root, metadata_requester=None, content_requester=None):
+    if not re.fullmatch(r"[A-Za-z0-9._-]{1,100}", str(archive_id or "")):
+        raise OnlineLibraryError(400, "公开书编号无效")
+    identifier = "archive:" + archive_id
+    text_path = _cache_path(cache_root, "book", identifier, "txt")
+    meta_path = _cache_path(cache_root, "book", identifier, "json")
+    try:
+        if text_path.is_file() and time.time() - text_path.stat().st_mtime <= 7 * 86400:
+            return dict(json.loads(meta_path.read_text(encoding="utf-8")), path=text_path, cached=True)
+    except (OSError, ValueError):
+        pass
+    try:
+        payload = (metadata_requester or _request_archive_metadata)(archive_id)
+        metadata = payload.get("metadata", {}) if isinstance(payload.get("metadata"), dict) else {}
+        title = str(metadata.get("title") or ("公开书 " + archive_id)).strip()[:200]
+        candidates = []
+        for item in payload.get("files", []):
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name") or "").strip()
+            if not name or "/" in name or "\\" in name:
+                continue
+            lowered = name.lower()
+            if not (lowered.endswith("_djvu.txt") or lowered.endswith(".txt")):
+                continue
+            if any(token in lowered for token in ("readme", "meta", "files.xml", "scandata")):
+                continue
+            try:
+                size = int(item.get("size") or 0)
+            except (TypeError, ValueError):
+                size = 0
+            if size and size > MAX_RESPONSE:
+                continue
+            candidates.append((not lowered.endswith("_djvu.txt"), size == 0, size, name))
+        if not candidates:
+            raise OnlineLibraryError(422, "该公开书暂时没有可识别的纯文本正文")
+        candidates.sort()
+        filename = candidates[0][3]
+        url = "https://archive.org/download/" + archive_id + "/" + quote(filename, safe="")
+        text = (content_requester or _download_archive_text)(url)
+        if len(text.strip()) < 40:
+            raise OnlineLibraryError(422, "该公开书正文过短")
+        book_meta = {"title": title, "source": ARCHIVE_SOURCE, "sourceUrl": "https://archive.org/details/" + archive_id}
+        with lock:
+            _write_atomic(text_path, text)
+            _write_atomic(meta_path, json.dumps(book_meta, ensure_ascii=False))
+        return dict(book_meta, path=text_path, cached=False)
+    except OnlineLibraryError:
+        if text_path.is_file():
+            try:
+                book_meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                book_meta = {"title": "公开书 " + archive_id, "source": ARCHIVE_SOURCE, "sourceUrl": "https://archive.org/details/" + archive_id}
+            return dict(book_meta, path=text_path, cached=True, stale=True)
+        raise
+
+
+def read(identifier, cache_root, requester=None, gutenberg_requester=None, content_requester=None, archive_metadata_requester=None, archive_content_requester=None):
     identifier = str(identifier or "").strip()
-    if identifier.startswith("gutenberg:"):
-        return _read_gutenberg(identifier.split(":", 1)[1], cache_root, gutenberg_requester, content_requester)
+    registry = BookSourceRegistry([
+        BookSourceAdapter("gutenberg", GUTENBERG_SOURCE, lambda _: [], lambda native_id: _read_gutenberg(native_id, cache_root, gutenberg_requester, content_requester)),
+        BookSourceAdapter("archive", ARCHIVE_SOURCE, lambda _: [], lambda native_id: _read_archive(native_id, cache_root, archive_metadata_requester, archive_content_requester)),
+    ])
+    adapter = registry.reader_for(identifier)
+    if adapter:
+        return adapter.reader(adapter.native_id(identifier))
     return _read_wikisource(identifier, cache_root, requester)

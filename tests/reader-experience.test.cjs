@@ -95,6 +95,7 @@ test('online search results can be saved directly and still open in the in-site 
   assert.match(online,/link\.textContent='站内阅读'/);
   assert.match(online,/save\.textContent=saved\?'已在书架':'加入书架'/);
   assert.match(online,/onlineId:item\.id/);
+  assert.match(online,/p:onlinePath\(item\)/);
   assert.match(online,/localStorage\.setItem\('xiaomuwu-shelf'/);
 });
 test('shelf data is mirrored locally so changing a card does not clear it', () => {
