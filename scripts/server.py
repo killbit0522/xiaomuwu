@@ -505,15 +505,22 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             if not filename or Path(filename).suffix.lower() not in allowed or length < 1 or length > 104857600:
                 self.send_json(400, {"ok": False}); return
             relative = Path(relative_header.replace("\\", "/")) if relative_header else Path(filename)
-            if len(relative.parts) > 1 and relative.parts[0].casefold() in {"textbook", "书库"}:
-                relative = Path(*relative.parts[1:])
             if relative.is_absolute() or not relative.parts or any(part in ("", ".", "..") for part in relative.parts) or len(relative.parts) > 30:
                 self.send_json(400, {"ok": False}); return
             body = self.rfile.read(length)
+            if len(body) != length:
+                self.send_json(400, {"ok": False, "message": "文件传输不完整，请重试"}); return
+            expected_hash = self.headers.get('X-Content-SHA256', '')
+            if expected_hash and hashlib.sha256(body).hexdigest() != expected_hash:
+                self.send_json(400, {"ok": False, "message": "文件校验失败，请重试"}); return
             defer_catalog = self.headers.get("X-Defer-Catalog", "") == "1"
             upload_root = self.textbook_root / "管理员上传"
             with self.upload_lock:
-                duplicates = find_duplicate_books(self.textbook_root, filename)
+                duplicates = find_duplicate_books(self.textbook_root, filename, body)
+                if self.headers.get('X-Upload-Mode') != 'folder':
+                    for existing in duplicates:
+                        if existing.name == filename and existing.read_bytes() == body:
+                            self.send_json(200, {"ok": True, "replaced": 0, "unchanged": True}); return
                 upload_root.mkdir(parents=True, exist_ok=True)
                 numbered = []
                 for child in upload_root.iterdir():
@@ -525,7 +532,15 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 if target_dir is None or current_count >= 20:
                     group_number += 1
                     target_dir = upload_root / f"新上传{group_number}"
+                if self.headers.get('X-Upload-Mode') == 'folder' and len(relative.parts) > 1:
+                    target_dir = upload_root / relative.parts[0]
+                    relative = Path(*relative.parts[1:])
                 target = (target_dir / relative).resolve()
+                if not target.is_relative_to(upload_root.resolve()):
+                    self.send_json(400, {"ok": False}); return
+                identical = next((p for p in duplicates if p.resolve() == target and p.read_bytes() == body), None)
+                if identical is not None:
+                    self.send_json(200, {"ok": True, "replaced": 0, "unchanged": True}); return
                 try:
                     if os.path.commonpath((str(target_dir.resolve()), str(target))) != str(target_dir.resolve()):
                         self.send_json(400, {"ok": False}); return
@@ -1203,12 +1218,19 @@ def titles_overlap_enough(left, right):
     return bool(left and right and left == right)
 
 
-def find_duplicate_books(root, filename):
+def find_duplicate_books(root, filename, body=None):
     identity = duplicate_title_key(filename)
+    digest = hashlib.sha256(body).digest() if body is not None else None
     matches = []
     for path in root.rglob("*"):
         if path.is_file() and path.suffix.lower() in BOOK_EXTENSIONS:
-            if titles_overlap_enough(identity, duplicate_title_key(path)):
+            same_content = False
+            if body is not None:
+                try:
+                    same_content = path.stat().st_size == len(body) and hashlib.sha256(path.read_bytes()).digest() == digest
+                except OSError:
+                    pass
+            if same_content or titles_overlap_enough(identity, duplicate_title_key(path)):
                 matches.append(path)
     return matches
 

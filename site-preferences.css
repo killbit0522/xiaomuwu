@@ -1,6 +1,7 @@
 /* 全站显示偏好：略小字号、图片铺满、柔和夜间模式 */
 html { font-size: 15px; font-synthesis: none; }
 body, button, input, textarea, select { font-synthesis: none; font-weight: 400; }
+.gw-nav a,.sh-nav a,.gw-nav-label,.sh-nav-label,.external-comics summary{font-weight:700!important;font-synthesis:weight}.external-comics{padding:.6rem;color:inherit}.external-comics summary{cursor:pointer}.external-comics a{display:block;padding:.65rem .3rem;color:inherit}
 img { object-fit: cover; }
 [class*="-art-img"], [class*="-cover"], [class*="-bg"] { background-size: cover !important; background-position: center !important; }
 .site-theme-toggle {

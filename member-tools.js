@@ -44,6 +44,7 @@
     var close = document.createElement('button'); close.type = 'button'; close.className = 'member-guide-close'; close.textContent = '×'; close.setAttribute('aria-label', '关闭使用指南');
     var title = document.createElement('h2'); title.textContent = '使用指南';
     var list = document.createElement('ol');
+    var externalTip=document.createElement('p');externalTip.textContent='导航中的“漫画”可选择漫蛙或漫画工具，“AO3 镜像”可直接打开外部页面。';card.appendChild(externalTip);
     ['点“目录”浏览书目；阅读卡在线阅读，下载卡下载，下载中断未完成会退回次数。', '新书会在首页提示；“近期新增”可查看最近 50 本。', '“木木有话说”保存我发的消息；“木木小广场”是交流区，我发布图文，会员可以写文字评论。', '缺书登记和“想看的类型”都可以留言，我会查看，也可以在后台回复。', '续费后用同一手机、同一浏览器登录，书架会保留；清理浏览器数据或换设备可能无法同步。'].forEach(function (text) { var item = document.createElement('li'); item.textContent = text; list.appendChild(item); });
     close.onclick = function () { modal.hidden = true; };
     modal.addEventListener('click', function (event) { if (event.target === modal) modal.hidden = true; });

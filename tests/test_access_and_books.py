@@ -313,6 +313,31 @@ class BookAccessIntegrationTests(unittest.TestCase):
             titles = {item["title"] for item in json.loads(response.read())}
         self.assertTrue(set(name[:-4] for name in names).issubset(titles))
 
+    def test_folder_upload_preserves_root_name_and_retry_is_idempotent(self):
+        body = '文件夹上传专用正文'.encode('utf-8')
+        headers = {'Cookie': 'cabin_admin=test-admin-token', 'X-Filename': urllib.parse.quote('文件夹书.txt'),
+                   'X-Relative-Path': urllib.parse.quote('我的分类/子目录/文件夹书.txt'),
+                   'X-Upload-Mode': 'folder', 'X-Content-SHA256': hashlib.sha256(body).hexdigest()}
+        for attempt in range(2):
+            request = urllib.request.Request(self.base + '/api/admin/upload', data=body, headers=headers)
+            with urllib.request.urlopen(request) as response:
+                result = json.loads(response.read())
+            if attempt:
+                self.assertTrue(result['unchanged'])
+        self.assertEqual((self.books / '管理员上传/我的分类/子目录/文件夹书.txt').read_bytes(), body)
+        headers['X-Content-SHA256'] = '0' * 64
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(urllib.request.Request(self.base + '/api/admin/upload', data=body, headers=headers))
+        self.assertEqual(error.exception.code, 400)
+
+    def test_identical_content_under_different_name_is_replaced(self):
+        body = '完全相同正文用于检查改名副本'.encode('utf-8')
+        for index, name in enumerate(['内容副本甲.txt', '内容副本乙.txt']):
+            request = urllib.request.Request(self.base + '/api/admin/upload', data=body,
+                headers={'Cookie': 'cabin_admin=test-admin-token', 'X-Filename': urllib.parse.quote(name)})
+            with urllib.request.urlopen(request) as response:
+                self.assertEqual(json.loads(response.read())['replaced'], index)
+
     def test_catalog_keeps_the_newest_copy_when_legacy_duplicates_remain(self):
         old_copy = self.books / "管理员上传" / "旧目录" / "同一本书.txt"
         new_copy = self.books / "管理员上传" / "新目录" / "同一本书（2）.txt"
