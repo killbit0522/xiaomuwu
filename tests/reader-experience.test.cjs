@@ -84,8 +84,12 @@ test('member guide, recent books, replies, and announcements are wired into the 
 });
 test('navigation excludes the unstable comics site and keeps auto-close and unread counters', () => {
   const preferences=fs.readFileSync('site-preferences.js','utf8');
+  const preferencesCss=fs.readFileSync('site-preferences.css','utf8');
   const memberTools=fs.readFileSync('member-tools.js','utf8');
   assert.doesNotMatch(preferences,/manwa\.hezidh\.com/);
+  assert.ok(preferences.indexOf("primaryNav.appendChild(ao3)") < preferences.indexOf("primaryNav.appendChild(comics)"), 'AO3 should sit immediately before the comics section');
+  assert.match(preferencesCss,/\.gw-sidebar,\.sh-side\{[^}]*background-color:color-mix/);
+  assert.match(preferencesCss,/\.gw-sidebar-bg,\.sh-side-bg\{[^}]*opacity:\.28!important/);
   assert.match(preferences,/timer=setTimeout\(hideSide,10000\)/);
   assert.match(preferences,/if\(side\.classList\.contains\('is-auto-hidden'\)\)showSide\(\);else hideSide\(\)/);
   assert.match(memberTools,/nav-unread-badge/);
