@@ -208,7 +208,7 @@ h1, h2, h3, h4 {
         background-color: currentColor;
       }
     </style>
-<link rel="stylesheet" href="../site-preferences.css?v=20261022-3">
+<link rel="stylesheet" href="../site-preferences.css?v=20261023-4">
 </head>
 <body>
 <style id="critical-layout">
@@ -1020,11 +1020,38 @@ h1, h2, h3, h4 {
     .gw-footer { margin-left: 1.5rem; margin-right: 1.5rem; }
     .gw-panel-line { letter-spacing: 0.24em; text-indent: 0.24em; }
   }
-  @media (max-width: 620px) {
-    .gw-hero { height:auto; min-height:clamp(360px,78svh,620px); }
-    .gw-hero-content { padding:4.5rem 1.15rem 2rem; }
-    .gw-hero-art-img { background-size:contain; background-position:center; }
-    .gw-panel-art-img { background-size:contain; background-position:center; }
+  @media (max-width: 700px) {
+    /* 手机端以画作局部作底纹，不把横图缩成一块贴在长屏中央。 */
+    .gw-hero { height:auto; min-height:440px; align-items:flex-end; }
+    .gw-hero-content { padding:12.5rem 1.4rem 2.4rem; gap:.8rem; }
+    .gw-hero-art {
+      inset:0 0 16%; opacity:.62; filter:saturate(.65) contrast(.9);
+      -webkit-mask-image:linear-gradient(to bottom, transparent, #000 8%, #000 38%, transparent 100%);
+      mask-image:linear-gradient(to bottom, transparent, #000 8%, #000 38%, transparent 100%);
+    }
+    .gw-hero-art-img {
+      background-size:cover; background-position:62% 32%;
+      -webkit-mask-image:linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+      mask-image:linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+    }
+    .gw-hero-glow { display:none; }
+    .gw-hero-fade { height:30%; background:linear-gradient(transparent, var(--zhaowen-page-base)); }
+    .gw-hero-title { font-size:2rem; letter-spacing:.22em; }
+    .gw-hero-sub { font-size:.8rem; letter-spacing:.08em; }
+    .gw-panel { min-height:380px; max-height:none; align-items:flex-end; }
+    .gw-panel-art {
+      -webkit-mask-image:linear-gradient(to bottom, transparent, #000 18%, #000 60%, transparent 95%);
+      mask-image:linear-gradient(to bottom, transparent, #000 18%, #000 60%, transparent 95%);
+    }
+    .gw-panel-art-img {
+      inset:0 0 18%; background-size:cover; background-position:62% center;
+      opacity:.65;
+      -webkit-mask-image:linear-gradient(to right, transparent, #000 14%, #000 86%, transparent);
+      mask-image:linear-gradient(to right, transparent, #000 14%, #000 86%, transparent);
+    }
+    .gw-panel-copy { padding:2rem 1.4rem 1.5rem; background:none; gap:.7rem; }
+    .gw-panel-line { font-size:1.08rem; letter-spacing:.16em; }
+    .gw-panel-sub { max-width:19em; font-size:.72rem; letter-spacing:.08em; }
     .gw-book { grid-template-columns: 72px minmax(0, 1fr); }
     .gw-book-thumb img { width: 72px; height: 72px; }
   }
@@ -1565,8 +1592,8 @@ h1, h2, h3, h4 {
         <p id="gw-hero-sub" class="gw-hero-sub">循着书名，找到想读的故事</p>
         <form id="home-search" class="gw-search" data-dom-id="home-search" role="search" novalidate>
           <i data-lucide="search" class="gw-ico" aria-hidden="true"></i>
-          <input id="gw-search-input" type="search" name="q" autocomplete="off" aria-label="搜索外部在线书源" placeholder="搜索外部书源 · 在线阅读">
-          <button class="gw-search-btn" type="submit">外部找书</button>
+          <input id="gw-search-input" type="search" name="q" autocomplete="off" aria-label="搜索本地书库和外部书源" placeholder="搜书名或作者 · 本地 + 外部">
+          <button class="gw-search-btn" type="submit">找书</button>
         </form>
       </div>
 
@@ -2241,6 +2268,6 @@ h1, h2, h3, h4 {
   if(count){count.textContent='今日 '+selected.length+' 本 · 每人不同'}
 })();
 </script>
-<script src="../site-preferences.js?v=20261022-3"></script>
+<script src="../site-preferences.js?v=20261023-4"></script>
 <script src="../recent-reading.js?v=20261001-1"></script></body>
 </html>

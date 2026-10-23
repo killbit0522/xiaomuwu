@@ -208,7 +208,7 @@ h1, h2, h3, h4 {
         background-color: currentColor;
       }
     </style>
-<link rel="stylesheet" href="../site-preferences.css?v=20261022-3">
+<link rel="stylesheet" href="../site-preferences.css?v=20261023-4">
 </head>
 <body class="min-h-screen antialiased">
 <style id="critical-layout">
@@ -1037,10 +1037,14 @@ h1, h2, h3, h4 {
   var active = 'all';
   var page = 1;
   var pageSize = 50;
+  var totalPages = 1;
   var accessMode = '';
   var returnState = null;
+  // Keep browsing position even if a mobile browser reloads this tab.
+  try { var browseState = JSON.parse(sessionStorage.getItem('xiaomuwu-catalog-browse') || 'null'); if(browseState){active=browseState.active||'all';page=Math.max(1,Math.trunc(Number(browseState.page)||1));} } catch(error) {}
   try { returnState = JSON.parse(sessionStorage.getItem('xiaomuwu-catalog-return') || 'null'); } catch (error) {}
   if (returnState) { active = returnState.active || 'all'; page = Number(returnState.page) || 1; }
+  function saveBrowseState(){try{sessionStorage.setItem('xiaomuwu-catalog-browse',JSON.stringify({active:active,page:page}))}catch(error){}}
 
   function isUnlocked() { return accessMode === 'download' || accessMode === 'reader'; }
   function visitorId() { try { var key='cabin-visitor-id',value=localStorage.getItem(key); if(!value){value=Math.random().toString(36).slice(2);localStorage.setItem(key,value)} return value } catch(error){return 'visitor'} }
@@ -1085,24 +1089,37 @@ h1, h2, h3, h4 {
     return row;
   }
 
+  // Pagination stays outside the list: replacing books must not remove the
+  // control currently under a finger, or expose another clickable row there.
+  var nav = document.createElement('nav'); nav.className = 'ct-filters ct-pagination'; nav.setAttribute('aria-label','书目分页'); nav.hidden=true;
+  var previous = document.createElement('button'); previous.className='ct-chip'; previous.type='button'; previous.textContent='上一页';
+  var label = document.createElement('span'); label.className='ct-chip is-active'; label.setAttribute('aria-live','polite');
+  var next = document.createElement('button'); next.className='ct-chip'; next.type='button'; next.textContent='下一页';
+  var jump = document.createElement('input'); jump.type='number';jump.min='1';jump.className='ct-chip';jump.style.width='5.5rem';jump.setAttribute('aria-label','输入要跳转的页码');
+  var jumpButton = document.createElement('button');jumpButton.className='ct-chip';jumpButton.type='button';jumpButton.textContent='跳转';
+  nav.append(previous,label,next,jump,jumpButton);list.after(nav);
+  function changePage(wanted,event){
+    if(event){event.preventDefault();event.stopPropagation()}
+    var target=Math.max(1,Math.min(totalPages,Math.trunc(Number(wanted)||1)));
+    if(target===page)return;
+    returnState=null;page=target;render();
+    // Explicitly show the first book of the NEW page, not the bottom of it.
+    window.scrollTo({top:Math.max(0,window.scrollY+list.getBoundingClientRect().top-80),behavior:'instant'});
+  }
+  previous.onclick=function(event){changePage(page-1,event)};
+  next.onclick=function(event){changePage(page+1,event)};
+  jumpButton.onclick=function(event){changePage(jump.value,event)};
+  jump.onkeydown=function(event){if(event.key==='Enter')changePage(jump.value,event)};
   function render() {
     var matches = active === 'all' ? books : books.filter(function (book) { var category=collectionOf(book); return category===active||category.indexOf(active+' /')===0; });
     var pages = Math.max(1, Math.ceil(matches.length / pageSize));
-    if (page > pages) { page = pages; }
-    list.replaceChildren();
-    matches.slice((page - 1) * pageSize, page * pageSize).forEach(function (book, index) { list.appendChild(makeRow(book, (page - 1) * pageSize + index)); });
-    if (pages > 1) {
-      var nav = document.createElement('div'); nav.className = 'ct-filters';
-      var previous = document.createElement('button'); previous.className = 'ct-chip'; previous.type = 'button'; previous.textContent = '上一页'; previous.disabled = page === 1;
-      var label = document.createElement('span'); label.className = 'ct-chip is-active'; label.textContent = page + ' / ' + pages + ' · 共 ' + matches.length + ' 本';
-      var next = document.createElement('button'); next.className = 'ct-chip'; next.type = 'button'; next.textContent = '下一页'; next.disabled = page === pages;
-      var jump = document.createElement('input'); jump.type = 'number'; jump.min = '1'; jump.max = String(pages); jump.value = String(page); jump.className = 'ct-chip'; jump.style.width = '5.5rem'; jump.setAttribute('aria-label', '输入要跳转的页码');
-      var jumpButton = document.createElement('button'); jumpButton.className = 'ct-chip'; jumpButton.type = 'button'; jumpButton.textContent = '跳转';
-      function jumpToPage(){var wanted=Math.max(1,Math.min(pages,Number(jump.value)||1));page=wanted;render();window.scrollTo({top:list.offsetTop-90,behavior:'smooth'})}
-      jumpButton.onclick = jumpToPage; jump.onkeydown = function(event){if(event.key==='Enter'){event.preventDefault();jumpToPage()}};
-      previous.onclick = function () { page -= 1; render(); }; next.onclick = function () { page += 1; render(); };
-      nav.append(previous, label, next, jump, jumpButton); list.appendChild(nav);
-    }
+    totalPages=pages;page=Math.max(1,Math.min(pages,Math.trunc(Number(page)||1)));
+    var fragment=document.createDocumentFragment();
+    matches.slice((page - 1) * pageSize, page * pageSize).forEach(function (book, index) { fragment.appendChild(makeRow(book, (page - 1) * pageSize + index)); });
+    list.replaceChildren(fragment);
+    nav.hidden=pages<=1;previous.disabled=page===1;next.disabled=page===pages;
+    label.textContent=page+' / '+pages+' · 共 '+matches.length+' 本';jump.max=String(pages);jump.value=String(page);
+    saveBrowseState();
     if (returnState) {
       var state = returnState;
       returnState = null;
@@ -1132,13 +1149,13 @@ h1, h2, h3, h4 {
   function loadCatalog(attempt) {
     fetch('../assets/catalog.json', { cache: 'no-cache', credentials: 'same-origin' })
       .then(function (response) {
-        if (response.redirected && response.url.indexOf('/pages/home.html') >= 0) { location.href='/pages/home.html?card=required';throw new Error('access'); }
+        if (response.redirected && response.url.indexOf('/pages/home.html') >= 0) { throw new Error('access'); }
         if (!response.ok || !(response.headers.get('content-type') || '').includes('application/json')) throw new Error('catalog');
         return response.json();
       })
       .then(function (data) { books = Array.isArray(data) ? data : []; books.sort(function(left,right){var leftRank=newUploadRank(left.category),rightRank=newUploadRank(right.category);if(leftRank||rightRank)return rightRank-leftRank;return String(left.title||'').localeCompare(String(right.title||''),'zh-CN')}); renderFilters(); render(); })
       .catch(function (error) {
-        if (error.message === 'access') return;
+        if (error.message === 'access') { list.textContent='书目请求被要求重新验证，当前页码已保留。';var login=document.createElement('a');login.href='./home.html?card=required';login.textContent='点此返回首页验证';list.appendChild(login);return; }
         if (attempt < 2) { list.textContent='书目正在重新载入…';setTimeout(function(){loadCatalog(attempt+1)},500*(attempt+1));return; }
         list.textContent = '书目暂时未载入，请刷新页面重试。';
       });
@@ -1146,6 +1163,13 @@ h1, h2, h3, h4 {
   loadCatalog(0);
 })();
 </script>
-<script src="../site-preferences.js?v=20261022-3"></script>
+<style>
+html{scroll-behavior:auto}
+.ct-pagination[hidden]{display:none}
+.ct-pagination{position:sticky;bottom:0;z-index:4;padding:.65rem .4rem calc(.65rem + env(safe-area-inset-bottom));background:var(--zhaowen-page-base);border-top:1px solid var(--zhaowen-line);gap:.5rem;touch-action:manipulation}
+.ct-pagination button{min-height:44px;min-width:64px}
+.ct-pagination button:disabled{opacity:.4;cursor:default}
+</style>
+<script src="../site-preferences.js?v=20261023-4"></script>
 </body>
 </html>

@@ -45,7 +45,7 @@
     var title = document.createElement('h2'); title.textContent = '使用指南';
     var list = document.createElement('ol');
     var externalTip=document.createElement('p');externalTip.textContent='导航中的“漫画”可选择漫蛙或漫画工具，“AO3 镜像”可直接打开外部页面。';card.appendChild(externalTip);
-    ['点“目录”浏览书目；阅读卡在线阅读，下载卡下载，下载中断未完成会退回次数。', '新书会在首页提示；“近期新增”可查看最近 50 本。', '“木木有话说”保存我发的消息；“木木小广场”是交流区，我发布图文，会员可以写文字评论。', '缺书登记和“想看的类型”都可以留言，我会查看，也可以在后台回复。', '续费后用同一手机、同一浏览器登录，书架会保留；清理浏览器数据或换设备可能无法同步。'].forEach(function (text) { var item = document.createElement('li'); item.textContent = text; list.appendChild(item); });
+    ['首页可同时搜索本地书库和公开外部书源；未登录读者可查看书名，需有效卡密才能阅读、收藏或下载。', '阅读卡可站内阅读并加入书架；下载卡用于下载本地书。', '“木木账号查看”可打开我的小红书与抖音主页；点击账号名称即可跳转。', '点“目录”浏览书目；新书会在首页提示，“近期新增”可查看最近 50 本。', '“木木有话说”保存我发的消息；“木木小广场”是交流区，我发布图文，会员可以写文字评论。', '缺书登记可一次填写多本书名、作者或补充说明；“想看的类型”也可以留言，我会查看并回复。', '续费后用同一手机、同一浏览器登录，书架会保留；清理浏览器数据或换设备可能无法同步。'].forEach(function (text) { var item = document.createElement('li'); item.textContent = text; list.appendChild(item); });
     close.onclick = function () { modal.hidden = true; };
     modal.addEventListener('click', function (event) { if (event.target === modal) modal.hidden = true; });
     card.append(close, title, list); modal.appendChild(card); document.body.appendChild(modal);

@@ -273,12 +273,12 @@ class BookAccessIntegrationTests(unittest.TestCase):
         with client.open(self.base + "/read/fallback.zip") as response:
             self.assertEqual(response.read().decode("utf-8"), "压缩包里的正文可以阅读。")
 
-    def test_admin_login_cookie_is_remembered_for_24_hours(self):
+    def test_admin_login_cookie_is_remembered_for_one_week(self):
         payload = json.dumps({"code": "test-admin-password"}).encode()
         request = urllib.request.Request(self.base + "/api/admin/login", data=payload, headers={"Content-Type": "application/json"})
         with urllib.request.urlopen(request) as response:
             cookie = response.headers.get("Set-Cookie", "")
-        self.assertIn("Max-Age=86400", cookie)
+        self.assertIn("Max-Age=604800", cookie)
         self.assertIn("HttpOnly", cookie)
 
     def test_admin_data_reports_storage_and_upload_replaces_existing_titles(self):

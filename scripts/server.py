@@ -783,6 +783,16 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 db.execute("INSERT INTO settings(key,value) VALUES('member_announcement',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (json.dumps(latest, ensure_ascii=False),))
             self.send_json(200, {"ok": True, "deleted": deleted}); return
         if api_path == "/api/requests":
+            request_text = str(payload.get("requestText", payload.get("body", ""))).strip()
+            if request_text:
+                if len(request_text) > 10000:
+                    self.send_json(400, {"ok": False, "message": "内容不能超过 10000 字"}); return
+                visitor = str(payload.get("visitor", ""))[:80]
+                title = "批量缺书登记"
+                with open_database(self.db_path) as db:
+                    db.execute("INSERT INTO book_requests(title,author,edition,section,purpose,contact,note,visitor,created_at) VALUES(?,?,?,?,?,?,?,?,?)", (title, "", "", "", "", "", request_text, visitor, datetime.now(timezone.utc).isoformat()))
+                self.save_event("request", visitor, title)
+                self.send_json(200, {"ok": True}); return
             title = str(payload.get("title", "")).strip()
             author = str(payload.get("author", "")).strip()
             if not title or not author:
@@ -799,8 +809,8 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 self.record_auth_failure("admin")
                 self.send_json(401, {"ok": False}); return
             self.clear_auth_failures("admin")
-            expires = datetime.now(timezone.utc) + timedelta(hours=24)
-            cookie = f"cabin_admin={self.admin_token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400; Expires={format_datetime(expires, usegmt=True)}"
+            expires = datetime.now(timezone.utc) + timedelta(days=7)
+            cookie = f"cabin_admin={self.admin_token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800; Expires={format_datetime(expires, usegmt=True)}"
             self.send_json(200, {"ok": True}, cookie); return
         if api_path == "/api/admin/password":
             if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
@@ -960,6 +970,18 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 self.send_json(200, online_library.search(query, self.online_cache_root))
             except online_library.OnlineLibraryError as error:
                 self.send_json(error.status, {"ok": False, "message": str(error)})
+            return
+        if request_path == "/api/catalog/search":
+            query = parse_qs(urlsplit(self.path).query).get("q", [""])[0].strip().casefold()
+            if not query or len(query) > 100:
+                self.send_json(200, {"items": [], "total": 0}); return
+            source = self.site_root / "assets" / "catalog.json"
+            try:
+                books = json.loads(source.read_text(encoding="utf-8"))
+                items = [book for book in books if isinstance(book, dict) and query in " ".join(str(book.get(key, "")) for key in ("title", "author", "category", "searchablePath")).casefold()]
+                self.send_json(200, {"items": items[:100], "total": len(items)})
+            except (OSError, ValueError, TypeError):
+                self.send_json(200, {"items": [], "total": 0})
             return
         if request_path == "/api/online/read":
             info = self.access_info()

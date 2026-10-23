@@ -208,7 +208,7 @@ h1, h2, h3, h4 {
         background-color: currentColor;
       }
     </style>
-<link rel="stylesheet" href="../site-preferences.css?v=20261022-3">
+<link rel="stylesheet" href="../site-preferences.css?v=20261023-4">
 </head>
 <body class="sh-body">
 <style id="critical-layout">
@@ -1001,35 +1001,23 @@ h1, h2, h3, h4 {
       <section id="request-form" data-dom-id="request-form" class="rq-panel" aria-labelledby="rq-panel-title">
         <div class="rq-panel-head">
           <h2 class="rq-panel-title" id="rq-panel-title">登记表单</h2>
-          <span class="rq-panel-note">带 <span class="rq-req">*</span> 为必填项</span>
+          <span class="rq-panel-note">可一次登记多本</span>
         </div>
 
         <form id="request-form-el" class="rq-form" novalidate>
           <div class="rq-grid">
             <div class="rq-field rq-field--full">
-              <label class="rq-label" for="rq-title">书名 <span class="rq-req">*</span></label>
-              <input
+              <label class="rq-label" for="rq-title">想找的书和补充说明</label>
+              <textarea
                 class="rq-input"
-                type="text"
                 id="rq-title"
-                name="title"
-                autocomplete="off"
-                placeholder="例：世说新语"
+                name="requestText"
+                rows="9"
+                maxlength="10000"
+                placeholder="可写多本书名、作者、版本或其他说明，一次提交即可。每行一本更方便整理。"
                 aria-describedby="rq-title-err">
+              </textarea>
               <p class="rq-err" id="rq-title-err" role="alert" hidden></p>
-            </div>
-
-            <div class="rq-field rq-field--full">
-              <label class="rq-label" for="rq-author">作者 <span class="rq-req">*</span></label>
-              <input
-                class="rq-input"
-                type="text"
-                id="rq-author"
-                name="author"
-                autocomplete="off"
-                placeholder="例：刘义庆；不清楚可填写未知"
-                aria-describedby="rq-author-err">
-              <p class="rq-err" id="rq-author-err" role="alert" hidden></p>
             </div>
 
           </div>
@@ -1039,13 +1027,13 @@ h1, h2, h3, h4 {
             <button type="button" id="rq-reset" class="rq-btn rq-btn-ghost">清空</button>
           </div>
 
-          <p class="rq-hint">登记会直接同步到管理后台，无需填写联系方式。</p>
+          <p class="rq-hint">登记会直接同步到管理后台；请勿填写手机号等个人敏感信息。</p>
         </form>
 
         <div id="rq-success" class="rq-success" hidden aria-live="polite">
           <span class="rq-success-seal" aria-hidden="true">得</span>
           <p class="rq-success-title">已登记 · 得书即告</p>
-          <p class="rq-success-text">我们已收到书名和作者信息，记录已同步到管理后台。</p>
+          <p class="rq-success-text">我们已收到你的登记内容，记录已同步到管理后台。</p>
           <button type="button" id="rq-again" class="rq-btn rq-btn-primary">再登记一本</button>
         </div>
       </section>
@@ -1126,34 +1114,15 @@ h1, h2, h3, h4 {
   form.addEventListener('submit', function (event) {
     event.preventDefault();
 
-    var titleValue = titleField ? titleField.value.trim() : '';
-    var authorValue = authorField ? authorField.value.trim() : '';
-    var firstBad = null;
-
-    if (titleValue === '') {
-      showError(entryFor(titleField), '请填写书名。');
-      firstBad = firstBad || titleField;
-    } else {
-      clearError(entryFor(titleField));
-    }
-
-    if (authorValue === '') {
-      showError(entryFor(authorField), '请填写作者；不清楚可填写“未知”。');
-      firstBad = firstBad || authorField;
-    } else {
-      clearError(entryFor(authorField));
-    }
-
-    if (firstBad) {
-      firstBad.focus();
-      return;
-    }
+    var requestText = titleField ? titleField.value.trim() : '';
+    if (!requestText) { showError(entryFor(titleField), '请至少填写一本想找的书。'); if (titleField) titleField.focus(); return; }
+    if (titleField) clearError(entryFor(titleField));
 
     clearAllErrors();
     var data = new FormData(form);
     var submit = form.querySelector('[type="submit"]');
     if (submit) { submit.disabled = true; submit.textContent = '正在提交…'; }
-    fetch('/api/requests', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({title:titleValue,author:authorValue,visitor:visitorId()}) })
+    fetch('/api/requests', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({requestText:requestText,visitor:visitorId()}) })
       .then(function(response){ if(!response.ok){throw new Error('submit')} form.hidden=true;success.hidden=false;if(againBtn){againBtn.focus()} })
       .catch(function(){ showError(entryFor(titleField),'提交失败，请稍后再试。');titleField.focus(); })
       .finally(function(){ if(submit){submit.disabled=false;submit.textContent='提交登记'} });
@@ -1195,6 +1164,6 @@ h1, h2, h3, h4 {
     window.lucide.createIcons();
   }
 </script>
-<script src="../site-preferences.js?v=20261022-3"></script>
+<script src="../site-preferences.js?v=20261023-4"></script>
 </body>
 </html>
