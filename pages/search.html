@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="../browser-compat.js?v=20261024-1"></script>
     <title>找书</title>
     <style id="theme-vars">
 /* ==========================================================================
@@ -1318,8 +1319,10 @@ h1, h2, h3, h4 {
     });
     if (terms.length) {
       filtered.sort(function(a,b){
-        function score(book){var whole=normalizeSearch(rawQuery);if(book._titleNormalized===whole)return 0;if(book._titleNormalized.indexOf(whole)===0)return 1;if(book._titleNormalized.indexOf(whole)>=0)return 2;return 3;}
-        return score(a)-score(b) || String(a.title).localeCompare(String(b.title), 'zh-CN') || String(a.searchablePath).localeCompare(String(b.searchablePath), 'zh-CN');
+        var whole=normalizeSearch(rawQuery);
+        function score(book){var title=book._titleNormalized||'';if(title===whole)return [0,0];if(title.indexOf(whole)===0)return [1,Math.max(0,title.length-whole.length)];if(title.indexOf(whole)>=0)return [2,Math.max(0,title.length-whole.length)];return [3,title.length];}
+        var left=score(a),right=score(b);
+        return left[0]-right[0] || left[1]-right[1] || String(a.title).localeCompare(String(b.title), 'zh-CN') || String(a.searchablePath).localeCompare(String(b.searchablePath), 'zh-CN');
       });
     }
     page = 1;

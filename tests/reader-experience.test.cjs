@@ -8,10 +8,20 @@ const save = source.slice(source.indexOf('function save('), source.indexOf('func
 const loader = source.slice(source.indexOf('async function loadBook('), source.indexOf("}fetch('/api/access'") + 1);
 test('all changed browser scripts parse', () => {
   new vm.Script(source);
+  new vm.Script(fs.readFileSync('browser-compat.js','utf8'));
   for (const file of ['reading-support.js','recent-reading.js','site-preferences.js','shelf-store.js','member-tools.js','type-requests.js','admin-community.js','reader-stability.js']) new vm.Script(fs.readFileSync(file,'utf8'));
   for (const file of ['pages/home.html','pages/bookshelf.html','pages/online-search.html','pages/admin.html']) {
     for (const match of fs.readFileSync(file,'utf8').matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)) new vm.Script(match[1]);
   }
+});
+test('core pages load fallbacks for older embedded mobile browsers before their app scripts', () => {
+  for (const page of ['pages/home.html','pages/search.html','pages/catalog.html','pages/online-search.html','pages/bookshelf.html','pages/community.html','pages/reader.html']) {
+    const content=fs.readFileSync(page,'utf8');
+    assert.match(content,/browser-compat\.js\?v=20261024-1/);
+  }
+  const compat=fs.readFileSync('browser-compat.js','utf8');
+  assert.match(compat,/replaceChildren/);
+  assert.match(compat,/URLSearchParams/);
 });
 test('tap zones and chapter controls are present in the reader', () => {
   assert.match(html, /id="chapter-prev"[^>]*>上一章/);
@@ -35,6 +45,7 @@ test('page turning has a visible-text fallback instead of leaving a blank page',
   assert.match(stability,/hasVisibleText/);
   assert.match(stability,/candidates = \[original - step/);
   assert.match(html,/reader-stability\.js\?v=20261011-1/);
+  assert.match(fs.readFileSync('site-preferences.css','utf8'),/height:calc\(100vh - 72px\)/);
 });
 test('reader offers stable in-book search from the settings panel', () => {
   assert.match(html, /id="search-text"/);
@@ -61,6 +72,8 @@ test('catalog and search always revalidate the book index after uploads', () => 
 test('typed search covers every directory and supports direct page jumps', () => {
   const search=fs.readFileSync('pages/search.html','utf8');
   assert.match(search,/return matchesQuery\(book\) && \(terms\.length \|\| \(inSection && inFormat\)\)/);
+  assert.match(search,/title===whole/);
+  assert.match(search,/title\.length-whole\.length/);
   assert.match(search,/aria-label', '跳转页码'/);
   assert.match(search,/sm-filters" hidden/);
 });
@@ -104,8 +117,18 @@ test('navigation excludes the unstable comics site and keeps auto-close and unre
   assert.match(memberTools,/nav-unread-badge/);
   assert.match(memberTools,/xiaomuwu-messages-read-at/);
   assert.match(memberTools,/xiaomuwu-community-read-at/);
+  assert.match(memberTools,/addReaderNavigation\(attempt\)/);
+  assert.match(memberTools,/setTimeout\(function \(\) \{ addReaderNavigation\(attempt \+ 1\); \}/);
   assert.match(preferences,/Number\(data\.expiresInSeconds\)>0&&Number\(data\.expiresInSeconds\)<=86400/);
   assert.match(preferences,/您的卡密还有一天到期，如需续期找木木哦/);
+  assert.match(preferencesCss,/\.site-side-reveal\.is-open\{[^}]*top:50%[^}]*translate\(-100%,-50%\)/);
+});
+test('online search remains available outside navigation, without a duplicate nav link', () => {
+  const preferences=fs.readFileSync('site-preferences.js','utf8');
+  const online=fs.readFileSync('pages/online-search.html','utf8');
+  assert.doesNotMatch(preferences,/联网找书|onlineLink/);
+  assert.match(online,/联网找书/);
+  assert.match(fs.readFileSync('pages/home.html','utf8'),/href="\.\/search\.html"/);
 });
 test('online search results can be saved directly and still open in the in-site reader', () => {
   const online=fs.readFileSync('pages/online-search.html','utf8');
@@ -121,6 +144,38 @@ test('home gate identifies the active card type and remaining downloads', () => 
   const home=fs.readFileSync('pages/home.html','utf8');
   assert.match(home,/下载卡 · 剩余 /);
   assert.match(home,/阅读卡 · 已验证/);
+});
+test('catalog page turns use portable scrolling and preserve the selected row on return', () => {
+  const catalog=fs.readFileSync('pages/catalog.html','utf8');
+  assert.doesNotMatch(catalog,/behavior:'instant'/);
+  assert.match(catalog,/behavior:'auto'/);
+  assert.match(catalog,/xiaomuwu-catalog-return/);
+  assert.match(catalog,/state\.path/);
+  assert.match(catalog,/returnParams\.set\('returnPage'/);
+  assert.match(catalog,/returnParams\.get\('returnPage'\)/);
+  assert.match(catalog,/returnParams\.set\('returnPath',book\.searchablePath\)/);
+  assert.match(catalog,/encodeURIComponent\(returnUrl\)/);
+  assert.match(html,/back\.addEventListener\('click'/);
+  assert.match(html,/addEventListener\('popstate'/);
+});
+test('community comments allow a persistent reader display ID without exposing visitor tokens', () => {
+  const community=fs.readFileSync('pages/community.html','utf8');
+  const server=fs.readFileSync('scripts/server.py','utf8');
+  assert.match(community,/community-display-id/);
+  assert.match(community,/xiaomuwu-community-display-id/);
+  assert.match(community,/displayId:displayId/);
+  assert.match(community,/item\.display_id/);
+  assert.match(server,/ALTER TABLE community_comments ADD COLUMN display_id/);
+  assert.match(server,/comment\.pop\("visitor", None\)/);
+});
+test('admin can select a mobile gallery photo, preview it, and publish after upload', () => {
+  const adminBoard=fs.readFileSync('community-board-admin.js','utf8');
+  assert.match(adminBoard,/从手机相册选择图片/);
+  assert.match(adminBoard,/accept="image\/jpeg,image\/png,image\/webp,image\/gif"/);
+  assert.match(adminBoard,/community-image-preview/);
+  assert.match(adminBoard,/file\.size > 3 \* 1024 \* 1024/);
+  assert.match(adminBoard,/if \(imageBusy\)/);
+  assert.match(adminBoard,/imageUrl: imageUrl/);
 });
 test('shelf data is mirrored locally so changing a card does not clear it', () => {
   const shelf=fs.readFileSync('shelf-store.js','utf8');

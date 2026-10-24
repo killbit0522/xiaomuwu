@@ -77,8 +77,12 @@
   }
 
   installGuide();
-  fetch('/api/access').then(function (response) { return response.json(); }).then(function (access) {
-    if (!access.ok || access.cardType !== 'reader') return;
+  function addReaderNavigation(attempt) {
+    fetch('/api/access', { cache: 'no-store' }).then(function (response) {
+      if (!response.ok) throw new Error('access');
+      return response.json();
+    }).then(function (access) {
+      if (!access.ok || access.cardType !== 'reader') return;
     var nav = document.querySelector('.gw-nav,.sh-nav');
     navLink(nav, './recent.html', '近期新增', '新', 'Recent');
     var messagesLink = navLink(nav, './messages.html', '木木有话说', '话', 'Messages');
@@ -86,5 +90,9 @@
     unreadMarker(messagesLink, '/api/messages', 'items', 'updatedAt', 'xiaomuwu-messages-read-at', '/pages/messages.html');
     unreadMarker(communityLink, '/api/community', 'items', 'created_at', 'xiaomuwu-community-read-at', '/pages/community.html');
     fetch('/api/announcement', { cache: 'no-store' }).then(function (response) { return response.ok ? response.json() : null; }).then(announcement).catch(function () {});
-  }).catch(function () {});
+    }).catch(function () {
+      if (attempt < 2) setTimeout(function () { addReaderNavigation(attempt + 1); }, 900 * (attempt + 1));
+    });
+  }
+  addReaderNavigation(0);
 })();

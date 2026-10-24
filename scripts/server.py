@@ -726,8 +726,11 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             except (TypeError, ValueError):
                 post_id = 0
             body = str(payload.get("body", "")).strip()
+            display_id = str(payload.get("displayId", "")).strip()
             if post_id < 1 or not body or len(body) > 500:
                 self.send_json(400, {"ok": False, "message": "评论需为 1 至 500 个字"}); return
+            if not re.fullmatch(r"[\w\u3400-\u9fff.-]{2,20}", display_id, flags=re.UNICODE):
+                self.send_json(400, {"ok": False, "message": "广场 ID 请用 2 至 20 位中英文、数字或 - _ ."}); return
             token = self.download_session()
             visitor = hashlib.sha256(token.encode("utf-8")).hexdigest()[:16] if token else "admin"
             with open_database(self.db_path) as db:
@@ -736,7 +739,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
                 recent_comments = db.execute("SELECT COUNT(*) FROM community_comments WHERE visitor=? AND created_at>=?", (visitor, cutoff)).fetchone()[0]
                 if recent_comments >= 20: self.send_json(429, {"ok": False, "message": "留言太频繁，请稍后再试"}); return
-                cursor = db.execute("INSERT INTO community_comments(post_id,body,visitor,created_at) VALUES(?,?,?,?)", (post_id, body, visitor, datetime.now(timezone.utc).isoformat()))
+                cursor = db.execute("INSERT INTO community_comments(post_id,body,visitor,display_id,created_at) VALUES(?,?,?,?,?)", (post_id, body, visitor, display_id, datetime.now(timezone.utc).isoformat()))
             self.send_json(200, {"ok": True, "id": cursor.lastrowid}); return
         if api_path == "/api/admin/community/posts/delete":
             if not self.has_admin_access(): self.send_json(403, {"ok": False}); return
@@ -941,8 +944,12 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 comments_by_post = {post_id: [] for post_id in post_ids}
                 if post_ids:
                     for post_id in post_ids:
-                        rows = db.execute("SELECT id,post_id,body,created_at FROM community_comments WHERE post_id=? ORDER BY id DESC LIMIT 50", (post_id,))
-                        comments_by_post[post_id] = list(reversed([dict(row) for row in rows]))
+                        rows = db.execute("SELECT id,post_id,body,visitor,display_id,created_at FROM community_comments WHERE post_id=? ORDER BY id DESC LIMIT 50", (post_id,))
+                        comments = list(reversed([dict(row) for row in rows]))
+                        for comment in comments:
+                            comment["display_id"] = comment["display_id"] or ("读者" + str(comment.get("visitor", ""))[:4])
+                            comment.pop("visitor", None)
+                        comments_by_post[post_id] = comments
             for post in posts:
                 post["comments"] = comments_by_post.get(post["id"], [])
             self.send_json(200, {"items": posts}); return
@@ -1429,6 +1436,8 @@ def main():
         db.execute("CREATE TABLE IF NOT EXISTS book_requests(id INTEGER PRIMARY KEY, title TEXT, author TEXT, edition TEXT, section TEXT, purpose TEXT, contact TEXT, note TEXT, visitor TEXT, created_at TEXT)")
         db.execute("CREATE TABLE IF NOT EXISTS community_posts(id INTEGER PRIMARY KEY, title TEXT NOT NULL, body TEXT NOT NULL, image_url TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL)")
         db.execute("CREATE TABLE IF NOT EXISTS community_comments(id INTEGER PRIMARY KEY, post_id INTEGER NOT NULL, body TEXT NOT NULL, visitor TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, FOREIGN KEY(post_id) REFERENCES community_posts(id))")
+        comment_columns = {row[1] for row in db.execute("PRAGMA table_info(community_comments)")}
+        if "display_id" not in comment_columns: db.execute("ALTER TABLE community_comments ADD COLUMN display_id TEXT NOT NULL DEFAULT ''")
         db.execute("CREATE INDEX IF NOT EXISTS community_comments_post_id ON community_comments(post_id, id)")
         db.execute("CREATE TABLE IF NOT EXISTS access_cards(id INTEGER PRIMARY KEY, code TEXT UNIQUE, download_limit INTEGER NOT NULL, remaining INTEGER NOT NULL, used INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL)")
         db.execute("CREATE TABLE IF NOT EXISTS download_sessions(token TEXT PRIMARY KEY, card_id INTEGER NOT NULL, created_at TEXT NOT NULL, last_used_at TEXT, FOREIGN KEY(card_id) REFERENCES access_cards(id))")

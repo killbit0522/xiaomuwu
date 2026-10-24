@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="../browser-compat.js?v=20261024-1"></script>
     <title>目录</title>
     <style id="theme-vars">
 /* ==========================================================================
@@ -1044,6 +1045,7 @@ h1, h2, h3, h4 {
   try { var browseState = JSON.parse(sessionStorage.getItem('xiaomuwu-catalog-browse') || 'null'); if(browseState){active=browseState.active||'all';page=Math.max(1,Math.trunc(Number(browseState.page)||1));} } catch(error) {}
   try { returnState = JSON.parse(sessionStorage.getItem('xiaomuwu-catalog-return') || 'null'); } catch (error) {}
   if (returnState) { active = returnState.active || 'all'; page = Number(returnState.page) || 1; }
+  try { var returnParams=new URLSearchParams(location.search),returnPage=Number(returnParams.get('returnPage'));if(returnPage>0){returnState={active:returnParams.get('returnActive')||'all',page:returnPage,scrollY:Number(returnParams.get('returnY'))||0,path:returnParams.get('returnPath')||''};active=returnState.active;page=returnPage;['returnActive','returnPage','returnY','returnPath'].forEach(function(key){returnParams.delete(key)});history.replaceState(history.state,'',location.pathname+(returnParams.toString()?'?'+returnParams.toString():'')+location.hash);} } catch(error) {}
   function saveBrowseState(){try{sessionStorage.setItem('xiaomuwu-catalog-browse',JSON.stringify({active:active,page:page}))}catch(error){}}
 
   function isUnlocked() { return accessMode === 'download' || accessMode === 'reader'; }
@@ -1083,7 +1085,7 @@ h1, h2, h3, h4 {
     button.append(number, main, category, toggle); row.append(button, note);
     button.addEventListener('click', function () {
       if (!isUnlocked()) { window.location.href = './search.html?q=' + encodeURIComponent(book.title); return; }
-      if(accessMode==='reader'){if(readable){try{sessionStorage.setItem('xiaomuwu-catalog-return',JSON.stringify({active:active,page:page,scrollY:window.scrollY,path:book.searchablePath}))}catch(error){}window.location.href='./reader.html?p='+encodeURIComponent(book.searchablePath)+'&title='+encodeURIComponent(book.title)+'&format='+encodeURIComponent(book.format)+'&return='+encodeURIComponent(location.pathname+location.search)}return}
+      if(accessMode==='reader'){if(readable){var scrollY=window.scrollY||window.pageYOffset||0,returnParams=new URLSearchParams(location.search);try{sessionStorage.setItem('xiaomuwu-catalog-return',JSON.stringify({active:active,page:page,scrollY:scrollY,path:book.searchablePath}))}catch(error){}returnParams.set('returnActive',active);returnParams.set('returnPage',String(page));returnParams.set('returnY',String(Math.round(scrollY)));returnParams.set('returnPath',book.searchablePath);var returnUrl=location.pathname+(returnParams.toString()?'?'+returnParams.toString():'');window.location.href='./reader.html?p='+encodeURIComponent(book.searchablePath)+'&title='+encodeURIComponent(book.title)+'&format='+encodeURIComponent(book.format)+'&return='+encodeURIComponent(returnUrl)}return}
       logDownload(book);downloadBook(book);
     });
     return row;
@@ -1104,7 +1106,7 @@ h1, h2, h3, h4 {
     if(target===page)return;
     returnState=null;page=target;render();
     // Explicitly show the first book of the NEW page, not the bottom of it.
-    window.scrollTo({top:Math.max(0,window.scrollY+list.getBoundingClientRect().top-80),behavior:'instant'});
+    window.scrollTo({top:Math.max(0,window.scrollY+list.getBoundingClientRect().top-80),behavior:'auto'});
   }
   previous.onclick=function(event){changePage(page-1,event)};
   next.onclick=function(event){changePage(page+1,event)};

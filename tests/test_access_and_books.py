@@ -64,6 +64,8 @@ class BookAccessIntegrationTests(unittest.TestCase):
             db.execute("CREATE TABLE events(id INTEGER PRIMARY KEY, type TEXT, visitor TEXT, detail TEXT, created_at TEXT)")
             db.execute("CREATE TABLE reviews(id INTEGER PRIMARY KEY, book TEXT, title TEXT, body TEXT, visitor TEXT, created_at TEXT, admin_reply TEXT NOT NULL DEFAULT '', replied_at TEXT NOT NULL DEFAULT '')")
             db.execute("CREATE TABLE book_requests(id INTEGER PRIMARY KEY, title TEXT, author TEXT, edition TEXT, section TEXT, purpose TEXT, contact TEXT, note TEXT, visitor TEXT, created_at TEXT)")
+            db.execute("CREATE TABLE community_posts(id INTEGER PRIMARY KEY, title TEXT NOT NULL, body TEXT NOT NULL, image_url TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL)")
+            db.execute("CREATE TABLE community_comments(id INTEGER PRIMARY KEY, post_id INTEGER NOT NULL, body TEXT NOT NULL, visitor TEXT NOT NULL DEFAULT '', display_id TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL)")
             db.execute("CREATE TABLE settings(key TEXT PRIMARY KEY, value TEXT NOT NULL)")
             db.execute("INSERT INTO settings(key,value) VALUES('admin_password_hash',?)", (hashlib.sha256(b"test-admin-password").hexdigest(),))
             now = datetime.now(timezone.utc)
@@ -114,6 +116,8 @@ class BookAccessIntegrationTests(unittest.TestCase):
         with sqlite3.connect(self.db) as db:
             db.execute("DELETE FROM reviews")
             db.execute("DELETE FROM book_requests")
+            db.execute("DELETE FROM community_comments")
+            db.execute("DELETE FROM community_posts")
             db.execute("DELETE FROM settings WHERE key='member_announcement'")
             db.execute("DELETE FROM settings WHERE key='member_messages'")
 
@@ -133,6 +137,34 @@ class BookAccessIntegrationTests(unittest.TestCase):
                 with client.open(url) as response:
                     self.assertEqual(response.headers.get_content_charset(), "utf-8")
                     self.assertEqual(response.read().decode("utf-8"), expected)
+
+    def test_community_comments_store_and_display_reader_chosen_id(self):
+        client = self.client()
+        self.unlock(client, "TEST-READER")
+        with sqlite3.connect(self.db) as db:
+            cursor = db.execute("INSERT INTO community_posts(title,body,created_at) VALUES(?,?,?)", ("测试动态", "分享", datetime.now(timezone.utc).isoformat()))
+            post_id = cursor.lastrowid
+        payload = json.dumps({"postId": post_id, "body": "很喜欢这段", "displayId": "木木读者7"}).encode()
+        request = urllib.request.Request(self.base + "/api/community/comments", data=payload, headers={"Content-Type": "application/json"})
+        with client.open(request) as response:
+            self.assertEqual(json.loads(response.read())["ok"], True)
+        with client.open(self.base + "/api/community") as response:
+            data = json.loads(response.read())
+        comment = data["items"][0]["comments"][0]
+        self.assertEqual(comment["display_id"], "木木读者7")
+        self.assertNotIn("visitor", comment)
+
+    def test_community_rejects_invalid_reader_display_id(self):
+        client = self.client()
+        self.unlock(client, "TEST-READER")
+        with sqlite3.connect(self.db) as db:
+            cursor = db.execute("INSERT INTO community_posts(title,body,created_at) VALUES(?,?,?)", ("测试动态", "分享", datetime.now(timezone.utc).isoformat()))
+            post_id = cursor.lastrowid
+        payload = json.dumps({"postId": post_id, "body": "测试", "displayId": "<b>恶意</b>"}).encode()
+        request = urllib.request.Request(self.base + "/api/community/comments", data=payload, headers={"Content-Type": "application/json"})
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            client.open(request)
+        self.assertEqual(error.exception.code, 400)
 
     def test_reader_text_uses_etag_cache_and_pdf_supports_byte_ranges(self):
         client = self.client()
