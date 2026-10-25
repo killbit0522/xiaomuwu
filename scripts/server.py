@@ -1205,7 +1205,12 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             self.end_headers()
             return
         if request_path.startswith("/books/"):
-            info = self.access_info()
+            try:
+                info = self.access_info()
+            except sqlite3.Error as error:
+                self.log_error("download access check failed: %s", error)
+                self.send_error(503, "Download service temporarily unavailable")
+                return
             if not info or info["card_type"] != "download":
                 self.send_error(403, "Download card required or download limit exhausted")
                 return
@@ -1236,7 +1241,14 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             except OSError:
                 self.send_error(503, "Book file temporarily unavailable")
                 return
-            reservation = self.reserve_download()
+            try:
+                reservation = self.reserve_download()
+            except sqlite3.Error as error:
+                if stream is not None:
+                    stream.close()
+                self.log_error("download reservation failed: %s", error)
+                self.send_error(503, "Download service temporarily unavailable; please retry")
+                return
             if not reservation:
                 if stream is not None:
                     stream.close()
@@ -1261,7 +1273,13 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                     if sent != content_length:
                         raise OSError("incomplete file read")
                 self.wfile.flush()
-                self.complete_download(reservation)
+                try:
+                    self.complete_download(reservation)
+                except sqlite3.Error as error:
+                    # The file has already been delivered. Keep the consumed use
+                    # and log the stale reservation for startup recovery rather
+                    # than closing a successful response as an apparent 502.
+                    self.log_error("download completed but reservation cleanup failed: %s", error)
             except (BrokenPipeError, ConnectionResetError, OSError):
                 self.refund_download(reservation)
             finally:

@@ -122,6 +122,7 @@ class BookAccessIntegrationTests(unittest.TestCase):
             db.execute("DELETE FROM reader_shelves")
             db.execute("DELETE FROM settings WHERE key='member_announcement'")
             db.execute("DELETE FROM settings WHERE key='member_messages'")
+            db.execute("UPDATE access_cards SET remaining=download_limit,used=0,active=1 WHERE code='TEST-DOWNLOAD'")
 
     def unlock(self, client, code):
         payload = json.dumps({"code": code}).encode()
@@ -270,6 +271,28 @@ class BookAccessIntegrationTests(unittest.TestCase):
         with sqlite3.connect(self.db) as db:
             remaining, used = db.execute("SELECT remaining,used FROM access_cards WHERE code='TEST-DOWNLOAD'").fetchone()
         self.assertEqual((remaining, used), (0, 2))
+
+    def test_download_database_lock_returns_retryable_503_instead_of_dropping_upstream(self):
+        client = self.client()
+        self.unlock(client, "TEST-DOWNLOAD")
+        with patch.object(LibraryHandler, "reserve_download", side_effect=sqlite3.OperationalError("database is locked")):
+            with self.assertRaises(urllib.error.HTTPError) as caught:
+                client.open(self.base + "/books/utf8.txt")
+        self.assertEqual(caught.exception.code, 503)
+        self.assertIn("temporarily unavailable", caught.exception.read().decode("utf-8"))
+        caught.exception.close()
+
+    def test_download_card_and_unicode_book_path_work_end_to_end(self):
+        folder = self.books / "新上传" / "测试目录"
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / "痛仰.txt").write_text("下载链路中文路径测试", encoding="utf-8")
+        client = self.client()
+        self.unlock(client, "TEST-DOWNLOAD")
+        url = self.base + "/books/" + urllib.parse.quote("新上传/测试目录/痛仰.txt", safe="/")
+        with client.open(url) as response:
+            self.assertEqual(response.status, 200)
+            self.assertIn("attachment", response.headers.get("Content-Disposition", ""))
+            self.assertEqual(response.read()[3:].decode("utf-8"), "下载链路中文路径测试")
 
     def test_reader_and_download_cards_cannot_be_mistaken_for_each_other(self):
         reader = self.client()
