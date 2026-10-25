@@ -177,10 +177,16 @@ test('admin can select a mobile gallery photo, preview it, and publish after upl
   assert.match(adminBoard,/if \(imageBusy\)/);
   assert.match(adminBoard,/imageUrl: imageUrl/);
 });
-test('shelf data is mirrored locally so changing a card does not clear it', () => {
+test('shelf data is backed up locally and synced per device across reader cards', () => {
   const shelf=fs.readFileSync('shelf-store.js','utf8');
   assert.match(shelf,/xiaomuwu-shelf-backup/);
   assert.match(shelf,/Storage\.prototype\.setItem/);
+  assert.match(shelf,/xiaomuwu-shelf-device/);
+  assert.match(shelf,/X-Shelf-Device/);
+  assert.match(shelf,/cabinShelfReady/);
+  for (const page of ['pages/search.html','pages/online-search.html','pages/reader.html','pages/bookshelf.html']) {
+    assert.match(fs.readFileSync(page,'utf8'),/shelf-store\.js\?v=20261025-1/);
+  }
 });
 function saveContext() {
   const writes = new Map();

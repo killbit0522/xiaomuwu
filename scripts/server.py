@@ -625,6 +625,66 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             image_dir.mkdir(parents=True, exist_ok=True)
             (image_dir / safe_name).write_bytes(image_body)
             self.send_json(200, {"ok": True, "imageUrl": "/api/community/image/" + safe_name}); return
+        if api_path == "/api/shelf":
+            info = self.access_info()
+            if not info or info["card_type"] != "reader":
+                self.send_json(403, {"ok": False, "message": "需要有效阅读卡"}); return
+            device_key = self.headers.get("X-Shelf-Device", "").strip().lower()
+            if not re.fullmatch(r"[a-f0-9]{32,64}", device_key):
+                self.send_json(400, {"ok": False, "message": "设备标识无效"}); return
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                if not 0 < length <= 262144:
+                    raise ValueError("书架数据过大")
+                payload = json.loads(self.rfile.read(length).decode("utf-8"))
+                if not isinstance(payload, dict):
+                    raise ValueError("书架数据格式无效")
+                items = payload.get("items", [])
+                removals = payload.get("remove", [])
+                if not isinstance(items, list) or len(items) > 300 or not isinstance(removals, list) or len(removals) > 300:
+                    raise ValueError("书架项目数量无效")
+                normalized = {}
+                for item in items:
+                    if not isinstance(item, dict):
+                        continue
+                    title = str(item.get("title", "")).strip()[:300]
+                    path = str(item.get("searchablePath", "")).strip()[:1200]
+                    if not title or not path or "\\" in path or any(ord(char) < 32 for char in path):
+                        continue
+                    if path.startswith("online:"):
+                        if not re.fullmatch(r"online:[\w:.-]{1,300}", path):
+                            continue
+                    else:
+                        parts = Path(path).parts
+                        if Path(path).is_absolute() or not parts or any(part in ("", ".", "..") for part in parts):
+                            continue
+                    source_url = str(item.get("sourceUrl", ""))[:1000]
+                    if source_url and not source_url.startswith("https://"):
+                        source_url = ""
+                    normalized[path] = {
+                        "title": title, "searchablePath": path,
+                        "format": str(item.get("format", "txt"))[:12],
+                        "category": str(item.get("category", ""))[:300],
+                        "onlineId": str(item.get("onlineId", ""))[:300],
+                        "source": str(item.get("source", ""))[:100],
+                        "sourceUrl": source_url,
+                    }
+                removals = [str(path)[:1200] for path in removals if isinstance(path, str)]
+                with open_database(self.db_path) as db:
+                    row = db.execute("SELECT books_json FROM reader_shelves WHERE device_key=?", (device_key,)).fetchone()
+                    try:
+                        books = json.loads(row[0]) if row else []
+                    except (ValueError, TypeError):
+                        books = []
+                    books = {book.get("searchablePath"): book for book in books if isinstance(book, dict) and book.get("searchablePath")}
+                    for path in removals:
+                        books.pop(path, None)
+                    books.update(normalized)
+                    books = list(books.values())[-300:]
+                    db.execute("INSERT INTO reader_shelves(device_key,books_json,updated_at) VALUES(?,?,?) ON CONFLICT(device_key) DO UPDATE SET books_json=excluded.books_json,updated_at=excluded.updated_at", (device_key, json.dumps(books, ensure_ascii=False), datetime.now(timezone.utc).isoformat()))
+                self.send_json(200, {"ok": True, "count": len(books)}); return
+            except (ValueError, UnicodeDecodeError, TypeError) as error:
+                self.send_json(400, {"ok": False, "message": str(error)}); return
         try:
             payload = self.read_json()
         except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
@@ -971,6 +1031,20 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             except (OSError, ValueError, TypeError):
                 self.send_json(200, {"version": "empty", "items": []})
             return
+        if request_path == "/api/shelf":
+            info = self.access_info()
+            if not info or info["card_type"] != "reader":
+                self.send_json(403, {"ok": False, "message": "需要有效阅读卡"}); return
+            device_key = self.headers.get("X-Shelf-Device", "").strip().lower()
+            if not re.fullmatch(r"[a-f0-9]{32,64}", device_key):
+                self.send_json(400, {"ok": False, "message": "设备标识无效"}); return
+            with open_database(self.db_path) as db:
+                row = db.execute("SELECT books_json FROM reader_shelves WHERE device_key=?", (device_key,)).fetchone()
+            try:
+                items = json.loads(row[0]) if row else []
+            except (ValueError, TypeError):
+                items = []
+            self.send_json(200, {"ok": True, "items": items if isinstance(items, list) else []}); return
         if request_path == "/api/online/search":
             query = parse_qs(urlsplit(self.path).query).get("q", [""])[0]
             try:
@@ -1443,6 +1517,7 @@ def main():
         db.execute("CREATE TABLE IF NOT EXISTS download_sessions(token TEXT PRIMARY KEY, card_id INTEGER NOT NULL, created_at TEXT NOT NULL, last_used_at TEXT, FOREIGN KEY(card_id) REFERENCES access_cards(id))")
         db.execute("CREATE TABLE IF NOT EXISTS download_reservations(id INTEGER PRIMARY KEY, card_id INTEGER NOT NULL, token TEXT NOT NULL, created_at TEXT NOT NULL, FOREIGN KEY(card_id) REFERENCES access_cards(id))")
         db.execute("CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+        db.execute("CREATE TABLE IF NOT EXISTS reader_shelves(device_key TEXT PRIMARY KEY, books_json TEXT NOT NULL DEFAULT '[]', updated_at TEXT NOT NULL)")
         columns = {row[1] for row in db.execute("PRAGMA table_info(access_cards)")}
         if "card_type" not in columns: db.execute("ALTER TABLE access_cards ADD COLUMN card_type TEXT NOT NULL DEFAULT 'download'")
         if "expires_at" not in columns: db.execute("ALTER TABLE access_cards ADD COLUMN expires_at TEXT NOT NULL DEFAULT ''")

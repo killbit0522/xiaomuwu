@@ -67,6 +67,7 @@ class BookAccessIntegrationTests(unittest.TestCase):
             db.execute("CREATE TABLE community_posts(id INTEGER PRIMARY KEY, title TEXT NOT NULL, body TEXT NOT NULL, image_url TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL)")
             db.execute("CREATE TABLE community_comments(id INTEGER PRIMARY KEY, post_id INTEGER NOT NULL, body TEXT NOT NULL, visitor TEXT NOT NULL DEFAULT '', display_id TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL)")
             db.execute("CREATE TABLE settings(key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+            db.execute("CREATE TABLE reader_shelves(device_key TEXT PRIMARY KEY, books_json TEXT NOT NULL DEFAULT '[]', updated_at TEXT NOT NULL)")
             db.execute("INSERT INTO settings(key,value) VALUES('admin_password_hash',?)", (hashlib.sha256(b"test-admin-password").hexdigest(),))
             now = datetime.now(timezone.utc)
             db.execute("INSERT INTO access_cards(code,card_type,download_limit,remaining,used,expires_at,active,created_at) VALUES(?,?,?,?,?,?,?,?)", ("TEST-READER", "reader", 0, 0, 0, (now + timedelta(days=2)).isoformat(), 1, now.isoformat()))
@@ -118,6 +119,7 @@ class BookAccessIntegrationTests(unittest.TestCase):
             db.execute("DELETE FROM book_requests")
             db.execute("DELETE FROM community_comments")
             db.execute("DELETE FROM community_posts")
+            db.execute("DELETE FROM reader_shelves")
             db.execute("DELETE FROM settings WHERE key='member_announcement'")
             db.execute("DELETE FROM settings WHERE key='member_messages'")
 
@@ -217,6 +219,29 @@ class BookAccessIntegrationTests(unittest.TestCase):
             items = json.loads(response.read())["items"]
         self.assertLessEqual(len(items), 50)
         self.assertEqual(items[0]["title"], "新书乙")
+
+    def test_shelf_sync_follows_device_across_different_reader_cards(self):
+        device = "a1" * 16
+        first = self.client(); self.unlock(first, "TEST-READER")
+        headers = {"Content-Type": "application/json", "X-Shelf-Device": device}
+        book = {"title": "白鸽", "searchablePath": "分类/白鸽.txt", "format": "txt", "category": "分类"}
+        request = urllib.request.Request(self.base + "/api/shelf", data=json.dumps({"items": [book]}).encode(), headers=headers)
+        with first.open(request) as response:
+            self.assertEqual(json.loads(response.read())["count"], 1)
+
+        second = self.client(); self.unlock(second, "TEST-EXPIRING")
+        read_request = urllib.request.Request(self.base + "/api/shelf", headers={"X-Shelf-Device": device})
+        with second.open(read_request) as response:
+            self.assertEqual(json.loads(response.read())["items"][0]["searchablePath"], "分类/白鸽.txt")
+        remove_request = urllib.request.Request(self.base + "/api/shelf", data=json.dumps({"items": [], "remove": [book["searchablePath"]]}).encode(), headers=headers)
+        with second.open(remove_request) as response:
+            self.assertEqual(json.loads(response.read())["count"], 0)
+
+        download = self.client()
+        with self.assertRaises(urllib.error.HTTPError) as denied:
+            download.open(urllib.request.Request(self.base + "/api/shelf", headers={"X-Shelf-Device": device}))
+        self.assertEqual(denied.exception.code, 403)
+        denied.exception.close()
 
     def test_valid_reader_card_can_be_entered_again_but_expired_card_cannot(self):
         self.assertTrue(self.unlock(self.client(), "TEST-READER")["ok"])
