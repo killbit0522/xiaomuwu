@@ -53,10 +53,19 @@ def start(handler, decode):
             temp.replace(destination)
         try:
             books = json.loads((handler.site_root / 'assets/catalog.json').read_text(encoding='utf-8'))
+            if not isinstance(books, list):
+                raise ValueError('catalog must be a list')
             result['total'] = len(books)
             persist()
-            for book in books:
+            for index, book in enumerate(books):
+                if not isinstance(book, dict):
+                    result['issues'].append({'title': f'目录记录 {index + 1}', 'path': '', 'message': '目录记录格式无效', 'severity': 'error', 'suggestion': '点击“安全修复并复检”重建目录；不会删除原书。'})
+                    result['errors'] += 1
+                    result['checked'] += 1
+                    continue
                 relative = book.get('searchablePath', '')
+                if not isinstance(relative, str) or not relative.strip() or '\x00' in relative:
+                    relative = ''
                 path = (handler.textbook_root / relative).resolve()
                 message = ''
                 severity = 'warning'
@@ -105,7 +114,7 @@ def start(handler, decode):
                     severity = 'error'
                     suggestion = '先点“安全修复并复检”；仍失败时请转换成 UTF-8 TXT 后重新上传。'
                 if message:
-                    result['issues'].append({'title': book.get('title', relative), 'path': relative, 'message': message, 'severity': severity, 'suggestion': suggestion})
+                    result['issues'].append({'title': str(book.get('title') or relative or f'目录记录 {index + 1}'), 'path': relative, 'message': message, 'severity': severity, 'suggestion': suggestion})
                     result['errors' if severity == 'error' else 'warnings'] += 1
                 result['checked'] += 1
                 if result['checked'] % 20 == 0:

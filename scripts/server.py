@@ -1287,7 +1287,12 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                     stream.close()
             return
         if request_path.startswith("/read/"):
-            info = self.access_info()
+            try:
+                info = self.access_info()
+            except sqlite3.Error as error:
+                self.log_error("reader access check failed: %s", error)
+                self.send_error(503, "Reading service temporarily unavailable; please retry")
+                return
             if not info or info["card_type"] != "reader": self.send_error(403, "Reader card required"); return
             if Path(request_path).suffix.lower() in {".txt", ".docx", ".epub", ".zip"}:
                 try:
@@ -1304,7 +1309,12 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 if not source.is_file():
                     self.send_error(404, "Book file unavailable")
                     return
-                self.send_file_range(source, "application/pdf")
+                try:
+                    self.send_file_range(source, "application/pdf")
+                except OSError as error:
+                    self.log_error("PDF read failed: %s", error)
+                    if not self.wfile.closed:
+                        self.send_error(503, "Book storage temporarily unavailable; please retry")
                 return
             self.send_error(415, "This format is not available for online reading")
             return
