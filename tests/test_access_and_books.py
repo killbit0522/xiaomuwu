@@ -282,6 +282,16 @@ class BookAccessIntegrationTests(unittest.TestCase):
         self.assertIn("temporarily unavailable", caught.exception.read().decode("utf-8"))
         caught.exception.close()
 
+    def test_download_temporary_txt_storage_error_is_retryable_503(self):
+        client = self.client()
+        self.unlock(client, "TEST-DOWNLOAD")
+        with patch.object(Path, "read_bytes", side_effect=OSError("temporary storage error")):
+            with self.assertRaises(urllib.error.HTTPError) as caught:
+                client.open(self.base + "/books/utf8.txt")
+        self.assertEqual(caught.exception.code, 503)
+        self.assertIn("temporarily unavailable", caught.exception.read().decode("utf-8"))
+        caught.exception.close()
+
     def test_download_card_and_unicode_book_path_work_end_to_end(self):
         folder = self.books / "新上传" / "测试目录"
         folder.mkdir(parents=True, exist_ok=True)

@@ -1222,7 +1222,11 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 try:
                     raw = source.read_bytes()
                     body = b"\xef\xbb\xbf" + decode_book_text(raw).encode("utf-8")
-                except (OSError, ValueError) as error:
+                except OSError as error:
+                    self.log_error("TXT download read failed: %s", error)
+                    self.send_error(503, "Book storage temporarily unavailable; please retry")
+                    return
+                except ValueError as error:
                     self.send_error(422, str(error))
                     return
                 # Keep the .txt extension and UTF-8 bytes, but tell mobile browsers
