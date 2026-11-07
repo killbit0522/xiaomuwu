@@ -1285,7 +1285,12 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                     # than closing a successful response as an apparent 502.
                     self.log_error("download completed but reservation cleanup failed: %s", error)
             except (BrokenPipeError, ConnectionResetError, OSError):
-                self.refund_download(reservation)
+                try:
+                    self.refund_download(reservation)
+                except sqlite3.Error as error:
+                    # Keep the reservation row so startup recovery can restore
+                    # the quota if the database is still busy at disconnect.
+                    self.log_error("download refund deferred to startup recovery: %s", error)
             finally:
                 if stream is not None:
                     stream.close()
