@@ -198,6 +198,18 @@ def _read_json_cache(path, lifetime):
     return None
 
 
+def _read_search_cache(path):
+    """Keep successful searches warm, but retry incomplete multi-source searches soon."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        lifetime = 45 if isinstance(data, dict) and data.get("partial") else 15 * 60
+        if time.time() - path.stat().st_mtime <= lifetime:
+            return data
+    except (OSError, ValueError):
+        pass
+    return None
+
+
 def _write_atomic(path, content, binary=False):
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
@@ -257,7 +269,8 @@ def search(query, cache_root, requester=None, gutenberg_requester=None, openlibr
     if len(query) < 1:
         raise OnlineLibraryError(400, "请输入书名或作者")
     cache = _cache_path(cache_root, "search", query.casefold(), "json")
-    cached = _read_json_cache(cache, 15 * 60)
+    stale_cache = _read_json_cache(cache, 15 * 60)
+    cached = _read_search_cache(cache)
     if cached is not None:
         return dict(cached, cached=True)
     wiki_requester = requester or _request_json
@@ -285,6 +298,16 @@ def search(query, cache_root, requester=None, gutenberg_requester=None, openlibr
                 source_errors.append(adapter.name + "：暂时不可用")
     for adapter in providers:
         items.extend(provider_items.get(adapter.key, []))
+    if source_errors and stale_cache:
+        failed_sources = {error.split("：", 1)[0] for error in source_errors}
+        fresh_ids = {(item.get("source"), item.get("id")) for item in items}
+        for item in stale_cache.get("items", []):
+            if not isinstance(item, dict) or item.get("source") not in failed_sources:
+                continue
+            identity = (item.get("source"), item.get("id"))
+            if identity not in fresh_ids:
+                items.append(item)
+                fresh_ids.add(identity)
     if not items and source_errors:
         try:
             stale = json.loads(cache.read_text(encoding="utf-8"))
