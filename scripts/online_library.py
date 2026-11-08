@@ -204,7 +204,7 @@ def _read_search_cache(path):
         data = json.loads(path.read_text(encoding="utf-8"))
         lifetime = 45 if isinstance(data, dict) and data.get("partial") else 15 * 60
         if time.time() - path.stat().st_mtime <= lifetime:
-            return data
+            return data if isinstance(data, dict) else None
     except (OSError, ValueError):
         pass
     return None
@@ -298,10 +298,13 @@ def search(query, cache_root, requester=None, gutenberg_requester=None, openlibr
                 source_errors.append(adapter.name + "：暂时不可用")
     for adapter in providers:
         items.extend(provider_items.get(adapter.key, []))
-    if source_errors and stale_cache:
+    if source_errors and isinstance(stale_cache, dict):
         failed_sources = {error.split("：", 1)[0] for error in source_errors}
         fresh_ids = {(item.get("source"), item.get("id")) for item in items}
-        for item in stale_cache.get("items", []):
+        stale_items = stale_cache.get("items", [])
+        if not isinstance(stale_items, list):
+            stale_items = []
+        for item in stale_items:
             if not isinstance(item, dict) or item.get("source") not in failed_sources:
                 continue
             identity = (item.get("source"), item.get("id"))
