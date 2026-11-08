@@ -41,9 +41,9 @@ document.addEventListener('keydown',function(e){if(!paged())return;if(e.key==='A
 document.addEventListener('visibilitychange',function(){if(document.hidden)save(true)});
 addEventListener('pagehide',function(){save(true)});var src=onlineId?'/api/online/read?id='+encodeURIComponent(onlineId):'/read/'+path.split('/').map(encodeURIComponent).join('/');async function loadBook(attempt){
 status.hidden=false;status.textContent=attempt?'网络波动，正在重试…':(onlineId?'正在整理公开书源正文，首次打开可能需要稍等…':'正在载入正文…');
-var controller=new AbortController(),timeout=setTimeout(function(){controller.abort()},onlineId?65000:20000);
+var controller=typeof window.AbortController==='function'?new window.AbortController():null,timeout=null,timeoutMs=onlineId?65000:20000;
 try{
-var response=await fetch(src,{cache:'default',signal:controller.signal});
+var fetchOptions={cache:'default'};if(controller)fetchOptions.signal=controller.signal;var response=await Promise.race([fetch(src,fetchOptions),new Promise(function(_,reject){timeout=setTimeout(function(){if(controller)controller.abort();var error=new Error('timeout');error.name='TimeoutError';reject(error)},timeoutMs)})]);
 if(!response.ok){var failure=new Error('HTTP '+response.status);failure.status=response.status;throw failure}
 var raw=await response.text();if(!raw.trim()){var empty=new Error('empty');empty.status=422;throw empty}status.textContent='正文已收到，正在排版…';await new Promise(function(resolve){requestAnimationFrame(resolve)});
 renderText(raw);
@@ -57,5 +57,5 @@ var feedback=document.createElement('button');feedback.type='button';feedback.te
 status.append(document.createElement('br'),retry,document.createTextNode(' '),feedback);
 if(code===401||code===403){var login=document.createElement('a');login.href='./home.html?card=required';login.textContent=' 返回首页验证';status.append(login)}
 document.dispatchEvent(new CustomEvent('reader-load-error',{detail:{message:message,code:code}}));
-}finally{clearTimeout(timeout)}
+}finally{if(timeout)clearTimeout(timeout)}
 }fetch('/api/access',{cache:'no-store'}).then(function(r){return r.json()}).then(function(access){if(!access.ok){status.textContent='阅读登录状态已失效，请返回首页验证卡密。';var noCard=document.createElement('a');noCard.href='./home.html?card=required';noCard.textContent=' 返回首页验证';status.append(noCard);return}if(access.cardType!=='reader'){status.textContent='当前登录的是下载卡，只能下载本地书；进入阅读器需要有效阅读卡。';var wrongCard=document.createElement('a');wrongCard.href='./home.html?card=required';wrongCard.textContent=' 切换阅读卡';status.append(wrongCard);return}if(format==='pdf'){status.hidden=true;title.hidden=true;pdf.hidden=false;pdf.src=src;tocList.innerHTML='<p class="toc-empty">PDF 文件使用文档自身的目录和页码。</p>'}else loadBook(0)}).catch(function(){status.textContent='暂时无法核对阅读卡状态，请检查网络后重试。'})})()</script><script src="../reading-support.js?v=20261003-1"></script><script src="../site-preferences.js?v=20261023-6"></script></body></html>
