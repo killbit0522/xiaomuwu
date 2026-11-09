@@ -209,7 +209,7 @@ h1, h2, h3, h4 {
         background-color: currentColor;
       }
     </style>
-<link rel="stylesheet" href="../site-preferences.css?v=20261023-6">
+<link rel="stylesheet" href="../site-preferences.css?v=20261109-winter-preview15">
 </head>
 <body>
 <style id="critical-layout">
@@ -2235,17 +2235,24 @@ h1, h2, h3, h4 {
   }
 
   function hash(text) {
-    var value = 2166136261;
-    for (var i = 0; i < text.length; i++) { value = Math.imul(value ^ text.charCodeAt(i), 16777619); }
+    /* Keep the daily rotation working in older Android WebViews without Math.imul. */
+    var value = 0;
+    for (var i = 0; i < text.length; i++) { value = (value * 31 + text.charCodeAt(i)) >>> 0; }
     return value >>> 0;
   }
 
   function dailySelection(items) {
-    var now = new Date();
-    var parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
-    var calendar = {}; parts.forEach(function (part) { calendar[part.type] = part.value; });
-    var dayNumber = Math.floor(Date.UTC(Number(calendar.year), Number(calendar.month) - 1, Number(calendar.day)) / 86400000);
-    var offset = (dayNumber + (hash(visitorId()) % items.length)) % items.length;
+    /* Use a fixed UTC+8 clock instead of formatToParts, missing in older phone browsers. */
+    var chinaNow = new Date(new Date().getTime() + 8 * 60 * 60 * 1000);
+    var dayNumber = Math.floor(Date.UTC(chinaNow.getUTCFullYear(), chinaNow.getUTCMonth(), chinaNow.getUTCDate()) / 86400000);
+    /* Advance by a coprime stride so two of three picks rotate each China day.
+       The current day and visitor still produce the same picks on every reload. */
+    var pickCount = Math.min(3, items.length);
+    function gcd(a, b) { while (b) { var remainder = a % b; a = b; b = remainder; } return a; }
+    var stride = Math.max(1, items.length - pickCount);
+    while (stride < items.length && gcd(stride, items.length) !== 1) { stride++; }
+    if (stride >= items.length) { stride = 1; }
+    var offset = (dayNumber * stride + (hash(visitorId()) % items.length)) % items.length;
     var picked = [];
     for (var i = 0; i < Math.min(3, items.length); i++) picked.push(items[(offset + i) % items.length]);
     return picked;
@@ -2275,9 +2282,9 @@ h1, h2, h3, h4 {
   list.replaceChildren();
   selected.forEach(function(item){list.appendChild(makeCard(item))});
   list.hidden=false;
-  if(count){count.textContent='今日 '+selected.length+' 本 · 每人不同'}
+  if(count){count.textContent='今日 '+selected.length+' 本 · 每日轮换'}
 })();
 </script>
-<script src="../site-preferences.js?v=20261023-6"></script>
+<script src="../site-preferences.js?v=20261109-winter-preview15"></script>
 <script src="../recent-reading.js?v=20261001-1"></script></body>
 </html>

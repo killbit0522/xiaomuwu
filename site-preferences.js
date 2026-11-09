@@ -17,12 +17,13 @@
   function savedTheme() { try { return localStorage.getItem(storageKey) || 'day'; } catch (error) { return 'day'; } }
   function apply(theme) {
     var dark = theme === 'dark';
-    root.setAttribute('data-theme', dark ? 'dark' : 'day');
+    var selected = theme === 'winter' ? 'winter' : (dark ? 'dark' : 'day');
+    root.setAttribute('data-theme', selected);
     var button = document.getElementById('site-theme-toggle');
     if (button) {
-      button.setAttribute('aria-pressed', dark ? 'true' : 'false');
-      button.setAttribute('aria-label', dark ? '切换到白天模式' : '切换到黑夜模式');
-      button.innerHTML = '<span aria-hidden="true">' + (dark ? '☀' : '☾') + '</span><span class="site-theme-label">' + (dark ? '白天' : '黑夜') + '</span>';
+      button.setAttribute('aria-pressed', selected !== 'day' ? 'true' : 'false');
+      button.setAttribute('aria-label', selected === 'day' ? '切换到冬日主题' : (selected === 'winter' ? '切换到黑夜模式' : '切换到白天模式'));
+      button.innerHTML = '<span aria-hidden="true">' + (selected === 'winter' ? '❄' : (dark ? '☀' : '☾')) + '</span><span class="site-theme-label">' + (selected === 'winter' ? '冬日' : (dark ? '白天' : '黑夜')) + '</span>';
     }
   }
   apply(savedTheme());
@@ -31,7 +32,8 @@
     button.id = 'site-theme-toggle'; button.className = 'site-theme-toggle'; button.type = 'button';
     document.body.appendChild(button); apply(savedTheme());
     button.addEventListener('click', function () {
-      var next = root.getAttribute('data-theme') === 'dark' ? 'day' : 'dark';
+      var current = root.getAttribute('data-theme');
+      var next = current === 'day' ? 'winter' : (current === 'winter' ? 'dark' : 'day');
       try { localStorage.setItem(storageKey, next); } catch (error) {}
       apply(next);
     });
