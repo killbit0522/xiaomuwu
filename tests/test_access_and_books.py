@@ -474,6 +474,33 @@ class BookAccessIntegrationTests(unittest.TestCase):
             urllib.request.urlopen(urllib.request.Request(self.base + '/api/admin/upload', data=body, headers=headers))
         self.assertEqual(error.exception.code, 400)
 
+    def test_named_upload_directory_skips_duplicate_matching_and_never_overwrites(self):
+        existing = self.books / '既有分类' / '自定义目录测试书.txt'
+        existing.parent.mkdir(parents=True, exist_ok=True)
+        existing.write_text('原有版本', encoding='utf-8')
+        body = '新上传版本'.encode('utf-8')
+        headers = {
+            'Cookie': 'cabin_admin=test-admin-token',
+            'X-Filename': urllib.parse.quote('自定义目录测试书.txt'),
+            'X-Relative-Path': urllib.parse.quote('自定义目录测试书.txt'),
+            'X-Target-Directory': urllib.parse.quote('我的自定义目录/冬季'),
+            'X-Skip-Duplicate-Check': '1',
+        }
+        for _ in range(2):
+            request = urllib.request.Request(self.base + '/api/admin/upload', data=body, headers=headers)
+            with urllib.request.urlopen(request) as response:
+                result = json.loads(response.read())
+            self.assertEqual(result['replaced'], 0)
+        destination = self.books / '我的自定义目录/冬季'
+        self.assertEqual((destination / '自定义目录测试书.txt').read_bytes(), body)
+        self.assertEqual((destination / '自定义目录测试书（2）.txt').read_bytes(), body)
+        self.assertEqual(existing.read_text(encoding='utf-8'), '原有版本')
+
+        bad_headers = {**headers, 'X-Target-Directory': urllib.parse.quote('../越界')}
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(urllib.request.Request(self.base + '/api/admin/upload', data=body, headers=bad_headers))
+        self.assertEqual(error.exception.code, 400)
+
     def test_replacement_restore_is_admin_only_and_preserves_current_version(self):
         headers={'Cookie': 'cabin_admin=test-admin-token', 'Content-Type': 'application/json'}
         original=self.books / 'restore-test.txt'

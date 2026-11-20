@@ -551,10 +551,20 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             if expected_hash and hashlib.sha256(body).hexdigest() != expected_hash:
                 self.send_json(400, {"ok": False, "message": "文件校验失败，请重试"}); return
             defer_catalog = self.headers.get("X-Defer-Catalog", "") == "1"
+            skip_duplicate_check = self.headers.get("X-Skip-Duplicate-Check", "") == "1"
+            requested_directory = unquote(self.headers.get("X-Target-Directory", "")).strip()
+            if requested_directory:
+                safe_directory = Path(requested_directory.replace("\\", "/"))
+                if safe_directory.is_absolute() or not safe_directory.parts or any(part in ("", ".", "..") for part in safe_directory.parts) or len(safe_directory.parts) > 20:
+                    self.send_json(400, {"ok": False, "message": "上传目录名称无效"}); return
+                if any(len(part) > 100 or any(ord(char) < 32 or char in '<>:"|?*' for char in part) for part in safe_directory.parts):
+                    self.send_json(400, {"ok": False, "message": "目录名称包含不支持的字符"}); return
+            else:
+                safe_directory = None
             upload_root = self.textbook_root / "管理员上传"
             with self.upload_lock:
-                duplicates = find_duplicate_books(self.textbook_root, filename, body)
-                if self.headers.get('X-Upload-Mode') != 'folder':
+                duplicates = [] if skip_duplicate_check else find_duplicate_books(self.textbook_root, filename, body)
+                if not skip_duplicate_check and self.headers.get('X-Upload-Mode') != 'folder':
                     for existing in duplicates:
                         if existing.name == filename and existing.read_bytes() == body:
                             self.send_json(200, {"ok": True, "replaced": 0, "unchanged": True}); return
@@ -569,11 +579,23 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 if target_dir is None or current_count >= 20:
                     group_number += 1
                     target_dir = upload_root / f"新上传{group_number}"
-                if self.headers.get('X-Upload-Mode') == 'folder' and len(relative.parts) > 1:
+                if safe_directory is not None:
+                    target_dir = self.textbook_root.joinpath(*safe_directory.parts)
+                    if self.headers.get('X-Upload-Mode') == 'folder' and len(relative.parts) > 1:
+                        relative = Path(*relative.parts[1:])
+                elif self.headers.get('X-Upload-Mode') == 'folder' and len(relative.parts) > 1:
                     target_dir = upload_root / relative.parts[0]
                     relative = Path(*relative.parts[1:])
+                if skip_duplicate_check:
+                    candidate = target_dir / relative
+                    if candidate.exists():
+                        suffix = candidate.suffix
+                        stem = candidate.name[:-len(suffix)] if suffix else candidate.name
+                        version = 2
+                        while (candidate.parent / f"{stem}（{version}）{suffix}").exists(): version += 1
+                        relative = candidate.parent.joinpath(f"{stem}（{version}）{suffix}").relative_to(target_dir)
                 target = (target_dir / relative).resolve()
-                if not target.is_relative_to(upload_root.resolve()):
+                if not target.is_relative_to(self.textbook_root.resolve()):
                     self.send_json(400, {"ok": False}); return
                 identical = next((p for p in duplicates if p.resolve() == target and p.read_bytes() == body), None)
                 if identical is not None:
