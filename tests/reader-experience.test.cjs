@@ -109,6 +109,8 @@ test('navigation excludes the unstable comics site and keeps auto-close and unre
   assert.match(preferences,/if\(data\.ok\)addMemberExternalLinks\(\)/);
   assert.match(preferences,/ao3\.href='\/go\/ao3'/);
   assert.match(preferences,/link\.href='\/go\/comics'/);
+  assert.match(preferences,/木木文（随机更新版）· 小红书号 42359301890/);
+  assert.match(preferences,/https:\/\/xhslink\.cn\/o\/6tv9L6vuINX/);
   assert.ok(preferences.indexOf("primaryNav.insertBefore(ao3,accountLinks)") < preferences.indexOf("primaryNav.insertBefore(comics,accountLinks)"), 'AO3 should sit immediately before the comics section');
   assert.match(preferencesCss,/\.gw-sidebar,\.sh-side\{[^}]*background-color:color-mix/);
   assert.match(preferencesCss,/\.gw-sidebar-bg,\.sh-side-bg\{[^}]*opacity:\.28!important/);
