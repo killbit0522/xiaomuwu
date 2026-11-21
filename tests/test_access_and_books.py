@@ -272,6 +272,48 @@ class BookAccessIntegrationTests(unittest.TestCase):
             remaining, used = db.execute("SELECT remaining,used FROM access_cards WHERE code='TEST-DOWNLOAD'").fetchone()
         self.assertEqual((remaining, used), (0, 2))
 
+    def test_repeated_requests_from_one_download_click_consume_only_once(self):
+        client = self.client()
+        self.unlock(client, "TEST-DOWNLOAD")
+        url = self.base + "/books/utf8.txt?download_id=tap-abc123-xyz987"
+        for _ in range(3):
+            with client.open(url) as response:
+                self.assertEqual(response.read()[3:].decode("utf-8"), self.samples["utf8.txt"])
+        with sqlite3.connect(self.db) as db:
+            remaining, used = db.execute("SELECT remaining,used FROM access_cards WHERE code='TEST-DOWNLOAD'").fetchone()
+            click_count = db.execute("SELECT COUNT(*) FROM download_clicks WHERE click_id='tap-abc123-xyz987'").fetchone()[0]
+        self.assertEqual((remaining, used, click_count), (1, 1, 1))
+
+        with client.open(self.base + "/books/utf8.txt?download_id=tap-def456-uvw321") as response:
+            response.read()
+        with sqlite3.connect(self.db) as db:
+            remaining, used = db.execute("SELECT remaining,used FROM access_cards WHERE code='TEST-DOWNLOAD'").fetchone()
+        self.assertEqual((remaining, used), (0, 2))
+
+    def test_repeated_request_still_works_when_the_click_uses_the_last_download(self):
+        with sqlite3.connect(self.db) as db:
+            db.execute("UPDATE access_cards SET download_limit=1,remaining=1,used=0 WHERE code='TEST-DOWNLOAD'")
+        try:
+            client = self.client()
+            self.unlock(client, "TEST-DOWNLOAD")
+            url = self.base + "/books/utf8.txt?download_id=last-use-abc123-xyz987"
+            for _ in range(2):
+                with client.open(url) as response:
+                    self.assertEqual(response.read()[3:].decode("utf-8"), self.samples["utf8.txt"])
+            with sqlite3.connect(self.db) as db:
+                remaining, used = db.execute("SELECT remaining,used FROM access_cards WHERE code='TEST-DOWNLOAD'").fetchone()
+            self.assertEqual((remaining, used), (0, 1))
+        finally:
+            with sqlite3.connect(self.db) as db:
+                db.execute("UPDATE access_cards SET download_limit=2,remaining=2,used=0 WHERE code='TEST-DOWNLOAD'")
+
+    def test_large_json_api_responses_use_gzip_when_requested(self):
+        request = urllib.request.Request(self.base + "/api/catalog/search?q=" + urllib.parse.quote("书"), headers={"Accept-Encoding": "gzip"})
+        with urllib.request.urlopen(request) as response:
+            self.assertEqual(response.headers.get("Content-Encoding"), "gzip")
+            payload = json.loads(gzip.decompress(response.read()))
+        self.assertGreater(payload["total"], 0)
+
     def test_download_database_lock_returns_retryable_503_instead_of_dropping_upstream(self):
         client = self.client()
         self.unlock(client, "TEST-DOWNLOAD")

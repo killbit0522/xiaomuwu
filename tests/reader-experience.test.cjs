@@ -209,7 +209,7 @@ test('delayed save rechecks restoration guard', () => {
 });
 function loadContext(code) {
   const scheduled=[];
-  const ctx={status:{append(){}},src:'/read/test',onlineId:'',AbortController,clearTimeout(){},setTimeout(fn,delay){scheduled.push(delay);return 1;},fetch:async()=>({ok:false,status:code}),document:{createElement(){return {};},createTextNode(){return {};},dispatchEvent(){}},CustomEvent:class{},bookTitle:'测试',path:'test',renderText(){throw Error('unexpected render');}};
+  const ctx={window:{AbortController},status:{append(){}},src:'/read/test',onlineId:'',AbortController,clearTimeout(){},setTimeout(fn,delay){scheduled.push(delay);return 1;},fetch:async()=>({ok:false,status:code}),document:{createElement(){return {};},createTextNode(){return {};},dispatchEvent(){}},CustomEvent:class{},bookTitle:'测试',path:'test',renderText(){throw Error('unexpected render');}};
   vm.createContext(ctx);vm.runInContext(loader,ctx);return {ctx,scheduled};
 }
 test('permission and missing-file failures do not retry automatically', async () => {

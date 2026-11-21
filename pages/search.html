@@ -1183,8 +1183,9 @@ h1, h2, h3, h4 {
     keyInput.focus();
   }
 
-  function bookUrl(book) {
-    return '/books/' + String(book.searchablePath || '').split('/').map(encodeURIComponent).join('/');
+  function makeDownloadId(){return Date.now().toString(36)+'-'+Math.random().toString(36).slice(2)+'-'+Math.random().toString(36).slice(2)}
+  function bookUrl(book, downloadId) {
+    return '/books/' + String(book.searchablePath || '').split('/').map(encodeURIComponent).join('/') + (downloadId ? '?download_id='+encodeURIComponent(downloadId) : '');
   }
   function readerUrl(book){return './reader.html?p='+encodeURIComponent(book.searchablePath)+'&title='+encodeURIComponent(book.title)+'&format='+encodeURIComponent(book.format)+'&return='+encodeURIComponent(location.pathname+location.search)}
   function addShelf(book){var shelf=[];try{shelf=JSON.parse(localStorage.getItem('xiaomuwu-shelf')||'[]')}catch(e){}if(!shelf.some(function(x){return x.searchablePath===book.searchablePath})){shelf.push(book);localStorage.setItem('xiaomuwu-shelf',JSON.stringify(shelf))}}
@@ -1237,10 +1238,11 @@ h1, h2, h3, h4 {
     if (accessMode === 'download') {
       badge = document.createElement('a');
       badge.className = 'sm-card-cta';
-      badge.href = bookUrl(book);
+      var downloadId=makeDownloadId(),downloadPending=false;
+      badge.href = bookUrl(book,downloadId);
       badge.setAttribute('download', '');
       badge.textContent = '下载';
-      badge.addEventListener('click', function () { logEvent('download', book.title); });
+      badge.addEventListener('click', function (event) { if(downloadPending){event.preventDefault();return}downloadPending=true;badge.setAttribute('aria-disabled','true');badge.textContent='正在下载…';logEvent('download', book.title);window.setTimeout(function(){downloadPending=false;downloadId=makeDownloadId();badge.href=bookUrl(book,downloadId);badge.textContent='下载';badge.removeAttribute('aria-disabled')},30000); });
       actions.appendChild(badge);
     } else if (accessMode === 'reader' && ['txt','pdf','docx','epub','zip'].indexOf(String(book.format).toLowerCase()) >= 0) {
       badge=document.createElement('a');badge.className='sm-card-cta';badge.href=readerUrl(book);badge.textContent='在线阅读';actions.appendChild(badge);

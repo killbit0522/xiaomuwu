@@ -192,6 +192,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
     auth_attempt_lock = threading.Lock()
     auth_attempts = {}
     auth_last_cleanup = 0.0
+    catalog_document_cache = {}
 
     def client_identity(self):
         forwarded = self.headers.get("X-Real-IP", "").strip()
@@ -346,14 +347,40 @@ class LibraryHandler(SimpleHTTPRequestHandler):
 
     def send_json(self, status, payload, cookie=None):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        use_gzip = len(body) >= 1024 and "gzip" in self.headers.get("Accept-Encoding", "").lower()
+        if use_gzip:
+            body = gzip.compress(body, compresslevel=5, mtime=0)
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Vary", "Accept-Encoding")
+        if use_gzip:
+            self.send_header("Content-Encoding", "gzip")
         if cookie:
             secure = "; Secure" if self.headers.get("X-Forwarded-Proto", "").lower() == "https" else ""
             self.send_header("Set-Cookie", cookie + secure)
         self.end_headers()
         self.wfile.write(body)
+
+    def catalog_document(self):
+        """Reuse the parsed catalog until an upload or sync changes its file signature."""
+        source = self.site_root / "assets" / "catalog.json"
+        stat = source.stat()
+        signature = (stat.st_mtime_ns, stat.st_size)
+        key = str(source.resolve())
+        with self.catalog_cache_lock:
+            cached = type(self).catalog_document_cache.get(key)
+            if cached and cached[0] == signature:
+                return cached[1]
+            document = json.loads(source.read_text(encoding="utf-8"))
+            if not isinstance(document, list):
+                raise ValueError("Catalog must be a list")
+            type(self).catalog_document_cache[key] = (signature, document)
+            if len(type(self).catalog_document_cache) > 8:
+                oldest = next(iter(type(self).catalog_document_cache))
+                if oldest != key:
+                    type(self).catalog_document_cache.pop(oldest, None)
+            return document
 
     def send_online_text(self, page):
         source = page["path"]
@@ -422,7 +449,15 @@ class LibraryHandler(SimpleHTTPRequestHandler):
         if row["card_type"] == "download" and row["remaining"] == 0: return None
         return dict(row)
 
-    def reserve_download(self):
+    def can_replay_download(self, click_id, book_path):
+        token = self.download_session()
+        if not token or not click_id:
+            return False
+        with open_database(self.db_path) as db:
+            row = db.execute("SELECT 1 FROM download_clicks d JOIN access_cards c ON c.id=d.card_id WHERE d.token=? AND d.click_id=? AND d.book_path=? AND d.state IN ('reserved','completed') AND c.active=1 AND c.card_type='download'", (token, click_id, book_path)).fetchone()
+        return bool(row)
+
+    def reserve_download(self, click_id="", book_path=""):
         """Reserve one use before streaming, so concurrent downloads cannot overrun a card."""
         token = self.download_session()
         if not token:
@@ -430,7 +465,21 @@ class LibraryHandler(SimpleHTTPRequestHandler):
         with open_database(self.db_path) as db:
             db.row_factory = sqlite3.Row
             db.execute("CREATE TABLE IF NOT EXISTS download_reservations(id INTEGER PRIMARY KEY, card_id INTEGER NOT NULL, token TEXT NOT NULL, created_at TEXT NOT NULL)")
+            db.execute("CREATE TABLE IF NOT EXISTS download_clicks(id INTEGER PRIMARY KEY, card_id INTEGER NOT NULL, token TEXT NOT NULL, click_id TEXT NOT NULL, book_path TEXT NOT NULL, reservation_id INTEGER NOT NULL, state TEXT NOT NULL, active_count INTEGER NOT NULL DEFAULT 1, succeeded INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, UNIQUE(token,click_id))")
             db.execute("BEGIN IMMEDIATE")
+            prior_click = None
+            if click_id:
+                cutoff = (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()
+                db.execute("DELETE FROM download_clicks WHERE state IN ('completed','refunded') AND created_at<?", (cutoff,))
+                prior_click = db.execute("SELECT id,card_id,book_path,reservation_id,state,active_count,succeeded FROM download_clicks WHERE token=? AND click_id=?", (token, click_id)).fetchone()
+                if prior_click:
+                    if prior_click["book_path"] != book_path:
+                        return None
+                    if prior_click["state"] == "completed":
+                        return {"card_id": prior_click["card_id"], "token": token, "reservation_id": prior_click["reservation_id"], "click_id": click_id, "reused": True}
+                    if prior_click["state"] == "reserved":
+                        db.execute("UPDATE download_clicks SET active_count=active_count+1 WHERE id=?", (prior_click["id"],))
+                        return {"card_id": prior_click["card_id"], "token": token, "reservation_id": prior_click["reservation_id"], "click_id": click_id, "reused": True}
             row = db.execute("SELECT c.id, c.remaining, c.card_type FROM download_sessions s JOIN access_cards c ON c.id=s.card_id WHERE s.token=? AND c.active=1", (token,)).fetchone()
             if not row or row["card_type"] != "download" or row["remaining"] == 0:
                 return None
@@ -439,7 +488,13 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 return None
             db.execute("UPDATE download_sessions SET last_used_at=? WHERE token=?", (datetime.now(timezone.utc).isoformat(), token))
             cursor = db.execute("INSERT INTO download_reservations(card_id,token,created_at) VALUES(?,?,?)", (row["id"], token, datetime.now(timezone.utc).isoformat()))
-        return {"card_id": row["id"], "token": token, "reservation_id": cursor.lastrowid}
+            if click_id:
+                now = datetime.now(timezone.utc).isoformat()
+                if prior_click:
+                    db.execute("UPDATE download_clicks SET reservation_id=?,state='reserved',active_count=1,succeeded=0,created_at=? WHERE id=?", (cursor.lastrowid, now, prior_click["id"]))
+                else:
+                    db.execute("INSERT INTO download_clicks(card_id,token,click_id,book_path,reservation_id,state,active_count,succeeded,created_at) VALUES(?,?,?,?,?,'reserved',1,0,?)", (row["id"], token, click_id, book_path, cursor.lastrowid, now))
+        return {"card_id": row["id"], "token": token, "reservation_id": cursor.lastrowid, "click_id": click_id, "reused": False}
 
     def refund_download(self, reservation):
         """Return a reserved use when the server could not finish sending the file."""
@@ -449,13 +504,26 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             db.execute("BEGIN IMMEDIATE")
             pending = db.execute("SELECT card_id FROM download_reservations WHERE id=?", (reservation["reservation_id"],)).fetchone()
             if pending:
+                if reservation.get("click_id"):
+                    click = db.execute("SELECT id,state,active_count,succeeded FROM download_clicks WHERE token=? AND click_id=?", (reservation["token"], reservation["click_id"])).fetchone()
+                    if click and click[1] == "completed":
+                        db.execute("UPDATE download_clicks SET active_count=MAX(0,active_count-1) WHERE id=?", (click[0],))
+                        return
+                    if click and click[1] == "reserved" and click[2] > 1:
+                        db.execute("UPDATE download_clicks SET active_count=active_count-1 WHERE id=?", (click[0],))
+                        return
                 db.execute("UPDATE access_cards SET remaining=MIN(download_limit, remaining+1), used=MAX(0, used-1) WHERE id=?", (pending[0],))
                 db.execute("DELETE FROM download_reservations WHERE id=?", (reservation["reservation_id"],))
+                if reservation.get("click_id"):
+                    db.execute("UPDATE download_clicks SET state='refunded',active_count=0,succeeded=0 WHERE token=? AND click_id=?", (reservation["token"], reservation["click_id"]))
 
     def complete_download(self, reservation):
         if not reservation:
             return
         with open_database(self.db_path) as db:
+            db.execute("BEGIN IMMEDIATE")
+            if reservation.get("click_id"):
+                db.execute("UPDATE download_clicks SET state='completed',succeeded=1,active_count=MAX(0,active_count-1) WHERE token=? AND click_id=?", (reservation["token"], reservation["click_id"]))
             db.execute("DELETE FROM download_reservations WHERE id=?", (reservation["reservation_id"],))
 
     def create_cards(self, count, download_limit=0, card_type="download", months=0):
@@ -977,10 +1045,8 @@ class LibraryHandler(SimpleHTTPRequestHandler):
         request_path = urlsplit(self.path).path
         if request_path == "/api/recent":
             if not self.access_info(): self.send_json(403, {"ok": False}); return
-            source = self.site_root / "assets" / "catalog.json"
             try:
-                books = json.loads(source.read_text(encoding="utf-8"))
-                books = [book for book in books if isinstance(book, dict) and book.get("title")]
+                books = [book for book in self.catalog_document() if isinstance(book, dict) and book.get("title")]
                 books.sort(key=lambda book: (str(book.get("modifiedAt", "")), str(book.get("searchablePath", ""))), reverse=True)
                 self.send_json(200, {"items": books[:50]})
             except (OSError, ValueError, TypeError):
@@ -1036,10 +1102,8 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 post["comments"] = comments_by_post.get(post["id"], [])
             self.send_json(200, {"items": posts}); return
         if request_path == "/api/updates":
-            source = self.site_root / "assets" / "catalog.json"
             try:
-                books = json.loads(source.read_text(encoding="utf-8"))
-                books = [book for book in books if isinstance(book, dict) and book.get("title") and book.get("modifiedAt")]
+                books = [book for book in self.catalog_document() if isinstance(book, dict) and book.get("title") and book.get("modifiedAt")]
                 books.sort(key=lambda book: (str(book.get("modifiedAt", "")), str(book.get("searchablePath", ""))), reverse=True)
                 latest = books[:2]
                 fingerprint = hashlib.sha256(json.dumps(
@@ -1078,9 +1142,8 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             query = parse_qs(urlsplit(self.path).query).get("q", [""])[0].strip().casefold()
             if not query or len(query) > 100:
                 self.send_json(200, {"items": [], "total": 0}); return
-            source = self.site_root / "assets" / "catalog.json"
             try:
-                books = json.loads(source.read_text(encoding="utf-8"))
+                books = self.catalog_document()
                 items = [book for book in books if isinstance(book, dict) and query in " ".join(str(book.get(key, "")) for key in ("title", "author", "category", "searchablePath")).casefold()]
                 self.send_json(200, {"items": items[:100], "total": len(items)})
             except (OSError, ValueError, TypeError):
@@ -1227,16 +1290,32 @@ class LibraryHandler(SimpleHTTPRequestHandler):
             self.end_headers()
             return
         if request_path.startswith("/books/"):
+            download_id = parse_qs(urlsplit(self.path).query).get("download_id", [""])[0]
+            if download_id and not re.fullmatch(r"[A-Za-z0-9_-]{12,80}", download_id):
+                self.send_error(400, "Invalid download request id")
+                return
             try:
                 info = self.access_info()
             except sqlite3.Error as error:
                 self.log_error("download access check failed: %s", error)
                 self.send_error(503, "Download service temporarily unavailable")
                 return
+            source = Path(self.translate_path(self.path))
+            try:
+                book_path = source.relative_to(self.textbook_root).as_posix()
+            except ValueError:
+                book_path = ""
+            if not info and download_id:
+                try:
+                    if self.can_replay_download(download_id, book_path):
+                        info = {"card_type": "download"}
+                except sqlite3.Error as error:
+                    self.log_error("download replay check failed: %s", error)
+                    self.send_error(503, "Download service temporarily unavailable")
+                    return
             if not info or info["card_type"] != "download":
                 self.send_error(403, "Download card required or download limit exhausted")
                 return
-            source = Path(self.translate_path(self.path))
             if not source.is_file():
                 self.send_error(404, "Book file unavailable")
                 return
@@ -1268,7 +1347,7 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 self.send_error(503, "Book file temporarily unavailable")
                 return
             try:
-                reservation = self.reserve_download()
+                reservation = self.reserve_download(download_id, book_path)
             except sqlite3.Error as error:
                 if stream is not None:
                     stream.close()
@@ -1575,6 +1654,7 @@ def main():
         db.execute("CREATE TABLE IF NOT EXISTS access_cards(id INTEGER PRIMARY KEY, code TEXT UNIQUE, download_limit INTEGER NOT NULL, remaining INTEGER NOT NULL, used INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL)")
         db.execute("CREATE TABLE IF NOT EXISTS download_sessions(token TEXT PRIMARY KEY, card_id INTEGER NOT NULL, created_at TEXT NOT NULL, last_used_at TEXT, FOREIGN KEY(card_id) REFERENCES access_cards(id))")
         db.execute("CREATE TABLE IF NOT EXISTS download_reservations(id INTEGER PRIMARY KEY, card_id INTEGER NOT NULL, token TEXT NOT NULL, created_at TEXT NOT NULL, FOREIGN KEY(card_id) REFERENCES access_cards(id))")
+        db.execute("CREATE TABLE IF NOT EXISTS download_clicks(id INTEGER PRIMARY KEY, card_id INTEGER NOT NULL, token TEXT NOT NULL, click_id TEXT NOT NULL, book_path TEXT NOT NULL, reservation_id INTEGER NOT NULL, state TEXT NOT NULL, active_count INTEGER NOT NULL DEFAULT 1, succeeded INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, UNIQUE(token,click_id))")
         db.execute("CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL)")
         db.execute("CREATE TABLE IF NOT EXISTS reader_shelves(device_key TEXT PRIMARY KEY, books_json TEXT NOT NULL DEFAULT '[]', updated_at TEXT NOT NULL)")
         columns = {row[1] for row in db.execute("PRAGMA table_info(access_cards)")}
@@ -1588,6 +1668,7 @@ def main():
             pending = db.execute("SELECT card_id FROM download_reservations WHERE id=?", (reservation_id,)).fetchone()
             if pending:
                 db.execute("UPDATE access_cards SET remaining=MIN(download_limit, remaining+1), used=MAX(0, used-1) WHERE id=?", (pending[0],))
+                db.execute("UPDATE download_clicks SET state='refunded',active_count=0,succeeded=0 WHERE reservation_id=? AND state='reserved'", (reservation_id,))
                 db.execute("DELETE FROM download_reservations WHERE id=?", (reservation_id,))
         now = datetime.now(timezone.utc)
         stale_session = (now - timedelta(days=45)).isoformat()
