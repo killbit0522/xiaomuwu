@@ -1046,6 +1046,8 @@ h1, h2, h3, h4 {
   try { returnState = JSON.parse(sessionStorage.getItem('xiaomuwu-catalog-return') || 'null'); } catch (error) {}
   if (returnState) { active = returnState.active || 'all'; page = Number(returnState.page) || 1; }
   try { var returnParams=new URLSearchParams(location.search),returnPage=Number(returnParams.get('returnPage'));if(returnPage>0){returnState={active:returnParams.get('returnActive')||'all',page:returnPage,scrollY:Number(returnParams.get('returnY'))||0,path:returnParams.get('returnPath')||''};active=returnState.active;page=returnPage;['returnActive','returnPage','returnY','returnPath'].forEach(function(key){returnParams.delete(key)});history.replaceState(history.state,'',location.pathname+(returnParams.toString()?'?'+returnParams.toString():'')+location.hash);} } catch(error) {}
+  var legacyUploadCategory=String(active||'').match(/^新上传(\d+)(?: \/ |$)/);
+  if(legacyUploadCategory){var legacyUploadPrefix='新上传'+legacyUploadCategory[1];active='新上传的text / '+legacyUploadPrefix+String(active).slice(legacyUploadPrefix.length);if(returnState)returnState.active=active;}
   function saveBrowseState(){try{sessionStorage.setItem('xiaomuwu-catalog-browse',JSON.stringify({active:active,page:page}))}catch(error){}}
 
   function isUnlocked() { return accessMode === 'download' || accessMode === 'reader'; }
@@ -1057,7 +1059,10 @@ h1, h2, h3, h4 {
 
   function collectionOf(book) {
     var parts = (book.category || '未分类').split(' / ');
-    if (parts[0] === '管理员上传' && parts.length > 1) { parts.shift(); }
+    if (parts[0] === '管理员上传' && parts.length > 1) {
+      if (/^新上传\d+$/.test(parts[1])) { parts = ['新上传的text', parts[1]].concat(parts.slice(2)); }
+      else { parts.shift(); }
+    }
     return parts.slice(0, 4).join(' / ') || '未分类';
   }
   function newUploadRank(value) {
@@ -1065,6 +1070,13 @@ h1, h2, h3, h4 {
     return match ? Number(match[1]) : 0;
   }
   function collectionSort(left, right) {
+    if (left === right) return 0;
+    if (left === '新上传的text') return -1;
+    if (right === '新上传的text') return 1;
+    if (left.indexOf('新上传的text / ') === 0 && right.indexOf('新上传的text / ') === 0) {
+      var groupedLeftRank = newUploadRank(left), groupedRightRank = newUploadRank(right);
+      if (groupedLeftRank !== groupedRightRank) return groupedRightRank - groupedLeftRank;
+    }
     var leftRank = newUploadRank(left), rightRank = newUploadRank(right);
     if (leftRank || rightRank) return rightRank - leftRank;
     return String(left).localeCompare(String(right), 'zh-CN');
@@ -1142,8 +1154,16 @@ h1, h2, h3, h4 {
   function renderFilters() {
     var collections = {};
     books.forEach(function (book) { var parts=collectionOf(book).split(' / ');for(var depth=1;depth<=parts.length;depth++){var key=parts.slice(0,depth).join(' / ');collections[key]=(collections[key]||0)+1} });
+    var uploadRoot='新上传的text',activeParts=active.split(' / '),uploadActive=active===uploadRoot||active.indexOf(uploadRoot+' / ')===0;
+    var visibleCollections=Object.keys(collections).filter(function(name){
+      if(name===uploadRoot)return true;
+      if(name.indexOf(uploadRoot+' / ')!==0)return true;
+      if(!uploadActive)return false;
+      var parts=name.split(' / '),isAncestor=parts.length<=activeParts.length&&parts.every(function(part,index){return activeParts[index]===part});
+      return isAncestor||(parts.length===activeParts.length+1&&activeParts.every(function(part,index){return parts[index]===part}));
+    });
     filters.replaceChildren();
-    [['all', '全部 ('+books.length+')']].concat(Object.keys(collections).sort(collectionSort).map(function (name) { var depth=name.split(' / ').length,label=(depth>1?'↳ ':'')+name.split(' / ').pop()+' ('+collections[name]+')';return [name,label]; })).forEach(function (entry) {
+    [['all', '全部 ('+books.length+')']].concat(visibleCollections.sort(collectionSort).map(function (name) { var depth=name.split(' / ').length,label=(depth>1?'↳ ':'')+name.split(' / ').pop()+' ('+collections[name]+')';return [name,label]; })).forEach(function (entry) {
       var chip = document.createElement('button'); chip.className = 'ct-chip' + (entry[0] === active ? ' is-active' : ''); chip.type = 'button'; chip.textContent = entry[1];
       if(entry[0]!=='all')chip.title=entry[0];
       chip.setAttribute('aria-pressed', entry[0] === active ? 'true' : 'false');
