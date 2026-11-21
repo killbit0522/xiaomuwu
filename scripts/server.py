@@ -2,6 +2,7 @@ import argparse
 import hashlib
 import json
 import os
+import random
 import secrets
 import sqlite3
 import threading
@@ -1116,6 +1117,32 @@ class LibraryHandler(SimpleHTTPRequestHandler):
                 ]})
             except (OSError, ValueError, TypeError):
                 self.send_json(200, {"version": "empty", "items": []})
+            return
+        if request_path == "/api/recommendations":
+            try:
+                books = self.catalog_document()
+                china_tz = timezone(timedelta(hours=8))
+                now = datetime.now(china_tz)
+                week_start = now.date() - timedelta(days=now.weekday())
+                refresh_at = datetime.combine(week_start + timedelta(days=7), datetime.min.time(), tzinfo=china_tz)
+                candidates = []
+                seen_paths = set()
+                for book in books:
+                    if not isinstance(book, dict) or not book.get("title") or not book.get("searchablePath"):
+                        continue
+                    book_format = str(book.get("format") or Path(str(book["searchablePath"])).suffix.lstrip(".")).lower()
+                    if book_format not in {"txt", "pdf", "docx", "epub", "mobi"}:
+                        continue
+                    path = str(book["searchablePath"])
+                    if path in seen_paths:
+                        continue
+                    seen_paths.add(path)
+                    candidates.append({"title": str(book["title"]), "author": str(book.get("author") or ""), "category": str(book.get("category") or ""), "searchablePath": path, "format": book_format})
+                seed = int(hashlib.sha256(week_start.isoformat().encode("ascii")).hexdigest()[:16], 16)
+                selected = random.Random(seed).sample(candidates, min(5, len(candidates))) if candidates else []
+                self.send_json(200, {"weekStart": week_start.isoformat(), "refreshAt": refresh_at.isoformat(), "items": selected})
+            except (OSError, ValueError, TypeError):
+                self.send_json(200, {"weekStart": "", "refreshAt": "", "items": []})
             return
         if request_path == "/api/shelf":
             info = self.access_info()

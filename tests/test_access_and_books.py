@@ -214,6 +214,33 @@ class BookAccessIntegrationTests(unittest.TestCase):
         self.assertEqual([item["title"] for item in payload["items"]], ["新书乙", "新书甲"])
         self.assertEqual(len(payload["version"]), 16)
 
+    def test_weekly_recommendations_return_five_stable_books_and_refresh_monday_china_time(self):
+        with urllib.request.urlopen(self.base + "/api/recommendations") as response:
+            first = json.loads(response.read())
+        with urllib.request.urlopen(self.base + "/api/recommendations") as response:
+            second = json.loads(response.read())
+        self.assertEqual(len(first["items"]), 5)
+        self.assertEqual(first["items"], second["items"])
+        self.assertEqual(first["refreshAt"], second["refreshAt"])
+        refresh_at = datetime.fromisoformat(first["refreshAt"])
+        self.assertEqual(refresh_at.weekday(), 0)
+        self.assertEqual((refresh_at.hour, refresh_at.minute, refresh_at.second), (0, 0, 0))
+
+        class FixedDateTime(datetime):
+            fixed_now = None
+
+            @classmethod
+            def now(cls, tz=None):
+                return cls.fixed_now.astimezone(tz) if tz else cls.fixed_now
+
+        week_starts = []
+        for instant in (datetime(2026, 11, 22, 15, 59, tzinfo=timezone.utc), datetime(2026, 11, 22, 16, 0, tzinfo=timezone.utc)):
+            FixedDateTime.fixed_now = instant
+            with patch("scripts.server.datetime", FixedDateTime):
+                with urllib.request.urlopen(self.base + "/api/recommendations") as response:
+                    week_starts.append(json.loads(response.read())["weekStart"])
+        self.assertEqual(week_starts, ["2026-11-16", "2026-11-23"])
+
     def test_recent_books_endpoint_returns_only_fifty_newest_items_for_reader(self):
         reader = self.client(); self.unlock(reader, "TEST-READER")
         with reader.open(self.base + "/api/recent") as response:

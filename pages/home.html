@@ -1777,10 +1777,10 @@ h1, h2, h3, h4 {
 
       <section class="gw-section" aria-labelledby="gw-rec-title">
         <div class="gw-sec-head">
-          <h2 id="gw-rec-title" class="gw-sec-title">今日推荐</h2>
-          <span id="gw-rec-count" class="gw-sec-meta">每日轮换</span>
+          <h2 id="gw-rec-title" class="gw-sec-title">本周推荐</h2>
+          <span id="gw-rec-count" class="gw-sec-meta">每周五本</span>
         </div>
-        <p id="gw-feed-lead" class="gw-sec-lead">每位读者每天会看到不同的书目组合。</p>
+        <p id="gw-feed-lead" class="gw-sec-lead">每周一 00:00（北京时间）定时更新，本周书目对所有读者一致。</p>
 
         <div id="recommendation-list" class="gw-rec-grid" data-dom-id="recommendation-list" hidden>
 
@@ -2217,47 +2217,8 @@ h1, h2, h3, h4 {
     if (!visitorValue) { visitorValue = Math.random().toString(36).slice(2); localStorage.setItem(visitorKey, visitorValue); }
     fetch('/api/events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'visit', visitor: visitorValue, detail: '首页' }) }).catch(function () {});
   } catch (error) {}
-  var preferred = [
-    { label: '朋友', keywords: ['朋友（1V3）', '朋友1V3'] },
-    { label: '白鸽', keywords: ['白鸽'] },
-    { label: '成佛', keywords: ['成佛'] },
-    { label: '被阴湿男同盯上以后', keywords: ['被阴湿男同盯上的普通人', '被阴湿男同盯上以后'] },
-    { label: '逃离禅院家', keywords: ['逃离禅院家'] }
-  ];
-
-  function visitorId() {
-    try {
-      var key = 'cabin-visitor-id';
-      var value = localStorage.getItem(key);
-      if (!value) { value = Math.random().toString(36).slice(2); localStorage.setItem(key, value); }
-      return value;
-    } catch (error) { return navigator.userAgent || 'visitor'; }
-  }
-
-  function hash(text) {
-    /* Keep the daily rotation working in older Android WebViews without Math.imul. */
-    var value = 0;
-    for (var i = 0; i < text.length; i++) { value = (value * 31 + text.charCodeAt(i)) >>> 0; }
-    return value >>> 0;
-  }
-
-  function dailySelection(items) {
-    /* Use a fixed UTC+8 clock instead of formatToParts, missing in older phone browsers. */
-    var chinaNow = new Date(new Date().getTime() + 8 * 60 * 60 * 1000);
-    var dayNumber = Math.floor(Date.UTC(chinaNow.getUTCFullYear(), chinaNow.getUTCMonth(), chinaNow.getUTCDate()) / 86400000);
-    /* Advance by a coprime stride so two of three picks rotate each China day.
-       The current day and visitor still produce the same picks on every reload. */
-    var pickCount = Math.min(3, items.length);
-    function gcd(a, b) { while (b) { var remainder = a % b; a = b; b = remainder; } return a; }
-    var stride = Math.max(1, items.length - pickCount);
-    while (stride < items.length && gcd(stride, items.length) !== 1) { stride++; }
-    if (stride >= items.length) { stride = 1; }
-    var offset = (dayNumber * stride + (hash(visitorId()) % items.length)) % items.length;
-    var picked = [];
-    for (var i = 0; i < Math.min(3, items.length); i++) picked.push(items[(offset + i) % items.length]);
-    return picked;
-  }
-
+  var refreshTimer = 0;
+  var currentWeek = '';
   function makeCard(item) {
     var article = document.createElement('article');
     article.className = 'gw-book';
@@ -2269,20 +2230,51 @@ h1, h2, h3, h4 {
     tag.className = 'gw-book-cat'; tag.textContent = '荐'; tag.setAttribute('aria-hidden', 'true');
     thumb.append(image, tag);
     var body = document.createElement('div'); body.className = 'gw-book-body';
-    var title = document.createElement('h3'); title.className = 'gw-book-title'; title.textContent = '《' + item.label + '》';
-    var meta = document.createElement('p'); meta.className = 'gw-book-meta'; meta.textContent = '今日为你选中 · 外部在线查找';
-    var note = document.createElement('p'); note.className = 'gw-book-note'; note.textContent = '输入卡密后前往外部书源阅读';
+    var title = document.createElement('h3'); title.className = 'gw-book-title'; title.textContent = '《' + item.title + '》';
+    var meta = document.createElement('p'); meta.className = 'gw-book-meta'; meta.textContent = (item.author ? item.author + ' · ' : '') + (item.category || '本周推荐');
+    var note = document.createElement('p'); note.className = 'gw-book-note'; note.textContent = '本周精选 · ' + String(item.format || '书籍').toUpperCase();
     var foot = document.createElement('div'); foot.className = 'gw-book-foot';
-    var link = document.createElement('a'); link.className = 'gw-link'; link.href = '/pages/online-search.html?q=' + encodeURIComponent(item.label); link.textContent = '联网查找';
+    var link = document.createElement('a'); link.className = 'gw-link'; link.href = '/pages/search.html?q=' + encodeURIComponent(item.title); link.textContent = '查找这本书';
     foot.appendChild(link); body.append(title, meta, note, foot); article.append(thumb, body);
     return article;
   }
-
-  var selected=dailySelection(preferred);
-  list.replaceChildren();
-  selected.forEach(function(item){list.appendChild(makeCard(item))});
-  list.hidden=false;
-  if(count){count.textContent='今日 '+selected.length+' 本 · 每日轮换'}
+  function scheduleRefresh(refreshAt) {
+    if (refreshTimer) window.clearTimeout(refreshTimer);
+    var wait = Date.parse(refreshAt) - Date.now();
+    if (!isFinite(wait) || wait < 1000) wait = 1000;
+    refreshTimer = window.setTimeout(function () { loadRecommendations(); }, wait);
+  }
+  function loadRecommendations() {
+    fetch('/api/recommendations', { cache: 'no-store' }).then(function (response) {
+      if (!response.ok) throw new Error('推荐接口暂不可用');
+      return response.json();
+    }).then(function (data) {
+      var books = Array.isArray(data.items) ? data.items.slice(0, 5) : [];
+      if (!books.length) throw new Error('当前没有可推荐书目');
+      list.replaceChildren();
+      books.forEach(function (item) { list.appendChild(makeCard(item)); });
+      list.hidden = false;
+      currentWeek = data.weekStart || '';
+      if (count) count.textContent = '本周 ' + books.length + ' 本 · 周一更新';
+      scheduleRefresh(data.refreshAt);
+    }).catch(function () {
+      list.replaceChildren(); list.hidden = true;
+      if (count) count.textContent = '推荐暂时无法加载';
+      if (refreshTimer) window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(loadRecommendations, 60000);
+    });
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && currentWeek) {
+      var localNow = new Date(Date.now() + 8 * 60 * 60 * 1000);
+      var day = localNow.getUTCDay();
+      var monday = new Date(Date.UTC(localNow.getUTCFullYear(), localNow.getUTCMonth(), localNow.getUTCDate() - ((day + 6) % 7)));
+      function twoDigits(value) { return value < 10 ? '0' + value : String(value); }
+      var weekKey = monday.getUTCFullYear() + '-' + twoDigits(monday.getUTCMonth() + 1) + '-' + twoDigits(monday.getUTCDate());
+      if (weekKey !== currentWeek) loadRecommendations();
+    }
+  });
+  loadRecommendations();
 })();
 </script>
 <script src="../site-preferences.js?v=20261109-winter-preview15"></script>
