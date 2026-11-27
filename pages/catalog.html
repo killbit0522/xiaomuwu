@@ -1154,16 +1154,15 @@ h1, h2, h3, h4 {
   function renderFilters() {
     var collections = {};
     books.forEach(function (book) { var parts=collectionOf(book).split(' / ');for(var depth=1;depth<=parts.length;depth++){var key=parts.slice(0,depth).join(' / ');collections[key]=(collections[key]||0)+1} });
-    var uploadRoot='新上传的text',activeParts=active.split(' / '),uploadActive=active===uploadRoot||active.indexOf(uploadRoot+' / ')===0;
-    var visibleCollections=Object.keys(collections).filter(function(name){
-      if(name===uploadRoot)return true;
-      if(name.indexOf(uploadRoot+' / ')!==0)return true;
-      if(!uploadActive)return false;
-      var parts=name.split(' / '),isAncestor=parts.length<=activeParts.length&&parts.every(function(part,index){return activeParts[index]===part});
-      return isAncestor||(parts.length===activeParts.length+1&&activeParts.every(function(part,index){return parts[index]===part}));
-    });
+    var uploadRoot='新上传的text';
+    var visibleCollections=Object.keys(collections);
     filters.replaceChildren();
-    [['all', '全部 ('+books.length+')']].concat(visibleCollections.sort(collectionSort).map(function (name) { var depth=name.split(' / ').length,label=(depth>1?'↳ ':'')+name.split(' / ').pop()+' ('+collections[name]+')';return [name,label]; })).forEach(function (entry) {
+    var sortedCollections=visibleCollections.sort(collectionSort),uploadRootIndex=sortedCollections.indexOf(uploadRoot);
+    if(uploadRootIndex>=0)sortedCollections.unshift(sortedCollections.splice(uploadRootIndex,1)[0]);
+    var entries=sortedCollections.map(function (name) { var depth=name.split(' / ').length,label=(depth>1?'↳ ':'')+name.split(' / ').pop()+' ('+collections[name]+')';return [name,label]; });
+    entries.unshift(['all', '全部 ('+books.length+')']);
+    if(uploadRootIndex>=0)entries.unshift(entries.splice(1,1)[0]);
+    entries.forEach(function (entry) {
       var chip = document.createElement('button'); chip.className = 'ct-chip' + (entry[0] === active ? ' is-active' : ''); chip.type = 'button'; chip.textContent = entry[1];
       if(entry[0]!=='all')chip.title=entry[0];
       chip.setAttribute('aria-pressed', entry[0] === active ? 'true' : 'false');
